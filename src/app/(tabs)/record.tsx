@@ -1,12 +1,11 @@
 import { Text, View, StyleSheet } from "react-native";
 
-// Figma: 스플래시
-// 앱 최초 진입 화면. 로고 노출 후 로그인 여부에 따라
-// (auth)/login 또는 (tabs)/home 으로 라우팅한다.
-export default function Splash() {
+// Figma: 기록
+// "차곡차곡 쌓인 나의 건강 기록" - 지금까지의 분석/일정 히스토리.
+export default function Record() {
   return (
     <View style={styles.container}>
-      <Text>스플래시</Text>
+      <Text>기록</Text>
     </View>
   );
 }

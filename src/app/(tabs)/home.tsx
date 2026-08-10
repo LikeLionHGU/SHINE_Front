@@ -1,12 +1,12 @@
 import { Text, View, StyleSheet } from "react-native";
 
-// Figma: 스플래시
-// 앱 최초 진입 화면. 로고 노출 후 로그인 여부에 따라
-// (auth)/login 또는 (tabs)/home 으로 라우팅한다.
-export default function Splash() {
+// Figma: # 홈
+// "지금 내 몸은 어떻게 변하고 있을까요?" 카드, 검사지 업로드 진입점,
+// 분석 요약, 추천 제품 섹션.
+export default function Home() {
   return (
     <View style={styles.container}>
-      <Text>스플래시</Text>
+      <Text>홈</Text>
     </View>
   );
 }

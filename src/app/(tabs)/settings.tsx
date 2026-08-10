@@ -1,12 +1,12 @@
 import { Text, View, StyleSheet } from "react-native";
 
-// Figma: 스플래시
-// 앱 최초 진입 화면. 로고 노출 후 로그인 여부에 따라
-// (auth)/login 또는 (tabs)/home 으로 라우팅한다.
-export default function Splash() {
+// Figma: 환경설정 (바텀탭 "기타")
+// 프로필(이메일/보호자 이메일), 카메라 촬영 안내, 알림 설정,
+// FAQ, 이용약관, 환경설정 메뉴.
+export default function Settings() {
   return (
     <View style={styles.container}>
-      <Text>스플래시</Text>
+      <Text>환경설정</Text>
     </View>
   );
 }
