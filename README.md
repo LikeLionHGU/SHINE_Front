@@ -25,6 +25,11 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Shared components
+
+- **Bottom tab bar** — [src/components/tab-bar.tsx](src/components/tab-bar.tsx) (`CustomTabBar`). Custom-drawn bottom nav (rounded top corners, shadow, Figma icons/labels) used instead of the OS-native tab bar, wired in via `src/app/(tabs)/_layout.tsx`'s `<Tabs tabBar={...}>`. It's a normal `BottomTabBarProps` component, so any screen inside `(tabs)/` gets it automatically — no per-screen setup needed. Tab icons/labels are defined in the `TAB_ICONS` / `TAB_LABELS` maps at the top of the file, keyed by route filename.
+- **Icons** — [src/components/icons.tsx](src/components/icons.tsx). All hand-matched SVG icons (from Figma) used across auth/settings/tab-bar screens live here as small components (e.g. `UserIcon`, `ChevronRightIcon`, `HomeTabIcon`). Add new ones here rather than inlining `<Svg>` in a screen, so they stay reusable.
+
 ## Get a fresh project
 
 When you're ready, run:

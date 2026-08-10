@@ -1,12 +1,118 @@
-import { Text, View, StyleSheet } from "react-native";
+import { useState } from "react";
+import { Pressable, ScrollView, Text, View, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import {
+  BackChevronIcon,
+  BellIcon,
+  CameraIcon,
+  ChevronRightIcon,
+  DocumentIcon,
+  EditPencilIcon,
+  FaqIcon,
+  GearIcon,
+  ToggleSwitch,
+  XXLogoIcon,
+} from "@/components/icons";
 
-// Figma: 환경설정 (바텀탭 "기타")
-// 프로필(이메일/보호자 이메일), 카메라 촬영 안내, 알림 설정,
-// FAQ, 이용약관, 환경설정 메뉴.
+// Figma: 환경설정 (바텀탭 "마이")
+// 프로필 카드, 개인정보(연락처/이메일), 기본 설정(카메라 동의/알림/FAQ/이용약관/환경설정).
 export default function Settings() {
+  const router = useRouter();
+  const [cameraConsent, setCameraConsent] = useState(true);
+  const [notifications, setNotifications] = useState(true);
+
   return (
     <View style={styles.container}>
-      <Text>환경설정</Text>
+      <LinearGradient
+        colors={["#FFFCFD", "#FFEBF3"]}
+        style={StyleSheet.absoluteFill}
+      />
+      <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} hitSlop={8}>
+            <BackChevronIcon color="#111111" />
+          </Pressable>
+          <Text style={styles.headerTitle}>마이</Text>
+          <View style={styles.headerSpacer} />
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <XXLogoIcon width={46} height={17} />
+
+          <Text style={styles.sectionTitle}>프로필</Text>
+          <Pressable style={[styles.card, styles.profileCard]}>
+            <View style={styles.avatar}>
+              <XXLogoIcon width={21} height={9} color="#FFFCFD" />
+            </View>
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>김더블</Text>
+              <Text style={styles.profileSubtitle}>Double X</Text>
+            </View>
+            <ChevronRightIcon />
+          </Pressable>
+
+          <Text style={styles.sectionTitle}>개인정보</Text>
+          <View style={[styles.card, styles.infoCard]}>
+            <Pressable style={[styles.infoRow, styles.infoRowToDivider]}>
+              <Text style={styles.infoLabel}>연락처 정보</Text>
+              <Text style={styles.infoValueAuto}>+821012345678</Text>
+              <View style={styles.infoSpacer} />
+              <ChevronRightIcon size={20} />
+            </Pressable>
+            <View style={styles.dividerSpaced} />
+            <View style={[styles.infoRow, styles.infoRowSpacing]}>
+              <Text style={styles.infoLabel}>본인 이메일</Text>
+              <Text style={styles.infoValueAuto}>DoubleX@gmail.com</Text>
+              <EditPencilIcon />
+            </View>
+            <View style={[styles.infoRow, styles.infoRowSpacing]}>
+              <Text style={styles.infoLabel}>보호자 이메일</Text>
+              <Text style={styles.infoValueAuto}>XX@gmail.com</Text>
+              <EditPencilIcon />
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>추가 이메일</Text>
+              <View style={styles.addEmailPill} />
+              <EditPencilIcon />
+            </View>
+          </View>
+
+          <Text style={styles.sectionTitle}>기본 설정</Text>
+          <View style={[styles.card, styles.settingsCard]}>
+            <View style={styles.settingsRow}>
+              <CameraIcon size={22} />
+              <Text style={styles.settingsLabel}>카메라 동의 여부</Text>
+              <ToggleSwitch value={cameraConsent} onValueChange={setCameraConsent} />
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.settingsRow}>
+              <BellIcon size={22} />
+              <Text style={styles.settingsLabel}>알림 설정</Text>
+              <ToggleSwitch value={notifications} onValueChange={setNotifications} />
+            </View>
+            <View style={styles.divider} />
+            <Pressable style={styles.settingsRow}>
+              <FaqIcon size={22} />
+              <Text style={styles.settingsLabel}>FAQ</Text>
+              <ChevronRightIcon />
+            </Pressable>
+            <View style={styles.divider} />
+            <Pressable style={styles.settingsRow}>
+              <DocumentIcon size={22} />
+              <Text style={styles.settingsLabel}>이용약관</Text>
+              <ChevronRightIcon />
+            </Pressable>
+            <View style={styles.divider} />
+            <Pressable style={styles.settingsRow}>
+              <GearIcon size={22} />
+              <Text style={styles.settingsLabel}>환경설정</Text>
+              <ChevronRightIcon />
+            </Pressable>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
     </View>
   );
 }
@@ -14,7 +120,133 @@ export default function Settings() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingTop: 10,
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: "center",
+    color: "#000000",
+    fontSize: 16,
+    fontFamily: "Pretendard-Medium",
+  },
+  headerSpacer: {
+    width: 24,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 25,
+    paddingBottom: 32,
+  },
+  sectionTitle: {
+    marginTop: 12,
+    marginBottom: 12,
+    color: "#4C4C4C",
+    fontSize: 18,
+    fontFamily: "Pretendard-SemiBold",
+  },
+  card: {
+    backgroundColor: "#FFFCFD",
+    borderRadius: 14,
+    overflow: "hidden",
+  },
+  profileCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 13,
+    gap: 15,
+  },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#FF0A68",
     alignItems: "center",
     justifyContent: "center",
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 16,
+    fontFamily: "Pretendard-Medium",
+    color: "#111111",
+  },
+  profileSubtitle: {
+    marginTop: 2,
+    fontSize: 16,
+    fontFamily: "Pretendard-Medium",
+    color: "#A0A0A0",
+  },
+  infoCard: {
+    paddingHorizontal: 13,
+    paddingTop: 15,
+    paddingBottom: 9,
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  infoRowToDivider: {
+    marginBottom: 10,
+  },
+  infoRowSpacing: {
+    marginBottom: 9,
+  },
+  infoLabel: {
+    width: 79,
+    fontSize: 12,
+    fontFamily: "Pretendard-Medium",
+    color: "#111111",
+  },
+  infoValueAuto: {
+    fontSize: 14,
+    fontFamily: "Pretendard-Medium",
+    color: "#A0A0A0",
+  },
+  infoSpacer: {
+    flex: 1,
+  },
+  addEmailPill: {
+    flex: 1,
+    height: 20,
+    backgroundColor: "#FFF0F6",
+    borderRadius: 50,
+  },
+  settingsCard: {
+    paddingHorizontal: 20,
+  },
+  settingsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    gap: 20,
+  },
+  settingsLabel: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: "Pretendard-Regular",
+    color: "#111111",
+  },
+  divider: {
+    height: 0.5,
+    marginLeft: 42,
+    marginRight: -20,
+    backgroundColor: "#A0A0A0",
+  },
+  dividerSpaced: {
+    height: 0.5,
+    marginLeft: 87,
+    marginRight: -13,
+    backgroundColor: "#A0A0A0",
+    marginBottom: 9,
   },
 });

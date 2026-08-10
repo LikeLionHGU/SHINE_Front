@@ -1,30 +1,20 @@
-import { NativeTabs } from "expo-router/unstable-native-tabs";
+import { Tabs } from "expo-router";
+import { CustomTabBar } from "@/components/tab-bar";
 
-// 바텀탭 5개: 홈 / 분석 / 캘린더 / 기록 / 기타(환경설정)
-// 아이콘은 임시 SF Symbol이며, 디자인 확정되면 실제 아이콘으로 교체한다.
+// 바텀탭 5개: 홈 / 분석 / 캘린더 / 기록 / 마이(프로필·설정)
+// Figma 디자인의 둥근 상단 모서리 + 그림자 커스텀 탭바를 그대로 구현하기 위해
+// OS 기본 탭바(NativeTabs) 대신 커스텀 tabBar를 사용한다.
 export default function TabsLayout() {
   return (
-    <NativeTabs>
-      <NativeTabs.Trigger name="home">
-        <NativeTabs.Trigger.Icon sf="house.fill" />
-        <NativeTabs.Trigger.Label>홈</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="analysis">
-        <NativeTabs.Trigger.Icon sf="chart.bar.fill" />
-        <NativeTabs.Trigger.Label>분석</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="calendar">
-        <NativeTabs.Trigger.Icon sf="calendar" />
-        <NativeTabs.Trigger.Label>캘린더</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="record">
-        <NativeTabs.Trigger.Icon sf="folder.fill" />
-        <NativeTabs.Trigger.Label>기록</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="settings">
-        <NativeTabs.Trigger.Icon sf="ellipsis.circle.fill" />
-        <NativeTabs.Trigger.Label>기타</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
+    <Tabs
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
+      <Tabs.Screen name="home" />
+      <Tabs.Screen name="analysis" />
+      <Tabs.Screen name="calendar" />
+      <Tabs.Screen name="record" />
+      <Tabs.Screen name="settings" />
+    </Tabs>
   );
 }
