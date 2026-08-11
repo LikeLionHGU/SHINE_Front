@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Stack } from "expo-router";
+import { DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import {
   useFonts,
   ZalandoSansExpanded_700Bold,
@@ -33,10 +33,22 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="(modals)" options={{ presentation: "modal" }} />
-    </Stack>
+    // 화면마다 자체 배경(그라디언트/카드)을 그리므로 네비게이터 기본 배경은 투명으로 둔다.
+    // 그래야 바텀시트 같은 투명 모달 뒤로 이전 화면이 비쳐 보인다.
+    <ThemeProvider value={TRANSPARENT_THEME}>
+      <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="(modals)"
+          options={{ presentation: "transparentModal", animation: "none" }}
+        />
+      </Stack>
+    </ThemeProvider>
   );
 }
+
+const TRANSPARENT_THEME = {
+  ...DefaultTheme,
+  colors: { ...DefaultTheme.colors, background: "transparent" },
+};

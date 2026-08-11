@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { BackChevronIcon, RequiredDot, XXLogoIcon } from "@/components/icons";
+import { savePregnancyInfo } from "@/lib/pregnancy";
 
 const PREGNANCY_WEEKS = Array.from({ length: 42 }, (_, i) => i + 1);
 
@@ -153,7 +154,11 @@ export default function Signup() {
           <Pressable
             style={[styles.submitButton, canSubmit && styles.submitButtonEnabled]}
             disabled={!canSubmit}
-            onPress={() => router.replace("/home")}
+            onPress={async () => {
+              // 캘린더의 주차 표시는 여기서 저장한 값을 기준으로 계산된다.
+              await savePregnancyInfo(pregnancyWeek);
+              router.replace("/home");
+            }}
           >
             <Text style={styles.submitButtonText}>완료</Text>
           </Pressable>
