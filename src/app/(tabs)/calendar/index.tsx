@@ -7,7 +7,6 @@ import { useRouter } from "expo-router";
 import {
   BackChevronIcon,
   ChevronRightIcon,
-  CloseIcon,
   EditOutlineIcon,
   UpTriangleIcon,
 } from "@/components/icons";
@@ -137,14 +136,7 @@ export default function Calendar() {
         <View style={styles.header}>
           <View style={styles.headerSpacer} />
           <Text style={styles.headerTitle}>캘린더</Text>
-          <Pressable
-            hitSlop={8}
-            onPress={() =>
-              router.canGoBack() ? router.back() : router.replace("/home")
-            }
-          >
-            <CloseIcon size={24} />
-          </Pressable>
+          <View style={styles.headerSpacer} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
