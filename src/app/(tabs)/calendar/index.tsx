@@ -3,11 +3,11 @@ import { Modal, Pressable, ScrollView, Text, View, StyleSheet } from "react-nati
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
-import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
   BackChevronIcon,
   ChevronRightIcon,
+  CloseIcon,
   EditOutlineIcon,
   UpTriangleIcon,
 } from "@/components/icons";
@@ -137,8 +137,13 @@ export default function Calendar() {
         <View style={styles.header}>
           <View style={styles.headerSpacer} />
           <Text style={styles.headerTitle}>캘린더</Text>
-          <Pressable hitSlop={8}>
-            <Ionicons name="search" size={20} color="#111111" />
+          <Pressable
+            hitSlop={8}
+            onPress={() =>
+              router.canGoBack() ? router.back() : router.replace("/home")
+            }
+          >
+            <CloseIcon size={24} />
           </Pressable>
         </View>
 
@@ -200,16 +205,25 @@ export default function Calendar() {
                       key={i}
                       style={styles.dayCell}
                       disabled={!cell}
-                      // 날짜를 누르면 그 날의 일정 추가 시트를 연다.
-                      onPress={() =>
-                        cell &&
+                      // 진료 기록이 있는 날은 상세 화면으로, 빈 날은 일정 추가 시트로.
+                      onPress={() => {
+                        if (!cell) return;
+                        const month = pad2(monthCursor.getMonth() + 1);
+                        const day = pad2(cell.day);
+                        if (cell.dot || cell.appointment) {
+                          router.push({
+                            pathname: "/calendar/[date]",
+                            params: {
+                              date: `${monthCursor.getFullYear()}-${month}-${day}`,
+                            },
+                          });
+                          return;
+                        }
                         router.push({
                           pathname: "/calendar-time",
-                          params: {
-                            date: `${pad2(monthCursor.getMonth() + 1)}.${pad2(cell.day)}`,
-                          },
-                        })
-                      }
+                          params: { date: `${month}.${day}` },
+                        });
+                      }}
                     >
                       {cell && (
                         <>
