@@ -44,7 +44,7 @@ export default function Settings() {
           <Text style={styles.sectionTitle}>프로필</Text>
           <Pressable style={[styles.card, styles.profileCard]}>
             <View style={styles.avatar}>
-              <XXLogoIcon width={21} height={9} color="#FFFCFD" />
+              <Text style={styles.avatarText}>XX</Text>
             </View>
             <View style={styles.profileInfo}>
               <Text style={styles.profileName}>김더블</Text>
@@ -166,10 +166,17 @@ const styles = StyleSheet.create({
   avatar: {
     width: 60,
     height: 60,
-    borderRadius: 30,
+    borderRadius: 42,
     backgroundColor: "#FF0A68",
     alignItems: "center",
     justifyContent: "center",
+  },
+  avatarText: {
+    textAlign: "center",
+    color: "#FFFCFD",
+    fontSize: 30,
+    lineHeight: 42,
+    fontFamily: "ZalandoSansExpanded_900Black",
   },
   profileInfo: {
     flex: 1,

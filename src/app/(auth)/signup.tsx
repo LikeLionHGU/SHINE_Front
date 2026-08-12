@@ -1,7 +1,5 @@
 import { useState } from "react";
 import {
-  FlatList,
-  Modal,
   Pressable,
   ScrollView,
   Text,
@@ -12,7 +10,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { BackChevronIcon, RequiredDot, XXLogoIcon } from "@/components/icons";
+import {
+  BackChevronIcon,
+  ChevronDownIcon,
+  RequiredDot,
+  XXLogoIcon,
+} from "@/components/icons";
 import { savePregnancyInfo } from "@/lib/pregnancy";
 
 const PREGNANCY_WEEKS = Array.from({ length: 42 }, (_, i) => i + 1);
@@ -91,16 +94,55 @@ export default function Signup() {
           />
 
           <FieldLabel text="임신 정보" required />
-          <View style={styles.fieldSpacingTight}>
+          {/* 필드 바로 아래로 펼쳐지는 드롭다운 */}
+          <View style={[styles.fieldSpacingTight, styles.weekSelectWrap]}>
             <Pressable
               style={styles.weekSelect}
-              onPress={() => setWeekPickerOpen(true)}
+              onPress={() => setWeekPickerOpen((open) => !open)}
             >
               <Text style={styles.weekSelectLabel} numberOfLines={1}>
                 임신 주차 선택
               </Text>
-              <Text style={styles.weekSelectValue}>{pregnancyWeek}</Text>
+              <View style={styles.weekSelectValueRow}>
+                <Text style={styles.weekSelectValue}>{pregnancyWeek}</Text>
+                <View style={weekPickerOpen && styles.chevronFlipped}>
+                  <ChevronDownIcon size={16} />
+                </View>
+              </View>
             </Pressable>
+
+            {weekPickerOpen && (
+              <View style={styles.weekDropdown}>
+                <ScrollView
+                  style={styles.weekDropdownList}
+                  nestedScrollEnabled
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {PREGNANCY_WEEKS.map((week) => {
+                    const selected = week === pregnancyWeek;
+                    return (
+                      <Pressable
+                        key={week}
+                        style={styles.weekOption}
+                        onPress={() => {
+                          setPregnancyWeek(week);
+                          setWeekPickerOpen(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.weekOptionText,
+                            selected && styles.weekOptionTextSelected,
+                          ]}
+                        >
+                          {week}주차
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
           </View>
 
           <FieldLabel text="휴대폰 번호" required />
@@ -164,49 +206,6 @@ export default function Signup() {
           </Pressable>
         </View>
       </SafeAreaView>
-
-      <Modal
-        visible={weekPickerOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setWeekPickerOpen(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setWeekPickerOpen(false)}
-          />
-          <SafeAreaView style={styles.modalSheet} edges={["bottom"]}>
-            <Text style={styles.modalTitle}>임신 주차 선택</Text>
-            <FlatList
-              data={PREGNANCY_WEEKS}
-              keyExtractor={(week) => String(week)}
-              style={styles.modalList}
-              renderItem={({ item: week }) => {
-                const selected = week === pregnancyWeek;
-                return (
-                  <Pressable
-                    style={styles.weekOption}
-                    onPress={() => {
-                      setPregnancyWeek(week);
-                      setWeekPickerOpen(false);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.weekOptionText,
-                        selected && styles.weekOptionTextSelected,
-                      ]}
-                    >
-                      {week}주차
-                    </Text>
-                  </Pressable>
-                );
-              }}
-            />
-          </SafeAreaView>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -265,6 +264,10 @@ const styles = StyleSheet.create({
   fieldSpacingTight: {
     marginBottom: 14,
   },
+  weekSelectWrap: {
+    position: "relative",
+    zIndex: 20,
+  },
   weekSelect: {
     width: 117,
     height: 60,
@@ -272,17 +275,25 @@ const styles = StyleSheet.create({
     borderWidth: 1.4,
     borderColor: "#A0A0A0",
     backgroundColor: "#FFFCFD",
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     paddingTop: 10,
+  },
+  weekSelectValueRow: {
+    marginTop: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  chevronFlipped: {
+    transform: [{ rotate: "180deg" }],
   },
   weekSelectLabel: {
     color: "#707070",
-    fontSize: 11,
+    fontSize: 14,
     fontFamily: "Pretendard-Medium",
-    lineHeight: 14,
+    lineHeight: 18.2,
   },
   weekSelectValue: {
-    marginTop: 4,
     color: "#111111",
     fontSize: 14,
     fontFamily: "Pretendard-Medium",
@@ -351,33 +362,26 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     textAlign: "center",
   },
-  modalContainer: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-  },
-  modalSheet: {
-    maxHeight: "60%",
+  // 드롭다운은 필드 아래에 겹쳐 떠야 하므로 다른 입력칸보다 위에 그린다.
+  weekDropdown: {
+    position: "absolute",
+    top: 64,
+    left: 0,
+    width: 117,
+    maxHeight: 220,
     backgroundColor: "#FFFCFD",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 16,
+    borderRadius: 12,
+    borderWidth: 1.4,
+    borderColor: "#A0A0A0",
+    overflow: "hidden",
+    zIndex: 20,
+    elevation: 6,
   },
-  modalTitle: {
-    textAlign: "center",
-    color: "#111111",
-    fontSize: 16,
-    fontFamily: "Pretendard-SemiBold",
-    marginBottom: 8,
-  },
-  modalList: {
-    paddingHorizontal: 16,
+  weekDropdownList: {
+    paddingHorizontal: 12,
   },
   weekOption: {
-    height: 48,
+    height: 40,
     justifyContent: "center",
     borderBottomWidth: 1,
     borderBottomColor: "#F5E9EE",

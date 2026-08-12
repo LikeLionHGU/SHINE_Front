@@ -1,9 +1,3 @@
-import { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, Text, View, StyleSheet } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
-import { Image } from "expo-image";
-import { useRouter } from "expo-router";
 import {
   BackChevronIcon,
   ChevronRightIcon,
@@ -14,11 +8,24 @@ import {
   hasSeenShareTip,
   loadPregnancyInfo,
   markShareTipSeen,
-  pregnancyWeekOf,
   PREGNANCY_LAST_WEEK,
+  pregnancyWeekOf,
   startOfWeek,
   type PregnancyInfo,
 } from "@/lib/pregnancy";
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -48,8 +55,18 @@ const DEMO_QUESTIONS = [
 ];
 
 const UPCOMING_VISITS = [
-  { date: "26.08.16", place: "OO 산부인과", time: "오후 4:30", questions: DEMO_QUESTIONS },
-  { date: "26.08.24", place: "OO 산부인과", time: "오후 4:30", questions: DEMO_QUESTIONS },
+  {
+    date: "26.08.16",
+    place: "OO 산부인과",
+    time: "오후 4:30",
+    questions: DEMO_QUESTIONS,
+  },
+  {
+    date: "26.08.24",
+    place: "OO 산부인과",
+    time: "오후 4:30",
+    questions: DEMO_QUESTIONS,
+  },
 ];
 
 /** 산전 검사지 업로드 완료 / 검사 일정만 잡힌 상태 */
@@ -66,7 +83,7 @@ type WeekRow = { cells: DayCell[]; pregnancyWeek: number | null };
 function buildMonthWeeks(
   year: number,
   month: number,
-  pregnancy: PregnancyInfo | null
+  pregnancy: PregnancyInfo | null,
 ): WeekRow[] {
   const isDemoMonth = year === DEMO_YEAR && month === DEMO_MONTH;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -98,7 +115,9 @@ function buildMonthWeeks(
 }
 
 export default function Calendar() {
-  const [monthCursor, setMonthCursor] = useState(new Date(DEMO_YEAR, DEMO_MONTH, 1));
+  const [monthCursor, setMonthCursor] = useState(
+    new Date(DEMO_YEAR, DEMO_MONTH, 1),
+  );
   const [calloutVisible, setCalloutVisible] = useState(false);
   const [questionsOpen, setQuestionsOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -119,11 +138,18 @@ export default function Calendar() {
   }, []);
 
   const weeks = useMemo(
-    () => buildMonthWeeks(monthCursor.getFullYear(), monthCursor.getMonth(), pregnancy),
-    [monthCursor, pregnancy]
+    () =>
+      buildMonthWeeks(
+        monthCursor.getFullYear(),
+        monthCursor.getMonth(),
+        pregnancy,
+      ),
+    [monthCursor, pregnancy],
   );
   const goToMonth = (delta: number) => {
-    setMonthCursor((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
+    setMonthCursor(
+      (prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1),
+    );
   };
 
   return (
@@ -144,7 +170,9 @@ export default function Calendar() {
           <View style={styles.calloutRow}>
             {calloutVisible && (
               <View style={styles.callout}>
-                <Text style={styles.calloutText}>보호자에게 메일이 보내져요</Text>
+                <Text style={styles.calloutText}>
+                  보호자에게 메일이 보내져요
+                </Text>
                 {/* 꼬리는 아래 공유하기 버튼 중앙을 가리킨다. */}
                 <View style={styles.calloutTail} />
               </View>
@@ -158,7 +186,8 @@ export default function Calendar() {
                 <BackChevronIcon size={24} color="#A0A0A0" />
               </Pressable>
               <Text style={styles.monthLabel}>
-                {monthCursor.getFullYear()}. {String(monthCursor.getMonth() + 1).padStart(2, "0")}
+                {monthCursor.getFullYear()}.{" "}
+                {String(monthCursor.getMonth() + 1).padStart(2, "0")}
               </Text>
               <Pressable onPress={() => goToMonth(1)} hitSlop={8}>
                 <ChevronRightIcon size={24} color="#A0A0A0" />
@@ -189,7 +218,9 @@ export default function Calendar() {
                 {week.pregnancyWeek !== null &&
                   week.pregnancyWeek >= 1 &&
                   week.pregnancyWeek <= PREGNANCY_LAST_WEEK && (
-                    <Text style={styles.weekNumberLabel}>{week.pregnancyWeek}주차</Text>
+                    <Text style={styles.weekNumberLabel}>
+                      {week.pregnancyWeek}주차
+                    </Text>
                   )}
                 <View style={styles.weekCells}>
                   {week.cells.map((cell, i) => (
@@ -220,10 +251,17 @@ export default function Calendar() {
                       {cell && (
                         <>
                           <Text style={styles.dayText}>{cell.day}</Text>
-                          {cell.dot === "uploaded" && <View style={styles.dayDotFilled} />}
-                          {cell.dot === "scheduled" && <View style={styles.dayDotHollow} />}
+                          {cell.dot === "uploaded" && (
+                            <View style={styles.dayDotFilled} />
+                          )}
+                          {cell.dot === "scheduled" && (
+                            <View style={styles.dayDotHollow} />
+                          )}
                           {cell.appointment && (
-                            <Text style={styles.dayAppointment} numberOfLines={1}>
+                            <Text
+                              style={styles.dayAppointment}
+                              numberOfLines={1}
+                            >
                               {cell.appointment}
                             </Text>
                           )}
@@ -318,7 +356,9 @@ export default function Calendar() {
         <View style={styles.dialogBackdrop}>
           <View style={styles.dialog}>
             <Text style={styles.dialogTitle}>공유하기</Text>
-            <Text style={styles.dialogQuestion}>아래 메일로 공유하시겠습니까?</Text>
+            <Text style={styles.dialogQuestion}>
+              아래 메일로 공유하시겠습니까?
+            </Text>
             <Text style={styles.dialogEmail}>{GUARDIAN_EMAIL}</Text>
             <Text style={styles.dialogNote}>
               일정공유 및 분석결과 리포트가 보내집니다.
@@ -430,9 +470,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
+  // 텍스트 영역 44x20 + 좌우 10 / 상하 4 패딩 (디자인 기준)
   shareButtonText: {
+    width: 44,
+    height: 20,
+    textAlign: "center",
+    textAlignVertical: "center",
     color: "#FFFCFD",
     fontSize: 12,
+    lineHeight: 20,
     fontFamily: "Pretendard-SemiBold",
   },
   calendarCard: {
@@ -569,7 +615,7 @@ const styles = StyleSheet.create({
   },
   visitMarkerCol: {
     position: "absolute",
-    left: "94.20%",
+    left: "90%",
     width: 14,
     top: 0,
     bottom: 0,

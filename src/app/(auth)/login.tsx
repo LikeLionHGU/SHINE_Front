@@ -3,7 +3,12 @@ import { Pressable, Text, TextInput, View, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { CheckboxCheckedIcon, LockIcon, UserIcon } from "@/components/icons";
+import {
+  CheckboxCheckedIcon,
+  CheckboxUncheckedIcon,
+  LockIcon,
+  UserIcon,
+} from "@/components/icons";
 
 // Figma: 로그인/회원가입
 // 아이디/비밀번호 입력, 자동 로그인 체크, 회원가입 진입 링크.
@@ -54,7 +59,7 @@ export default function Login() {
                 {autoLogin ? (
                   <CheckboxCheckedIcon size={20} />
                 ) : (
-                  <View style={[styles.checkboxInner, styles.checkboxUnchecked]} />
+                  <CheckboxUncheckedIcon size={20} />
                 )}
               </View>
               <Text
@@ -163,15 +168,6 @@ const styles = StyleSheet.create({
     height: 24,
     alignItems: "center",
     justifyContent: "center",
-  },
-  checkboxInner: {
-    width: 18,
-    height: 18,
-    borderWidth: 1.4,
-  },
-  checkboxUnchecked: {
-    backgroundColor: "#8DAC9E",
-    borderColor: "#FFFDF9",
   },
   autoLoginText: {
     fontSize: 14,
