@@ -1,0 +1,17 @@
+name: Deploy team web preview
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  cancel_in_progress: true
+  group: ${{ workflow.filename }}-${{ github.ref }}
+
+jobs:
+  deploy_web:
+    name: Deploy web to team alias
+    type: deploy
+    params:
+      alias: team
