@@ -41,7 +41,9 @@ export default function CalendarDay() {
     setQuestions((prev) => prev.map((q, i) => (i === index ? value : q)));
   };
 
-  const canAddMore = questions[questions.length - 1].trim().length > 0;
+  const hasAddedQuestion = questions.some((question) => question.trim().length > 0);
+  const canAddMore =
+    hasAddedQuestion && questions[questions.length - 1].trim().length > 0;
 
   return (
     <View style={styles.container}>
@@ -192,6 +194,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     backgroundColor: "#FFFCFD",
     borderRadius: 14,
+    boxShadow: "0 3px 3px rgba(0, 0, 0, 0.06)",
   },
   questionCardTitle: {
     marginLeft: 4,
