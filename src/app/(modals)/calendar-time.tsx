@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ToggleSwitch } from "@/components/icons";
+import { saveCalendarVisit } from "@/lib/calendar-visits";
 
 /** 휠에는 AM/PM으로 표기하고, 화면 상단 요약에는 오전/오후로 보여준다. */
 const MERIDIEMS = ["AM", "PM"];
@@ -33,8 +34,23 @@ const PICKER_SLIDE_DISTANCE = 320;
 /** 시트가 차지하는 화면 비율. 열릴 때 이 높이만큼 아래에서 올라온다. */
 const SHEET_HEIGHT_RATIO = 0.73;
 
+/** 시간/산부인과 한 줄 높이. 시간 피커를 그 줄 바로 아래에 붙일 때 쓴다. */
+const OPTION_ROW_HEIGHT = 41;
+
 function pad(value: number) {
   return String(value).padStart(2, "0");
+}
+
+/** "YY.MM.DD" → Date. 형식이 어긋나면 오늘 날짜로 둔다. */
+function parseVisitDate(value: string) {
+  const parts = value.split(".").map(Number);
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return new Date();
+  const [year, month, day] = parts;
+  return new Date(2000 + year, month - 1, day);
+}
+
+function formatVisitDate(value: Date) {
+  return `${pad(value.getFullYear() % 100)}.${pad(value.getMonth() + 1)}.${pad(value.getDate())}`;
 }
 
 /** 한 칸씩 스냅되는 세로 휠. 가운데 칸이 선택 값이 된다. */
@@ -104,16 +120,30 @@ function WheelColumn({
 // 일정 추가/수정 바텀시트. 제목·장소·시간·병원 여부를 입력한다.
 export default function CalendarTimePicker() {
   const router = useRouter();
-  const { date } = useLocalSearchParams<{ date?: string }>();
+  const params = useLocalSearchParams<{ date?: string; mode?: string; visitId?: string; title?: string; place?: string; meridiem?: string; hour?: string; minute?: string; isHospital?: string; questions?: string }>();
+  // 날짜 칸을 눌러 들어오면 그 날짜가 채워지고,
+  // "일정 추가" 버튼으로 들어오면 비어 있는 상태에서 직접 고른다.
+  const [selectedDate, setSelectedDate] = useState<Date | null>(() =>
+    params.date ? parseVisitDate(params.date) : null,
+  );
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const base = params.date ? parseVisitDate(params.date) : new Date();
+    return new Date(base.getFullYear(), base.getMonth(), 1);
+  });
+  const date = selectedDate ? formatVisitDate(selectedDate) : "";
 
-  const [title, setTitle] = useState("");
-  const [place, setPlace] = useState("");
-  const [isHospital, setIsHospital] = useState(true);
+  const [title, setTitle] = useState(params.title ?? "");
+  const [place, setPlace] = useState(params.place ?? "");
+  const [isHospital, setIsHospital] = useState(params.isHospital !== "false");
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  // 시간 피커는 "시간" 행 바로 아래에 붙어 시트 바닥까지 채운다.
+  const [optionCardY, setOptionCardY] = useState<number | null>(null);
+  const today = useMemo(() => new Date(), []);
 
-  const [meridiemIndex, setMeridiemIndex] = useState(1);
-  const [hourIndex, setHourIndex] = useState(2);
-  const [minuteIndex, setMinuteIndex] = useState(0);
+  const [meridiemIndex, setMeridiemIndex] = useState(params.meridiem === "AM" ? 0 : 1);
+  const [hourIndex, setHourIndex] = useState(Math.max(0, HOURS.indexOf(Number(params.hour ?? 3))));
+  const [minuteIndex, setMinuteIndex] = useState(Math.max(0, MINUTES.indexOf(Number(params.minute ?? 0))));
 
   const timeLabel = useMemo(
     () =>
@@ -127,7 +157,7 @@ export default function CalendarTimePicker() {
   const [pickerMounted, setPickerMounted] = useState(false);
 
   useEffect(() => {
-    if (pickerOpen) {
+    if (pickerOpen || datePickerOpen) {
       setPickerMounted(true);
       Animated.timing(slide, {
         toValue: 1,
@@ -145,7 +175,18 @@ export default function CalendarTimePicker() {
     }).start(({ finished }) => {
       if (finished) setPickerMounted(false);
     });
-  }, [pickerOpen, slide]);
+  }, [datePickerOpen, pickerOpen, slide]);
+
+  const calendarCells = useMemo(() => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const days = new Date(year, month + 1, 0).getDate();
+    return [
+      ...Array.from({ length: firstDay }, () => null),
+      ...Array.from({ length: days }, (_, index) => index + 1),
+    ];
+  }, [calendarMonth]);
 
   // 시트는 열릴 때 아래에서 올라오고, 배경은 부드럽게 어두워진다.
   const enter = useRef(new Animated.Value(0)).current;
@@ -172,6 +213,29 @@ export default function CalendarTimePicker() {
     });
   };
 
+  const saveAndClose = async () => {
+    // 날짜 없이 저장하면 어디에도 안 보이므로, 먼저 날짜를 고르게 한다.
+    if (!selectedDate) {
+      setPickerOpen(false);
+      setDatePickerOpen(true);
+      return;
+    }
+    let questions: string[] = [];
+    try { questions = params.questions ? JSON.parse(params.questions) : []; } catch { questions = []; }
+    await saveCalendarVisit({
+      id: params.visitId ?? `visit-${Date.now()}`,
+      date,
+      title,
+      place,
+      meridiem: meridiemIndex === 0 ? "AM" : "PM",
+      hour: HOURS[hourIndex],
+      minute: MINUTES[minuteIndex],
+      isHospital,
+      questions,
+    });
+    closeSheet();
+  };
+
   return (
     <View style={styles.root}>
       <Animated.View style={[styles.backdrop, { opacity: enter }]} />
@@ -190,16 +254,27 @@ export default function CalendarTimePicker() {
           },
         ]}
       >
-        <SafeAreaView edges={["bottom"]}>
+        <SafeAreaView edges={["bottom"]} style={styles.sheetContent}>
           <View style={styles.header}>
             <Pressable onPress={closeSheet} hitSlop={8}>
               <Text style={styles.cancelText}>취소</Text>
             </Pressable>
-            <Text style={styles.dateTitle}>{date ?? "08.26"}</Text>
-            <Pressable onPress={closeSheet} hitSlop={8}>
-              <Text style={styles.addText}>추가</Text>
+            <Text style={styles.dateTitle}>{params.mode === "edit" ? "일정 수정" : "일정 추가"}</Text>
+            <Pressable onPress={saveAndClose} hitSlop={8}>
+              <Text style={styles.addText}>완료</Text>
             </Pressable>
           </View>
+
+        <Pressable
+          style={styles.dateField}
+          onPress={() => {
+            setPickerOpen(false);
+            setDatePickerOpen((open) => !open);
+          }}
+        >
+          <Text style={styles.optionLabel}>날짜</Text>
+          <View style={styles.dateChip}><Text style={styles.timeChipText}>{date}</Text></View>
+        </Pressable>
 
         <View style={styles.fieldGroup}>
           <TextInput
@@ -219,12 +294,18 @@ export default function CalendarTimePicker() {
           />
         </View>
 
-        <View style={styles.optionCard}>
+        <View
+          style={styles.optionCard}
+          onLayout={(e) => setOptionCardY(e.nativeEvent.layout.y)}
+        >
           <View style={styles.optionRow}>
             <Text style={styles.optionLabel}>시간</Text>
             <Pressable
               style={styles.timeChip}
-              onPress={() => setPickerOpen((open) => !open)}
+              onPress={() => {
+                setDatePickerOpen(false);
+                setPickerOpen((open) => !open);
+              }}
             >
               <Text style={styles.timeChipText}>{timeLabel}</Text>
             </Pressable>
@@ -236,10 +317,86 @@ export default function CalendarTimePicker() {
           </View>
         </View>
 
+        {/* 피커는 아래쪽 입력들을 덮으므로, 가려진 곳을 누르면 닫히게 한다. */}
         {pickerMounted && (
+          <Pressable
+            style={styles.pickerDismissArea}
+            onPress={() => {
+              setPickerOpen(false);
+              setDatePickerOpen(false);
+            }}
+          />
+        )}
+
+        {pickerMounted && datePickerOpen && (
+          <Animated.View
+            style={[
+              styles.datePickerCard,
+              {
+                opacity: slide,
+                transform: [{ translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [PICKER_SLIDE_DISTANCE, 0] }) }],
+              },
+            ]}
+          >
+            <View style={styles.calendarPickerHeader}>
+              <Text style={styles.calendarPickerTitle}>
+                {calendarMonth.getFullYear()}년 {calendarMonth.getMonth() + 1}월
+              </Text>
+              <View style={styles.calendarPickerActions}>
+                <Pressable hitSlop={8} onPress={() => setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}>
+                  <Text style={styles.calendarPickerArrow}>‹</Text>
+                </Pressable>
+                <Pressable hitSlop={8} onPress={() => setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}>
+                  <Text style={styles.calendarPickerArrow}>›</Text>
+                </Pressable>
+              </View>
+            </View>
+            <View style={styles.calendarPickerGrid}>
+              {calendarCells.map((day, index) => {
+                const selected =
+                  selectedDate != null &&
+                  day === selectedDate.getDate() &&
+                  calendarMonth.getMonth() === selectedDate.getMonth() &&
+                  calendarMonth.getFullYear() === selectedDate.getFullYear();
+                // 오늘은 키컬러로, 선택하려는 날짜는 원으로 표시한다.
+                const isToday =
+                  day === today.getDate() &&
+                  calendarMonth.getMonth() === today.getMonth() &&
+                  calendarMonth.getFullYear() === today.getFullYear();
+                return (
+                  <Pressable
+                    key={`${index}-${day ?? "empty"}`}
+                    disabled={day == null}
+                    style={[styles.calendarPickerDay, selected && styles.calendarPickerDaySelected]}
+                    onPress={() => {
+                      if (day == null) return;
+                      setSelectedDate(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day));
+                      setDatePickerOpen(false);
+                    }}
+                  >
+                    {day != null && (
+                      <Text
+                        style={[
+                          styles.calendarPickerDayText,
+                          isToday && styles.calendarPickerDayTextToday,
+                          selected && styles.calendarPickerDayTextSelected,
+                        ]}
+                      >
+                        {day}
+                      </Text>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Animated.View>
+        )}
+
+        {pickerMounted && pickerOpen && (
           <Animated.View
             style={[
               styles.pickerCard,
+              optionCardY != null && { top: optionCardY + OPTION_ROW_HEIGHT },
               {
                 opacity: slide,
                 transform: [
@@ -318,6 +475,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  sheetContent: {
+    flex: 1,
+  },
   cancelText: {
     color: "#707070",
     fontSize: 16,
@@ -332,13 +492,32 @@ const styles = StyleSheet.create({
   },
   dateTitle: {
     color: "#111111",
-    fontSize: 24,
-    lineHeight: 32,
+    fontSize: 16,
+    lineHeight: 26,
     fontFamily: "Pretendard-SemiBold",
+  },
+  dateField: {
+    height: 41,
+    marginTop: 20,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    backgroundColor: "#FFF0F6",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  dateChip: {
+    minWidth: 80,
+    height: 29,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    backgroundColor: "#FFFCFD",
+    alignItems: "center",
+    justifyContent: "center",
   },
   // 제목/장소는 위아래로 붙은 한 덩어리 (사이에만 구분선)
   fieldGroup: {
-    marginTop: 20,
+    marginTop: 14,
     borderRadius: 8,
     overflow: "hidden",
   },
@@ -397,18 +576,90 @@ const styles = StyleSheet.create({
     fontFamily: "Pretendard-Medium",
   },
   // 디자인 기준 카드 325x340: 제목 y=28, 시간 y=87, 휠 y=136 (높이 195.67)
+  pickerDismissArea: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  // "시간" 행 바로 아래(top은 실제 위치로 계산)부터 시트 바닥까지 채운다.
   pickerCard: {
-    marginTop: 16,
+    position: "absolute",
+    left: -34,
+    right: -34,
+    bottom: 0,
     paddingTop: 28,
-    paddingBottom: 8,
     alignItems: "center",
     backgroundColor: "#FFFCFD",
-    borderRadius: 12,
-    shadowColor: "#000000",
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 0 },
     elevation: 3,
+  },
+  datePickerCard: {
+    position: "absolute",
+    left: -34,
+    right: -34,
+    bottom: 0,
+    height: 344,
+    paddingHorizontal: 35,
+    paddingTop: 25,
+    backgroundColor: "#FFFCFD",
+    borderTopLeftRadius: 13,
+    borderTopRightRadius: 19,
+    boxShadow: "0 0 2px rgba(0, 0, 0, 0.20)",
+  },
+  calendarPickerHeader: {
+    height: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  calendarPickerTitle: {
+    color: "#111111",
+    fontSize: 15.4,
+    lineHeight: 22,
+    fontFamily: "Pretendard-SemiBold",
+  },
+  calendarPickerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 24,
+  },
+  calendarPickerArrow: {
+    color: "#A0A0A0",
+    fontSize: 28,
+    lineHeight: 28,
+    fontFamily: "Pretendard-Medium",
+  },
+  calendarPickerGrid: {
+    marginTop: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  calendarPickerDay: {
+    width: "14.2857%",
+    height: 46.16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 24,
+  },
+  calendarPickerDaySelected: {
+    backgroundColor: "#FFF0F6",
+  },
+  calendarPickerDayText: {
+    color: "#111111",
+    fontSize: 18.1,
+    lineHeight: 22,
+    fontFamily: "Pretendard-Regular",
+  },
+  // 오늘 날짜는 선택 여부와 상관없이 키컬러로 구분한다.
+  calendarPickerDayTextToday: {
+    color: "#FA0C56",
+    fontFamily: "Pretendard-SemiBold",
+  },
+  calendarPickerDayTextSelected: {
+    color: "#FF0A68",
+    fontSize: 21.7,
+    lineHeight: 26,
   },
   pickerTitle: {
     height: 26,

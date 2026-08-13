@@ -15,8 +15,9 @@ import {
 } from "@/lib/pregnancy";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { DEFAULT_CALENDAR_VISITS, formatVisitTime, loadCalendarVisits, type CalendarVisit } from "@/lib/calendar-visits";
 import {
   Modal,
   Pressable,
@@ -49,26 +50,6 @@ function pad2(value: number) {
   return String(value).padStart(2, "0");
 }
 
-const DEMO_QUESTIONS = [
-  "Ex) 당 수치가 올라가고 있는데 괜찮나요?",
-  "Ex) 비타민 D 수치가 떨어지고 있는데 괜찮나요?",
-];
-
-const UPCOMING_VISITS = [
-  {
-    date: "26.08.16",
-    place: "OO 산부인과",
-    time: "오후 4:30",
-    questions: DEMO_QUESTIONS,
-  },
-  {
-    date: "26.08.24",
-    place: "OO 산부인과",
-    time: "오후 4:30",
-    questions: DEMO_QUESTIONS,
-  },
-];
-
 /** 산전 검사지 업로드 완료 / 검사 일정만 잡힌 상태 */
 type DayMark = "uploaded" | "scheduled";
 
@@ -84,17 +65,30 @@ function buildMonthWeeks(
   year: number,
   month: number,
   pregnancy: PregnancyInfo | null,
+  visits: CalendarVisit[],
 ): WeekRow[] {
   const isDemoMonth = year === DEMO_YEAR && month === DEMO_MONTH;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstWeekday = new Date(year, month, 1).getDay();
+
+  // 등록한 일정이 있는 날은 달력에도 표시한다.
+  const monthPrefix = `${pad2(year % 100)}.${pad2(month + 1)}.`;
+  const visitDays = new Set(
+    visits
+      .filter((visit) => visit.date.startsWith(monthPrefix))
+      .map((visit) => Number(visit.date.slice(monthPrefix.length))),
+  );
 
   const cells: DayCell[] = [];
   for (let i = 0; i < firstWeekday; i++) cells.push(null);
   for (let day = 1; day <= daysInMonth; day++) {
     cells.push({
       day,
-      dot: isDemoMonth ? DEMO_DOTS[day] : undefined,
+      dot: isDemoMonth
+        ? (DEMO_DOTS[day] ?? (visitDays.has(day) ? "scheduled" : undefined))
+        : visitDays.has(day)
+          ? "scheduled"
+          : undefined,
       appointment: isDemoMonth ? DEMO_APPOINTMENTS[day] : undefined,
     });
   }
@@ -123,6 +117,13 @@ export default function Calendar() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const router = useRouter();
   const [pregnancy, setPregnancy] = useState<PregnancyInfo | null>(null);
+  const [upcomingVisits, setUpcomingVisits] = useState<CalendarVisit[]>(DEFAULT_CALENDAR_VISITS);
+
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    loadCalendarVisits().then((visits) => { if (active) setUpcomingVisits(visits); });
+    return () => { active = false; };
+  }, []));
 
   useEffect(() => {
     loadPregnancyInfo().then(setPregnancy);
@@ -143,8 +144,9 @@ export default function Calendar() {
         monthCursor.getFullYear(),
         monthCursor.getMonth(),
         pregnancy,
+        upcomingVisits,
       ),
-    [monthCursor, pregnancy],
+    [monthCursor, pregnancy, upcomingVisits],
   );
   const goToMonth = (delta: number) => {
     setMonthCursor(
@@ -198,7 +200,9 @@ export default function Calendar() {
                 style={styles.addScheduleButton}
                 onPress={() => router.push("/calendar-time")}
               >
-                <Text style={styles.addScheduleButtonText}>일정 추가</Text>
+                <Text numberOfLines={1} style={styles.addScheduleButtonText}>
+                  일정 추가
+                </Text>
               </Pressable>
               <Pressable
                 style={styles.shareButton}
@@ -250,9 +254,11 @@ export default function Calendar() {
                           });
                           return;
                         }
+                        // 시트는 YY.MM.DD 형식을 기대한다.
+                        const year = pad2(monthCursor.getFullYear() % 100);
                         router.push({
                           pathname: "/calendar-time",
-                          params: { date: `${month}.${day}` },
+                          params: { date: `${year}.${month}.${day}` },
                         });
                       }}
                     >
@@ -284,10 +290,10 @@ export default function Calendar() {
 
           <View style={styles.visitsCard}>
             <Text style={styles.visitsTitle}>예정된 방문</Text>
-            {UPCOMING_VISITS.map((visit, i) => {
+            {upcomingVisits.map((visit, i) => {
               const isNext = i === 0;
               return (
-                <View key={i}>
+                <View key={visit.id}>
                   {i > 0 && (
                     <LinearGradient
                       colors={[
@@ -314,11 +320,23 @@ export default function Calendar() {
                       <Text style={styles.visitPlace}>{visit.place}</Text>
                     </View>
                     <View style={styles.visitTimeCol}>
-                      <Text style={styles.visitTime}>{visit.time}</Text>
+                      <Text style={styles.visitTime}>{formatVisitTime(visit)}</Text>
                     </View>
-                    <View style={styles.visitEditCol}>
+                    <Pressable
+                      style={styles.visitEditCol}
+                      hitSlop={10}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        router.push({ pathname: "/calendar-time", params: {
+                          mode: "edit", visitId: visit.id, date: visit.date,
+                          title: visit.title, place: visit.place,
+                          meridiem: visit.meridiem, hour: String(visit.hour), minute: String(visit.minute),
+                          isHospital: String(visit.isHospital), questions: JSON.stringify(visit.questions),
+                        }});
+                      }}
+                    >
                       <EditOutlineIcon size={16} />
-                    </View>
+                    </Pressable>
                     {isNext && (
                       <View
                         style={[
@@ -478,22 +496,24 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   addScheduleButton: {
+    minWidth: 66,
+    height: 28,
     backgroundColor: "#FFFCFD",
     borderWidth: 1,
     borderColor: "#FA0C56",
     borderRadius: 6,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    alignItems: "center",
+    justifyContent: "center",
   },
   addScheduleButtonText: {
-    width: 44,
-    height: 20,
     textAlign: "center",
     textAlignVertical: "center",
     color: "#FA0C56",
     fontSize: 12,
-    lineHeight: 20,
+    lineHeight: 16,
     fontFamily: "Pretendard-SemiBold",
+    includeFontPadding: false,
   },
   shareButton: {
     backgroundColor: "#FA0C56",
