@@ -1,4 +1,4 @@
-name: Deploy team web preview
+name: Deploy web to production
 
 on:
   push:
@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   deploy_web:
-    name: Deploy web to team alias
+    name: Deploy web to production
     type: deploy
     params:
-      alias: team
+      prod: true
