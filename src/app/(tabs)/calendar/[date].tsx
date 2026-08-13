@@ -12,14 +12,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { BackChevronIcon, ChevronRightIcon, PlusIcon } from "@/components/icons";
-import { loadCalendarVisits } from "@/lib/calendar-visits";
-
-// 실제 검사/질문 데이터 연동 전까지의 예시
-const PREVIOUS_REPORT_DATE = "2026. 08. 15";
-const SUGGESTED_QUESTIONS = [
-  "Ex) 당 수치가 올라가고 있는데 괜찮나요?",
-  "Ex) 비타민 D 수치가 떨어지고 있는데 괜찮나요?",
-];
+import { getVisitDetail, type VisitDetail } from "@/lib/api";
 
 /** "2026-08-15" → "2026. 08. 15" */
 function formatDate(value: string | undefined) {
@@ -35,12 +28,6 @@ function toVisitKey(value: string | undefined) {
   const [year, month, day] = value.split("-");
   if (!year || !month || !day) return "";
   return `${year.slice(2)}.${month}.${day}`;
-}
-
-function todayVisitKey() {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(now.getFullYear() % 100)}.${pad(now.getMonth() + 1)}.${pad(now.getDate())}`;
 }
 
 // Figma: 캘린더_일정
@@ -60,23 +47,21 @@ export default function CalendarDay() {
   const canAddMore =
     hasAddedQuestion && questions[questions.length - 1].trim().length > 0;
 
-  // 이전 검사지는 "다음 진료"까지만 존재한다. 그 뒤에 잡힌 일정은 아직
-  // 직전 진료가 끝나지 않았으므로 검사지도 질문도 준비되지 않은 상태로 보여준다.
-  const [reportReady, setReportReady] = useState(true);
+  const [detail, setDetail] = useState<VisitDetail | null>(null);
 
   useEffect(() => {
     let active = true;
-    loadCalendarVisits().then((visits) => {
-      if (!active) return;
-      const today = todayVisitKey();
-      const nextVisit = visits.find((visit) => visit.date >= today);
-      const current = toVisitKey(date);
-      setReportReady(!nextVisit || current <= nextVisit.date);
+    getVisitDetail(toVisitKey(date)).then((result) => {
+      if (active) setDetail(result);
     });
     return () => {
       active = false;
     };
   }, [date]);
+
+  // 검사지가 아직 없는 일정은 질문도 준비되지 않은 상태로 보여준다.
+  const previousReport = detail?.previousReport ?? null;
+  const suggestedQuestions = detail?.suggestedQuestions ?? [];
 
   return (
     <View style={styles.container}>
@@ -100,10 +85,10 @@ export default function CalendarDay() {
             <Text style={styles.reportNote}>*진료 후 업로드됩니다</Text>
           </View>
 
-          {reportReady ? (
+          {previousReport ? (
             <Pressable style={[styles.reportCard, styles.reportCardSpacing]}>
               <Text style={styles.reportLabel}>이전검사지</Text>
-              <Text style={styles.reportDate}>{PREVIOUS_REPORT_DATE}</Text>
+              <Text style={styles.reportDate}>{previousReport.date}</Text>
               <ChevronRightIcon size={20} />
             </Pressable>
           ) : (
@@ -113,7 +98,7 @@ export default function CalendarDay() {
             </View>
           )}
 
-          {!reportReady ? (
+          {!previousReport ? (
             <View style={[styles.questionCard, styles.questionCardEmpty]}>
               <Text style={styles.questionEmptyText}>
                 검사지 업로드 후 관련 질문을 확인하실 수 있습니다
@@ -123,7 +108,7 @@ export default function CalendarDay() {
           <View style={styles.questionCard}>
             <Text style={styles.questionCardTitle}>다음 진료 때 여쭤보아요</Text>
 
-            {SUGGESTED_QUESTIONS.map((text, i) => (
+            {suggestedQuestions.map((text, i) => (
               <View key={i} style={styles.questionRow}>
                 <Image
                   source={require("@/assets/images/AIicon.png")}

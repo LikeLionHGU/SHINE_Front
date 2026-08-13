@@ -17,7 +17,15 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { DEFAULT_CALENDAR_VISITS, formatVisitTime, loadCalendarVisits, type CalendarVisit } from "@/lib/calendar-visits";
+import {
+  formatVisitTime,
+  getCalendarMonthMarks,
+  getGuardianEmail,
+  getVisits,
+  type CalendarMonthMarks,
+  type CalendarVisit,
+  type DayMark,
+} from "@/lib/api";
 import {
   Modal,
   Pressable,
@@ -30,28 +38,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
-// 2026년 8월 데모 데이터 (실제 검사/일정 데이터 연동 전까지의 예시).
-// 다른 달로 넘어가면 이 장식(점/일정 텍스트)은 표시되지 않는다.
-const DEMO_YEAR = 2026;
-const DEMO_MONTH = 7; // 0-indexed → 8월
-// uploaded: 산전 검사지를 업로드한 날 (채워진 원)
-// scheduled: 검사 일정만 잡아둔 날 (테두리만 있는 원)
-const DEMO_DOTS: Record<number, DayMark> = {
-  15: "uploaded",
-  16: "scheduled",
-  24: "scheduled",
-};
-const DEMO_APPOINTMENTS: Record<number, string> = { 18: "이비인후.." };
-
-// 회원가입에서 받은 보호자 이메일 (백엔드 연동 전까지의 예시)
-const GUARDIAN_EMAIL = "XX@gmail.com";
+const EMPTY_MARKS: CalendarMonthMarks = { marks: {}, labels: {} };
 
 function pad2(value: number) {
   return String(value).padStart(2, "0");
 }
-
-/** 산전 검사지 업로드 완료 / 검사 일정만 잡힌 상태 */
-type DayMark = "uploaded" | "scheduled";
 
 type DayCell = {
   day: number;
@@ -66,8 +57,8 @@ function buildMonthWeeks(
   month: number,
   pregnancy: PregnancyInfo | null,
   visits: CalendarVisit[],
+  monthMarks: CalendarMonthMarks,
 ): WeekRow[] {
-  const isDemoMonth = year === DEMO_YEAR && month === DEMO_MONTH;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstWeekday = new Date(year, month, 1).getDay();
 
@@ -91,13 +82,11 @@ function buildMonthWeeks(
   for (let day = 1; day <= daysInMonth; day++) {
     cells.push({
       day,
-      dot: isDemoMonth
-        ? (DEMO_DOTS[day] ?? (hospitalDays.has(day) ? "scheduled" : undefined))
-        : hospitalDays.has(day)
-          ? "scheduled"
-          : undefined,
-      appointment:
-        otherDayLabels[day] ?? (isDemoMonth ? DEMO_APPOINTMENTS[day] : undefined),
+      // 서버가 내려준 검사 기록이 우선, 없으면 등록한 산부인과 일정으로 표시
+      dot:
+        monthMarks.marks[day] ??
+        (hospitalDays.has(day) ? ("scheduled" as DayMark) : undefined),
+      appointment: otherDayLabels[day] ?? monthMarks.labels[day],
     });
   }
   while (cells.length % 7 !== 0) cells.push(null);
@@ -117,25 +106,42 @@ function buildMonthWeeks(
 }
 
 export default function Calendar() {
-  const [monthCursor, setMonthCursor] = useState(
-    new Date(DEMO_YEAR, DEMO_MONTH, 1),
-  );
+  const [monthCursor, setMonthCursor] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
   const [calloutVisible, setCalloutVisible] = useState(false);
   const [questionsOpen, setQuestionsOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const router = useRouter();
   const [pregnancy, setPregnancy] = useState<PregnancyInfo | null>(null);
-  const [upcomingVisits, setUpcomingVisits] = useState<CalendarVisit[]>(DEFAULT_CALENDAR_VISITS);
+  const [upcomingVisits, setUpcomingVisits] = useState<CalendarVisit[]>([]);
+  const [monthMarks, setMonthMarks] = useState<CalendarMonthMarks>(EMPTY_MARKS);
+  const [guardianEmail, setGuardianEmail] = useState("");
 
   useFocusEffect(useCallback(() => {
     let active = true;
-    loadCalendarVisits().then((visits) => { if (active) setUpcomingVisits(visits); });
+    getVisits().then((visits) => { if (active) setUpcomingVisits(visits); });
     return () => { active = false; };
   }, []));
 
   useEffect(() => {
     loadPregnancyInfo().then(setPregnancy);
+    getGuardianEmail().then(setGuardianEmail);
   }, []);
+
+  // 보고 있는 달이 바뀔 때마다 그 달의 검사 기록을 받아온다.
+  useEffect(() => {
+    let active = true;
+    getCalendarMonthMarks(monthCursor.getFullYear(), monthCursor.getMonth()).then(
+      (marks) => {
+        if (active) setMonthMarks(marks);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [monthCursor]);
 
   // 안내 말풍선은 앱을 처음 쓸 때 한 번만 보여주고 바로 본 것으로 기록한다.
   useEffect(() => {
@@ -153,8 +159,9 @@ export default function Calendar() {
         monthCursor.getMonth(),
         pregnancy,
         upcomingVisits,
+        monthMarks,
       ),
-    [monthCursor, pregnancy, upcomingVisits],
+    [monthCursor, pregnancy, upcomingVisits, monthMarks],
   );
 
   // "예정된 방문"에는 지금 보고 있는 달의 산부인과 일정만 올린다.
@@ -411,7 +418,7 @@ export default function Calendar() {
             <Text style={styles.dialogQuestion}>
               아래 메일로 공유하시겠습니까?
             </Text>
-            <Text style={styles.dialogEmail}>{GUARDIAN_EMAIL}</Text>
+            <Text style={styles.dialogEmail}>{guardianEmail}</Text>
             <Text style={styles.dialogNote}>
               일정공유 및 분석결과 리포트가 보내집니다.
             </Text>
