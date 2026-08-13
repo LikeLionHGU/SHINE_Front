@@ -193,15 +193,23 @@ export default function Calendar() {
                 <ChevronRightIcon size={24} color="#A0A0A0" />
               </Pressable>
             </View>
-            <Pressable
-              style={styles.shareButton}
-              onPress={() => {
-                setCalloutVisible(false);
-                setShareDialogOpen(true);
-              }}
-            >
-              <Text style={styles.shareButtonText}>공유하기</Text>
-            </Pressable>
+            <View style={styles.monthActions}>
+              <Pressable
+                style={styles.addScheduleButton}
+                onPress={() => router.push("/calendar-time")}
+              >
+                <Text style={styles.addScheduleButtonText}>일정 추가</Text>
+              </Pressable>
+              <Pressable
+                style={styles.shareButton}
+                onPress={() => {
+                  setCalloutVisible(false);
+                  setShareDialogOpen(true);
+                }}
+              >
+                <Text style={styles.shareButtonText}>공유하기</Text>
+              </Pressable>
+            </View>
           </View>
 
           <View style={styles.calendarCard}>
@@ -463,6 +471,29 @@ const styles = StyleSheet.create({
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
     borderTopColor: "rgba(17,17,17,0.6)",
+  },
+  monthActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  addScheduleButton: {
+    backgroundColor: "#FFFCFD",
+    borderWidth: 1,
+    borderColor: "#FA0C56",
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  addScheduleButtonText: {
+    width: 44,
+    height: 20,
+    textAlign: "center",
+    textAlignVertical: "center",
+    color: "#FA0C56",
+    fontSize: 12,
+    lineHeight: 20,
+    fontFamily: "Pretendard-SemiBold",
   },
   shareButton: {
     backgroundColor: "#FA0C56",
