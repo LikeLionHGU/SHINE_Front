@@ -72,12 +72,19 @@ function buildMonthWeeks(
   const firstWeekday = new Date(year, month, 1).getDay();
 
   // 등록한 일정이 있는 날은 달력에도 표시한다.
+  // 산부인과 일정은 빈 원으로, 그 밖의 일정은 제목 텍스트로 보여준다.
   const monthPrefix = `${pad2(year % 100)}.${pad2(month + 1)}.`;
-  const visitDays = new Set(
-    visits
-      .filter((visit) => visit.date.startsWith(monthPrefix))
-      .map((visit) => Number(visit.date.slice(monthPrefix.length))),
-  );
+  const hospitalDays = new Set<number>();
+  const otherDayLabels: Record<number, string> = {};
+  for (const visit of visits) {
+    if (!visit.date.startsWith(monthPrefix)) continue;
+    const day = Number(visit.date.slice(monthPrefix.length));
+    if (visit.isHospital) {
+      hospitalDays.add(day);
+    } else {
+      otherDayLabels[day] = visit.title || visit.place;
+    }
+  }
 
   const cells: DayCell[] = [];
   for (let i = 0; i < firstWeekday; i++) cells.push(null);
@@ -85,11 +92,12 @@ function buildMonthWeeks(
     cells.push({
       day,
       dot: isDemoMonth
-        ? (DEMO_DOTS[day] ?? (visitDays.has(day) ? "scheduled" : undefined))
-        : visitDays.has(day)
+        ? (DEMO_DOTS[day] ?? (hospitalDays.has(day) ? "scheduled" : undefined))
+        : hospitalDays.has(day)
           ? "scheduled"
           : undefined,
-      appointment: isDemoMonth ? DEMO_APPOINTMENTS[day] : undefined,
+      appointment:
+        otherDayLabels[day] ?? (isDemoMonth ? DEMO_APPOINTMENTS[day] : undefined),
     });
   }
   while (cells.length % 7 !== 0) cells.push(null);
@@ -148,6 +156,15 @@ export default function Calendar() {
       ),
     [monthCursor, pregnancy, upcomingVisits],
   );
+
+  // "예정된 방문"에는 지금 보고 있는 달의 산부인과 일정만 올린다.
+  const monthlyHospitalVisits = useMemo(() => {
+    const prefix = `${pad2(monthCursor.getFullYear() % 100)}.${pad2(monthCursor.getMonth() + 1)}.`;
+    return upcomingVisits.filter(
+      (visit) => visit.isHospital && visit.date.startsWith(prefix),
+    );
+  }, [monthCursor, upcomingVisits]);
+
   const goToMonth = (delta: number) => {
     setMonthCursor(
       (prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1),
@@ -288,9 +305,17 @@ export default function Calendar() {
             ))}
           </View>
 
+          {/* 일정이 없는 달은 제목 없이 안내 문구만 보여준다. */}
+          {monthlyHospitalVisits.length === 0 ? (
+            <View style={[styles.visitsCard, styles.visitsCardEmpty]}>
+              <Text style={styles.visitsEmptyText}>
+                예정된 산부인과 방문 일정이 없습니다.
+              </Text>
+            </View>
+          ) : (
           <View style={styles.visitsCard}>
             <Text style={styles.visitsTitle}>예정된 방문</Text>
-            {upcomingVisits.map((visit, i) => {
+            {monthlyHospitalVisits.map((visit, i) => {
               const isNext = i === 0;
               return (
                 <View key={visit.id}>
@@ -370,6 +395,7 @@ export default function Calendar() {
               );
             })}
           </View>
+          )}
         </ScrollView>
       </SafeAreaView>
 
@@ -624,6 +650,21 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     color: "#111111",
     fontSize: 14,
+    fontFamily: "Pretendard-Medium",
+  },
+  // 문구만 있는 카드 (디자인: 높이 86, 문구는 세로 가운데)
+  visitsCardEmpty: {
+    height: 86,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 0,
+    paddingBottom: 0,
+  },
+  visitsEmptyText: {
+    textAlign: "center",
+    color: "#A0A0A0",
+    fontSize: 14,
+    lineHeight: 34,
     fontFamily: "Pretendard-Medium",
   },
   // 컬럼 위치는 Figma 361px 카드 기준 좌표를 비율로 환산한 값이라
