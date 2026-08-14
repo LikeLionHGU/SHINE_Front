@@ -88,7 +88,7 @@ export default function ScanStart() {
 
   function handleComplete() {
     if (!imageUri) return;
-    router.push({ pathname: "/(modals)/scan/analyzing", params: { uri: imageUri } });
+    router.push({ pathname: "/(modals)/scan/date-confirm", params: { uri: imageUri } });
   }
 
   return (

@@ -2,17 +2,36 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const STORAGE_KEY = "shine.report.last.v1";
 
+/** lib/insights.ts가 검사항목을 바탕으로 추천해주는 음식 한 개. */
+export type ReportFood = { name: string; reason: string };
+
 export type LastReport = {
   /** 업로드한 검사지 이미지의 로컬 URI */
   uri: string;
-  /** ISO 날짜 문자열 */
+  /** ISO 날짜 문자열 — 앱에 "저장한" 시각 */
   uploadedAt: string;
+  /** 검사지에 실제로 찍힌 검사 날짜("YY.MM.DD"). scan/date-confirm.tsx에서
+   * OCR로 읽거나 사용자가 직접 고른 값 — 파싱/선택 전이면 없을 수 있다. */
+  testDate?: string;
   /** OCR로 읽어낸 검사항목/수치/상태 목록. 파싱 실패 시 비어있을 수 있다. */
   items?: ParsedTestItem[];
+  /** lib/insights.ts가 items를 바탕으로 작성한 종합 소견(3~5문장). 생성 실패 시 없을 수 있다. */
+  summary?: string;
+  /** 다음 진료 때 물어보면 좋을 추천 질문. 생성 실패 시 없을 수 있다. */
+  questions?: string[];
+  /** 부족하거나 신경 써야 할 성분을 보완하는 데 도움되는 추천 음식. 생성 실패 시 없을 수 있다. */
+  foods?: ReportFood[];
 };
 
-export async function saveLastReport(uri: string, items?: ParsedTestItem[]) {
-  const report: LastReport = { uri, uploadedAt: new Date().toISOString(), items };
+export async function saveLastReport(data: {
+  uri: string;
+  items?: ParsedTestItem[];
+  testDate?: string;
+  summary?: string;
+  questions?: string[];
+  foods?: ReportFood[];
+}) {
+  const report: LastReport = { ...data, uploadedAt: new Date().toISOString() };
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(report));
   return report;
 }
@@ -29,6 +48,31 @@ export async function loadLastReport(): Promise<LastReport | null> {
   }
 }
 
+// scan/date-confirm.tsx가 OCR로 미리 읽어둔 검사항목·검사일을, 다음 단계인
+// scan/analyzing.tsx로 넘겨주기 위한 임시 저장소. 두 화면 다 같은 JS
+// 런타임에서 돌기 때문에(네이티브 전환이 아니라 같은 앱 안 화면 이동)
+// AsyncStorage나 URL 파라미터 없이 모듈 스코프 변수로 충분히 안전하게
+// 전달할 수 있다. analyzing.tsx는 이 값이 없거나 uri가 안 맞으면(예: 새로고침
+// 등으로 값이 날아간 경우) 스스로 다시 스캔·파싱하도록 방어적으로 처리한다.
+type PendingScan = {
+  uri: string;
+  items?: ParsedTestItem[];
+  testDate?: string;
+};
+
+let pendingScan: PendingScan | null = null;
+
+export function setPendingScan(value: PendingScan) {
+  pendingScan = value;
+}
+
+export function takePendingScan(uri: string): PendingScan | null {
+  if (!pendingScan || pendingScan.uri !== uri) return null;
+  const value = pendingScan;
+  pendingScan = null;
+  return value;
+}
+
 // 실제 DUR/건강기능식품 API·OCR 연동 전까지 쓰는 자리표시 분석 결과.
 // Figma(node 671:4356/671:4386 검사지 분석-번역) 문구를 그대로 옮겨왔다.
 export const DEMO_SUMMARY =
@@ -37,6 +81,8 @@ export const DEMO_SUMMARY =
 export type IndicatorStatus = "안심" | "주의" | "위험";
 
 // lib/ocr.ts(OpenAI Vision)가 검사지 사진에서 실제로 읽어낸 한 줄.
+// definition/verdict는 report.tsx의 지표 상세 하단 시트(기존 DEMO_INDICATORS와
+// 동일한 UI)를 그대로 재사용하기 위해 IndicatorDetail과 같은 모양으로 맞췄다.
 export type ParsedTestItem = {
   /** 검사항목 (예: "헤모글로빈") */
   name: string;
@@ -44,6 +90,10 @@ export type ParsedTestItem = {
   value: string;
   /** OCR 모델이 판단한 상태 */
   status: IndicatorStatus;
+  /** 이 검사 항목이 일반적으로 무엇을 보는 지표인지 쉬운 설명 (1~2문장) */
+  definition: string;
+  /** 이번에 읽은 수치가 왜 이 상태로 판정됐는지에 대한 설명 (1~2문장) */
+  verdict: string;
 };
 
 export type IndicatorDetail = {

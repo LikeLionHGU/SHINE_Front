@@ -36,7 +36,12 @@ const NESTED_STACK_TABS = new Set(["analysis", "calendar"]);
 // 탭 추가/이름 변경 시 위 TAB_ICONS / TAB_LABELS 맵만 route 파일명 기준으로 고치면 됨.
 export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
   return (
-    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+    // 그림자(shadowWrap)와 둥근 모서리+배경(container)을 분리했다. 같은
+    // View에 shadow*와 borderRadius를 같이 주면(특히 웹에서) 그림자가 둥근
+    // 모서리를 따라가지 않고 각진 사각형으로 삐져나와 보이는 문제가 있어서,
+    // 배경을 채우고 실제로 자르는(overflow: hidden) 안쪽 View를 따로 뒀다.
+    <View style={styles.shadowWrap}>
+      <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 12) }]}>
       <View style={styles.row}>
         {state.routes.map((route, index) => {
           const focused = state.index === index;
@@ -73,22 +78,31 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
           );
         })}
       </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 12,
-    paddingHorizontal: 10,
+  // 그림자 전용 — borderRadius/overflow를 주지 않아 그림자가 사각형 그대로
+  // 자연스럽게 퍼진다(각진 실루엣이라 완전한 라운드 그림자는 아니지만,
+  // 웹에서 그림자가 둥근 모서리 밖으로 깨져 보이는 것보다 훨씬 낫다).
+  shadowWrap: {
     shadowColor: "#000000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 8,
+  },
+  // 배경 채우기 + 둥근 모서리는 여기서만 담당하고, overflow: hidden으로
+  // 실제로 그 모양 밖으로는 아무것도(그림자 포함) 삐져나오지 않게 자른다.
+  container: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: "hidden",
+    paddingTop: 12,
+    paddingHorizontal: 10,
   },
   row: {
     flexDirection: "row",
