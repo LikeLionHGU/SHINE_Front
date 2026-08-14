@@ -8,7 +8,7 @@ import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-n
 import { Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// Figma(node 671:4538 분석_개별 상세 페이지): 선택한 지표의 추이 그래프 +
+// Figma(node 837:5500 분석_개별 상세 페이지): 선택한 지표의 추이 그래프 +
 // 종합 추이 상세 설명. 실제 지표 추출 API가 붙기 전까지는 데모 데이터
 // (lib/report.ts DEMO_TREND_INDICATORS)를 쓴다.
 export default function AnalysisDetail() {

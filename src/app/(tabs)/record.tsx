@@ -41,7 +41,11 @@ export default function Record() {
                 {index !== 0 && <View style={styles.connector} />}
                 <Pressable
                   style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-                  onPress={() => router.push("/(tabs)/analysis/report")}
+                  onPress={() =>
+                    // from=record를 같이 넘겨서, report.tsx의 뒤로가기가 분석 탭
+                    // 안으로 파고들지 않고 이 기록 화면으로 되돌아오게 한다.
+                    router.push({ pathname: "/(tabs)/analysis/report", params: { from: "record" } })
+                  }
                 >
                   <View style={styles.dateCol}>
                     <View style={styles.dot} />

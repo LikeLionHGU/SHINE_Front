@@ -8,15 +8,24 @@ import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// Figma(node 671:3093 분석): "분석" 탭의 실제 진입 화면 — 검사지에서 뽑힌
-// 지표들을 한눈에 볼 수 있는 리스트. 행을 누르면 개별 추이 상세
-// ([indicatorId].tsx, node 671:4538)로 이동한다. 실제 지표 추출 API가
-// 붙기 전까지는 데모 데이터(lib/report.ts DEMO_TREND_INDICATORS)를 쓴다.
+// DEMO_TREND_INDICATORS의 모든 지표가 같은 4개 날짜(4월 20일~8월 1일)를 x축으로
+// 공유해서, 그중 아무 지표의 history나 날짜 목록으로 쓸 수 있다. 최신 날짜가
+// 마지막 항목이라 기본 선택값은 배열의 끝이다.
+const DATE_LABELS = DEMO_TREND_INDICATORS[0]?.history.map((point) => point.date) ?? [];
+
+// Figma(node 837:4354 분석): "분석" 탭의 실제 진입 화면 — 검사지에서 뽑힌
+// 지표들을 한눈에 볼 수 있는 리스트. 상단 날짜 옆 화살표로 지난 검사 날짜를
+// 오갈 수 있다(실제 지표 추출 API가 붙기 전까지는 지표 값 자체는 데모 데이터
+// DEMO_TREND_INDICATORS로 고정 — 날짜 이동은 라벨만 바뀐다). 행을 누르면
+// 개별 추이 상세([indicatorId].tsx, node 837:5500)로 이동한다.
 export default function Analysis() {
   const router = useRouter();
   const [report, setReport] = useState<LastReport | null>(null);
   const [checking, setChecking] = useState(true);
   const [query, setQuery] = useState("");
+  const [dateIndex, setDateIndex] = useState(Math.max(0, DATE_LABELS.length - 1));
+  const canGoPrevDate = dateIndex > 0;
+  const canGoNextDate = dateIndex < DATE_LABELS.length - 1;
 
   useFocusEffect(
     useCallback(() => {
@@ -71,9 +80,27 @@ export default function Analysis() {
 
         {report && (
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-            <Pressable onPress={() => router.push("/(tabs)/analysis/report")} hitSlop={6}>
-              <Text style={styles.dateHeading}>8월 15일</Text>
-            </Pressable>
+            <View style={styles.dateNav}>
+              <Pressable
+                hitSlop={8}
+                disabled={!canGoPrevDate}
+                onPress={() => setDateIndex((i) => Math.max(0, i - 1))}
+              >
+                <BackChevronIcon size={24} color={canGoPrevDate ? "#414141" : "#D8D8D8"} />
+              </Pressable>
+              <Pressable onPress={() => router.push("/(tabs)/analysis/report")} hitSlop={6}>
+                <Text style={styles.dateHeading}>{DATE_LABELS[dateIndex] ?? ""}</Text>
+              </Pressable>
+              <Pressable
+                hitSlop={8}
+                disabled={!canGoNextDate}
+                onPress={() => setDateIndex((i) => Math.min(DATE_LABELS.length - 1, i + 1))}
+              >
+                <View style={{ transform: [{ rotate: "180deg" }] }}>
+                  <BackChevronIcon size={24} color={canGoNextDate ? "#414141" : "#D8D8D8"} />
+                </View>
+              </Pressable>
+            </View>
 
             <View style={styles.searchWrap}>
               <TextInput
@@ -152,7 +179,8 @@ const styles = StyleSheet.create({
   emptyButtonText: { color: "#FFFDF9", fontFamily: "Pretendard-SemiBold", fontSize: 16 },
 
   content: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 24, gap: 12 },
-  dateHeading: { color: "#414141", fontFamily: "Pretendard-SemiBold", fontSize: 20, letterSpacing: -1 },
+  dateNav: { flexDirection: "row", alignItems: "center", gap: 2, alignSelf: "flex-start" },
+  dateHeading: { color: "#414141", fontFamily: "Pretendard-SemiBold", fontSize: 20, letterSpacing: -1, textAlign: "center", minWidth: 79 },
 
   searchWrap: {
     height: 40,

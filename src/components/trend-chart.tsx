@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from "react-native-svg";
 import type { TrendIndicator, TrendPoint } from "@/lib/report";
 
-// Figma(node 671:3093 분석 리스트): 각 지표 행의 작은 추이 미리보기.
+// Figma(node 837:4354 분석 리스트): 각 지표 행의 작은 추이 미리보기.
 export function MiniTrendLine({
   values,
   width = 46,
@@ -33,7 +33,7 @@ export function MiniTrendLine({
 
 const CHART_HEIGHT = 128;
 
-// Figma(node 671:4538 분석_개별 상세 페이지): 지표 추이 큰 차트.
+// Figma(node 837:5500 분석_개별 상세 페이지): 지표 추이 큰 차트.
 // 3개 구간 기준선(높음/안정/낮음) + 데이터 포인트 4개 + 마지막 값 강조 툴팁.
 export function TrendChart({
   indicator,

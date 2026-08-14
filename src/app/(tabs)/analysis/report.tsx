@@ -11,7 +11,7 @@ import {
   type LastReport,
 } from "@/lib/report";
 import { LinearGradient } from "expo-linear-gradient";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   Image,
@@ -42,9 +42,11 @@ const DEFAULT_QUESTIONS = ["Ex) 당 수치가 올라가고 있는데 괜찮나�
 //
 // "분석" 탭의 실제 진입점은 지표 리스트(analysis/index.tsx)이고, 이 화면은
 // 검사지 업로드 직후(scan/analyzing.tsx → dismissTo)와 리스트 상단 날짜를
-// 눌렀을 때 도달하는 하위 화면이다.
+// 눌렀을 때, 그리고 기록 탭(record.tsx, from=record 파라미터와 함께)에서
+// 도달하는 하위 화면이다.
 export default function AnalysisReport() {
   const router = useRouter();
+  const { from } = useLocalSearchParams<{ from?: string }>();
   const [report, setReport] = useState<LastReport | null>(null);
   const [checking, setChecking] = useState(true);
   const [summaryOpen, setSummaryOpen] = useState(true);
@@ -100,6 +102,14 @@ export default function AnalysisReport() {
   }
 
   function goBack() {
+    // 기록 탭(record.tsx)에서 들어온 경우, 이 화면은 "분석" 탭 스택 위에
+    // 새로 push된 것이라 router.back()이 분석 탭 안에서만 뒤로 가버린다
+    // (기록 탭으로 못 돌아옴) — from=record일 때는 명시적으로 기록 탭으로
+    // 돌려보낸다.
+    if (from === "record") {
+      router.replace("/(tabs)/record");
+      return;
+    }
     if (router.canGoBack()) router.back();
     else router.push("/(tabs)/analysis");
   }
