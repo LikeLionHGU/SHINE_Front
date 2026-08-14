@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -15,6 +15,7 @@ import {
   ToggleSwitch,
   XXLogoIcon,
 } from "@/components/icons";
+import { getUserProfile, type UserProfile } from "@/lib/api";
 
 // Figma: 환경설정 (바텀탭 "마이")
 // 프로필 카드, 개인정보(연락처/이메일), 기본 설정(카메라 동의/알림/FAQ/이용약관/환경설정).
@@ -22,6 +23,11 @@ export default function Settings() {
   const router = useRouter();
   const [cameraConsent, setCameraConsent] = useState(true);
   const [notifications, setNotifications] = useState(true);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    getUserProfile().then(setProfile);
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -47,8 +53,10 @@ export default function Settings() {
               <Text style={styles.avatarText}>XX</Text>
             </View>
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>김더블</Text>
-              <Text style={styles.profileSubtitle}>Double X</Text>
+              <Text style={styles.profileName}>{profile?.name ?? ""}</Text>
+              <Text style={styles.profileSubtitle}>
+                {profile?.accountName ?? ""}
+              </Text>
             </View>
             <ChevronRightIcon />
           </Pressable>
@@ -57,19 +65,21 @@ export default function Settings() {
           <View style={[styles.card, styles.infoCard]}>
             <Pressable style={[styles.infoRow, styles.infoRowToDivider]}>
               <Text style={styles.infoLabel}>연락처 정보</Text>
-              <Text style={styles.infoValueAuto}>+821012345678</Text>
+              <Text style={styles.infoValueAuto}>{profile?.phone ?? ""}</Text>
               <View style={styles.infoSpacer} />
               <ChevronRightIcon size={20} />
             </Pressable>
             <View style={styles.dividerSpaced} />
             <View style={[styles.infoRow, styles.infoRowSpacing]}>
               <Text style={styles.infoLabel}>본인 이메일</Text>
-              <Text style={styles.infoValueAuto}>DoubleX@gmail.com</Text>
+              <Text style={styles.infoValueAuto}>{profile?.email ?? ""}</Text>
               <EditPencilIcon />
             </View>
             <View style={[styles.infoRow, styles.infoRowSpacing]}>
               <Text style={styles.infoLabel}>보호자 이메일</Text>
-              <Text style={styles.infoValueAuto}>XX@gmail.com</Text>
+              <Text style={styles.infoValueAuto}>
+                {profile?.guardianEmail ?? ""}
+              </Text>
               <EditPencilIcon />
             </View>
             <View style={styles.infoRow}>
@@ -156,6 +166,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFCFD",
     borderRadius: 14,
     overflow: "hidden",
+    boxShadow: "0 3px 3px rgba(0, 0, 0, 0.06)",
   },
   profileCard: {
     flexDirection: "row",

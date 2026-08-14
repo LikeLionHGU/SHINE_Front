@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ToggleSwitch } from "@/components/icons";
-import { saveCalendarVisit } from "@/lib/calendar-visits";
+import { saveVisit } from "@/lib/api";
 import { centeredSheetStyle } from "@/lib/layout";
 
 /** 휠에는 AM/PM으로 표기하고, 화면 상단 요약에는 오전/오후로 보여준다. */
@@ -223,7 +223,7 @@ export default function CalendarTimePicker() {
     }
     let questions: string[] = [];
     try { questions = params.questions ? JSON.parse(params.questions) : []; } catch { questions = []; }
-    await saveCalendarVisit({
+    await saveVisit({
       id: params.visitId ?? `visit-${Date.now()}`,
       date,
       title,
