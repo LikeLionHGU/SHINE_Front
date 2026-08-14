@@ -1,16 +1,34 @@
 import { CloseIcon, XXLogoIcon } from "@/components/icons";
+import { centeredContentStyle, centeredSheetStyle } from "@/lib/layout";
 import { DEMO_SUMMARY } from "@/lib/report";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // 검사지 분석 4단계: 종합 분석 결과. analyzing.tsx에서 이미 이 사진을
 // "분석" 탭이 볼 최근 검사지로 저장해뒀으므로, 여기서는 짧게 완료를 보여주고
 // "분석 보러가기"로 실제 상세(쉬운 번역본 화면, node 671:4356)로 이어준다.
+// (현재는 analyzing.tsx가 이 화면을 거치지 않고 report.tsx로 바로
+// dismissTo하기 때문에 실제 앱 흐름에서는 도달하지 않는 레거시 화면이다 —
+// 그래도 스타일은 다른 화면과 일관되게 반응형으로 맞춰둔다.)
 export default function ScanResult() {
   const router = useRouter();
   const { uri } = useLocalSearchParams<{ uri?: string }>();
+  // report.tsx와 동일하게, 고정 height 대신 사진 원본 비율로 보여준다.
+  const [imageAspect, setImageAspect] = useState(310.088 / 320);
+
+  useEffect(() => {
+    if (!uri) return;
+    Image.getSize(
+      uri,
+      (width, height) => {
+        if (width > 0 && height > 0) setImageAspect(width / height);
+      },
+      () => {},
+    );
+  }, [uri]);
 
   function goHome() {
     router.dismissTo("/(tabs)/home");
@@ -30,15 +48,15 @@ export default function ScanResult() {
             <CloseIcon size={24} />
           </Pressable>
         </View>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <Text style={styles.heading}>검사지 분석이{"\n"}완료됐어요</Text>
-          {!!uri && <Image source={{ uri }} style={styles.preview} resizeMode="cover" />}
+          {!!uri && <Image source={{ uri }} style={[styles.preview, { aspectRatio: imageAspect }]} resizeMode="contain" />}
           <View style={styles.summaryCard}>
             <Text style={styles.summaryTitle}>쉬운 번역본</Text>
             <Text style={styles.summaryText}>{DEMO_SUMMARY}</Text>
           </View>
         </ScrollView>
-        <View style={styles.actions}>
+        <View style={[centeredSheetStyle, styles.actions]}>
           <Pressable style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]} onPress={goHome}>
             <Text style={styles.secondaryButtonText}>홈으로</Text>
           </Pressable>
@@ -57,7 +75,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 6 },
   content: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 24, gap: 16 },
   heading: { color: "#4C4C4C", fontFamily: "Pretendard-SemiBold", fontSize: 24, lineHeight: 32 },
-  preview: { width: "100%", height: 320, borderRadius: 14, backgroundColor: "#FFF0F6" },
+  preview: { width: "100%", borderRadius: 14, backgroundColor: "#FFF0F6" },
   summaryCard: { padding: 18, borderRadius: 14, backgroundColor: "#FFFCFD", gap: 6 },
   summaryTitle: { color: "#111", fontFamily: "Pretendard-Medium", fontSize: 16 },
   summaryText: { color: "#707070", fontFamily: "Pretendard-Regular", fontSize: 14, lineHeight: 20 },

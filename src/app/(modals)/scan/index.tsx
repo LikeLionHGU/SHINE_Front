@@ -5,6 +5,7 @@ import {
   UploadCloudIcon,
   XXLogoIcon,
 } from "@/components/icons";
+import { centeredContentStyle, centeredSheetStyle, MAX_CONTENT_WIDTH } from "@/lib/layout";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
@@ -16,16 +17,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type PickMethod = "camera" | "library";
-
-// 미리보기 박스가 넘지 않을 최대 크기. 실제 표시 크기는 선택한 사진의
-// 원본 비율을 유지한 채 이 박스 안에 맞춰(축소만, 확대는 하지 않음) 계산한다.
-const MAX_PREVIEW_WIDTH = 300;
-const MAX_PREVIEW_HEIGHT = 420;
 
 // Figma(node 837:4597 선택 상태 / 837:4567 사진 불러온 상태): 검사지 분석 1단계.
 // "사진 찍기"는 네이티브 카메라를, "사진 불러오기"는 사진 보관함을 바로 띄운다.
@@ -33,6 +30,13 @@ const MAX_PREVIEW_HEIGHT = 420;
 // analyzing 화면으로 넘어가 스캔 애니메이션 후 결과 화면으로 이동한다.
 export default function ScanStart() {
   const router = useRouter();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  // 미리보기 박스가 넘지 않을 최대 크기. 화면 폭에서 계산해서(고정 300px가
+  // 아니라) 작은 폰에서는 잘리지 않고, 큰 화면에서는 콘텐츠 폭(MAX_CONTENT_WIDTH)
+  // 이상으로 커지지 않는다. 실제 표시 크기는 선택한 사진의 원본 비율을 유지한
+  // 채 이 박스 안에 맞춰(축소만, 확대는 하지 않음) 계산한다.
+  const maxPreviewWidth = Math.min(windowWidth - 32, MAX_CONTENT_WIDTH - 32);
+  const maxPreviewHeight = windowHeight * 0.45;
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [method, setMethod] = useState<PickMethod | null>(null);
   const [previewSize, setPreviewSize] = useState({ width: 241, height: 395 });
@@ -43,12 +47,12 @@ export default function ScanStart() {
     Image.getSize(
       imageUri,
       (width, height) => {
-        const scale = Math.min(MAX_PREVIEW_WIDTH / width, MAX_PREVIEW_HEIGHT / height, 1);
+        const scale = Math.min(maxPreviewWidth / width, maxPreviewHeight / height, 1);
         setPreviewSize({ width: Math.round(width * scale), height: Math.round(height * scale) });
       },
       () => {},
     );
-  }, [imageUri]);
+  }, [imageUri, maxPreviewWidth, maxPreviewHeight]);
 
   async function pickFromCamera() {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -104,7 +108,7 @@ export default function ScanStart() {
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <XXLogoIcon width={65} />
           <Text style={styles.heading}>산전 검사지를{"\n"}업로드 해주세요</Text>
 
@@ -142,7 +146,7 @@ export default function ScanStart() {
 
         {imageUri && (
           <Pressable
-            style={({ pressed }) => [styles.completeButton, pressed && styles.pressed]}
+            style={({ pressed }) => [centeredSheetStyle, styles.completeButton, pressed && styles.pressed]}
             onPress={handleComplete}
           >
             <Text style={styles.completeButtonText}>완료</Text>

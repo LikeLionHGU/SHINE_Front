@@ -1,6 +1,7 @@
 import { BackChevronIcon, CloseIcon, UpTriangleIcon } from "@/components/icons";
 import { StatusBadge } from "@/components/status-badge";
 import { TrendChart } from "@/components/trend-chart";
+import { centeredContentStyle, MAX_CONTENT_WIDTH } from "@/lib/layout";
 import { getTrendIndicator } from "@/lib/report";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -49,7 +50,10 @@ export default function AnalysisDetail() {
     );
   }
 
-  const chartWidth = Math.min(windowWidth - 32 - 30 - 34, 300);
+  // 300으로 고정 상한을 두면 화면이 넓어져도(태블릿/웹) 차트가 그대로
+  // 300px에 묶여 카드 안에서 작고 왼쪽에 치우쳐 보인다 — MAX_CONTENT_WIDTH
+  // 기준으로 상한을 잡아서, 콘텐츠 폭이 커지는 만큼 차트도 같이 커지게 한다.
+  const chartWidth = Math.min(windowWidth - 32 - 30 - 34, MAX_CONTENT_WIDTH - 32 - 30 - 34);
 
   return (
     <View style={styles.container}>
@@ -65,7 +69,7 @@ export default function AnalysisDetail() {
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.titleRow}>
             <View style={{ transform: [{ rotate: trendingUp ? "0deg" : "180deg" }] }}>
               <UpTriangleIcon size={14} />

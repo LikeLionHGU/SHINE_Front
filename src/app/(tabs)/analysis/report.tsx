@@ -5,6 +5,7 @@ import {
   SparkleIcon,
 } from "@/components/icons";
 import { StatusBadge } from "@/components/status-badge";
+import { centeredContentStyle, centeredSheetStyle } from "@/lib/layout";
 import {
   DEMO_SUMMARY,
   loadLastReport,
@@ -142,7 +143,7 @@ export default function AnalysisReport() {
         )}
 
         {report && (
-          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <ScrollView style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             {/* 이미지 위 마커는 OCR이 추정한 위치가 부정확해서(항목 텍스트와
                 안 맞는 곳에 찍힘) 뺐다 — 항목 상세는 아래 종합 분석 표의
                 행을 눌러서만 연다. */}
@@ -349,6 +350,7 @@ const styles = StyleSheet.create({
   modalRoot: { flex: 1, justifyContent: "flex-end" },
   modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.25)" },
   sheet: {
+    ...centeredSheetStyle,
     backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,

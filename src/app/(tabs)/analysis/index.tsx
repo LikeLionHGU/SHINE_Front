@@ -1,6 +1,7 @@
 import { BackChevronIcon, ChevronRightIcon } from "@/components/icons";
 import { StatusBadge } from "@/components/status-badge";
 import { MiniTrendLine } from "@/components/trend-chart";
+import { centeredContentStyle } from "@/lib/layout";
 import { DEMO_TREND_INDICATORS, loadLastReport, type LastReport } from "@/lib/report";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -79,7 +80,7 @@ export default function Analysis() {
         )}
 
         {report && (
-          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <ScrollView style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             <View style={styles.dateNav}>
               <Pressable
                 hitSlop={8}

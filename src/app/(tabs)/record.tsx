@@ -1,4 +1,5 @@
 import { BackChevronIcon, ChevronRightIcon, XXLogoIcon } from "@/components/icons";
+import { centeredContentStyle } from "@/lib/layout";
 import { DEMO_RECORDS } from "@/lib/report";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -31,7 +32,7 @@ export default function Record() {
           <View style={{ width: 24 }} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <XXLogoIcon width={44} />
           <Text style={styles.heading}>차곡차곡 쌓인{"\n"}나의 건강 기록</Text>
 

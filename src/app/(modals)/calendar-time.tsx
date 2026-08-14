@@ -16,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ToggleSwitch } from "@/components/icons";
 import { saveCalendarVisit } from "@/lib/calendar-visits";
+import { centeredSheetStyle } from "@/lib/layout";
 
 /** 휠에는 AM/PM으로 표기하고, 화면 상단 요약에는 오전/오후로 보여준다. */
 const MERIDIEMS = ["AM", "PM"];
@@ -459,6 +460,7 @@ const styles = StyleSheet.create({
   // 캘린더 요일 줄 아래까지 올라오는 큰 시트.
   // overflow hidden이라 피커 카드가 시트 아래에서 밀려 올라오는 것처럼 보인다.
   sheet: {
+    ...centeredSheetStyle,
     height: `${SHEET_HEIGHT_RATIO * 100}%`,
     overflow: "hidden",
     backgroundColor: "#FFFFFF",

@@ -1,4 +1,5 @@
 import { BackChevronIcon, CloseIcon, EditOutlineIcon, XXLogoIcon } from "@/components/icons";
+import { centeredContentStyle, centeredSheetStyle } from "@/lib/layout";
 import { setPendingScan, type ParsedTestItem } from "@/lib/report";
 import { parseTestReport } from "@/lib/ocr";
 import { scanDocumentImage } from "@/lib/scan";
@@ -162,7 +163,7 @@ export default function ScanDateConfirm() {
             </View>
           </View>
         ) : (
-          <View style={styles.content}>
+          <View style={[centeredContentStyle, styles.content]}>
             <XXLogoIcon width={65} />
             <Text style={styles.heading}>검사 날짜를{"\n"}확인해주세요</Text>
 
@@ -251,6 +252,7 @@ export default function ScanDateConfirm() {
         {!loading && (
           <Pressable
             style={({ pressed }) => [
+              centeredSheetStyle,
               styles.confirmButton,
               !selectedDate && styles.confirmButtonDisabled,
               pressed && selectedDate && styles.pressed,

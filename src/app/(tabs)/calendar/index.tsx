@@ -4,6 +4,7 @@ import {
   EditOutlineIcon,
   UpTriangleIcon,
 } from "@/components/icons";
+import { centeredContentStyle } from "@/lib/layout";
 import {
   hasSeenShareTip,
   loadPregnancyInfo,
@@ -184,7 +185,7 @@ export default function Calendar() {
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView style={centeredContentStyle} contentContainerStyle={styles.scrollContent}>
           {/* 안내 말풍선(디자인 y=118)은 헤더와 월 선택 줄 사이에 놓인다. */}
           <View style={styles.calloutRow}>
             {calloutVisible && (
@@ -778,7 +779,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   dialog: {
-    width: 326,
+    // 326 고정 대신 화면 폭 대비 85%로 잡아서, 아주 좁은 화면(구형 기기 등)에서도
+    // 좌우 여백 없이 잘리지 않는다. maxWidth로 큰 화면에서 과하게 커지는 것도 막는다.
+    width: "85%",
+    maxWidth: 326,
     backgroundColor: "#111111",
     borderRadius: 20,
     borderWidth: 1,
