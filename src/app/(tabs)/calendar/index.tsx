@@ -66,15 +66,23 @@ function buildMonthWeeks(
   // 산부인과 일정은 빈 원으로, 그 밖의 일정은 제목 텍스트로 보여준다.
   const monthPrefix = `${pad2(year % 100)}.${pad2(month + 1)}.`;
   const hospitalDays = new Set<number>();
-  const otherDayLabels: Record<number, string> = {};
+  const otherVisitsByDay: Record<number, string[]> = {};
   for (const visit of visits) {
     if (!visit.date.startsWith(monthPrefix)) continue;
     const day = Number(visit.date.slice(monthPrefix.length));
     if (visit.isHospital) {
       hospitalDays.add(day);
     } else {
-      otherDayLabels[day] = visit.title || visit.place;
+      const label = visit.title || visit.place;
+      (otherVisitsByDay[day] ??= []).push(label);
     }
+  }
+
+  // 같은 날 일정이 여러 개면 첫 제목 뒤에 남은 개수를 덧붙인다.
+  const otherDayLabels: Record<number, string> = {};
+  for (const [day, labels] of Object.entries(otherVisitsByDay)) {
+    otherDayLabels[Number(day)] =
+      labels.length > 1 ? `${labels[0]} +${labels.length - 1}` : labels[0];
   }
 
   const cells: DayCell[] = [];
@@ -571,6 +579,7 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     paddingBottom: 11,
     marginTop: 14,
+    boxShadow: "0 3px 3px rgba(0, 0, 0, 0.06)",
   },
   // 그리드는 좌측 주차 라벨(디자인 left 10) 자리를 비우고 left 54부터 시작한다.
   weekdayRow: {
@@ -651,6 +660,7 @@ const styles = StyleSheet.create({
     paddingTop: 15,
     paddingBottom: 8,
     marginTop: 19,
+    boxShadow: "0 3px 3px rgba(0, 0, 0, 0.06)",
   },
   visitsTitle: {
     marginLeft: 16,

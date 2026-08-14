@@ -166,6 +166,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFCFD",
     borderRadius: 14,
     overflow: "hidden",
+    boxShadow: "0 3px 3px rgba(0, 0, 0, 0.06)",
   },
   profileCard: {
     flexDirection: "row",

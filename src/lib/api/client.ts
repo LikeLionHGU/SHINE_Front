@@ -78,6 +78,13 @@ export async function getVisits(): Promise<CalendarVisit[]> {
   }
 }
 
+/** 하루에 등록된 일정 (시간 순) */
+export async function getVisitsByDate(date: VisitDate): Promise<CalendarVisit[]> {
+  // TODO(api): GET /visits?date=
+  const visits = await getVisits();
+  return visits.filter((visit) => visit.date === date);
+}
+
 /** 일정 추가·수정 */
 export async function saveVisit(visit: CalendarVisit): Promise<void> {
   // TODO(api): POST /visits (신규) 또는 PUT /visits/:id (수정)
@@ -86,6 +93,14 @@ export async function saveVisit(visit: CalendarVisit): Promise<void> {
   const next = exists
     ? visits.map((item) => (item.id === visit.id ? visit : item))
     : [...visits, visit];
+  await AsyncStorage.setItem(VISITS_KEY, JSON.stringify(next));
+}
+
+/** 일정 삭제 */
+export async function deleteVisit(id: string): Promise<void> {
+  // TODO(api): DELETE /visits/:id
+  const visits = await getVisits();
+  const next = visits.filter((visit) => visit.id !== id);
   await AsyncStorage.setItem(VISITS_KEY, JSON.stringify(next));
 }
 

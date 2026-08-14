@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
+  Modal,
   Pressable,
   ScrollView,
   Text,
@@ -10,9 +11,24 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { BackChevronIcon, ChevronRightIcon, PlusIcon } from "@/components/icons";
-import { getVisitDetail, type VisitDetail } from "@/lib/api";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import {
+  BackChevronIcon,
+  ChevronRightIcon,
+  EditOutlineIcon,
+  PlusIcon,
+  TrashIcon,
+} from "@/components/icons";
+import {
+  deleteVisit,
+  formatVisitTime,
+  getCalendarMonthMarks,
+  getVisitDetail,
+  getVisitsByDate,
+  type CalendarVisit,
+  type DayMark,
+  type VisitDetail,
+} from "@/lib/api";
 
 /** "2026-08-15" → "2026. 08. 15" */
 function formatDate(value: string | undefined) {
@@ -48,20 +64,84 @@ export default function CalendarDay() {
     hasAddedQuestion && questions[questions.length - 1].trim().length > 0;
 
   const [detail, setDetail] = useState<VisitDetail | null>(null);
+  // 하루에 여러 일정이 있을 수 있어, 각각을 따로 수정·삭제한다.
+  const [dayVisits, setDayVisits] = useState<CalendarVisit[]>([]);
+  const [pendingDelete, setPendingDelete] = useState<CalendarVisit | null>(null);
+
+  const visitKey = toVisitKey(date);
+
+  const [dayMark, setDayMark] = useState<DayMark | undefined>(undefined);
 
   useEffect(() => {
     let active = true;
-    getVisitDetail(toVisitKey(date)).then((result) => {
+    getVisitDetail(visitKey).then((result) => {
       if (active) setDetail(result);
+    });
+    return () => {
+      active = false;
+    };
+  }, [visitKey]);
+
+  // 산전 검사 기록이 있는 날인지 확인 (검사지·질문 카드 노출 여부를 가른다)
+  useEffect(() => {
+    if (!date) return;
+    const [year, month, day] = date.split("-").map(Number);
+    if (!year || !month || !day) return;
+    let active = true;
+    getCalendarMonthMarks(year, month - 1).then((marks) => {
+      if (active) setDayMark(marks.marks[day]);
     });
     return () => {
       active = false;
     };
   }, [date]);
 
+  // 일정 시트에서 돌아왔을 때 목록을 다시 읽는다.
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      getVisitsByDate(visitKey).then((visits) => {
+        if (active) setDayVisits(visits);
+      });
+      return () => {
+        active = false;
+      };
+    }, [visitKey]),
+  );
+
+  const openEditSheet = (visit: CalendarVisit) => {
+    router.push({
+      pathname: "/calendar-time",
+      params: {
+        mode: "edit",
+        visitId: visit.id,
+        date: visit.date,
+        title: visit.title,
+        place: visit.place,
+        meridiem: visit.meridiem,
+        hour: String(visit.hour),
+        minute: String(visit.minute),
+        isHospital: String(visit.isHospital),
+        questions: JSON.stringify(visit.questions),
+      },
+    });
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    await deleteVisit(pendingDelete.id);
+    setPendingDelete(null);
+    setDayVisits(await getVisitsByDate(visitKey));
+  };
+
   // 검사지가 아직 없는 일정은 질문도 준비되지 않은 상태로 보여준다.
   const previousReport = detail?.previousReport ?? null;
   const suggestedQuestions = detail?.suggestedQuestions ?? [];
+
+  // 산부인과 진료일에만 검사지·질문 카드를 노출한다.
+  // 다른 병원 일정만 있는 날은 일정 목록만 보여주면 충분하다.
+  const isPrenatalDay =
+    dayMark !== undefined || dayVisits.some((visit) => visit.isHospital);
 
   return (
     <View style={styles.container}>
@@ -80,6 +160,69 @@ export default function CalendarDay() {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Text style={styles.dateText}>{formatDate(date)}</Text>
 
+          {/* 이 날 등록된 일정들. 산부인과·타 병원이 섞여 있어도 각각 관리한다. */}
+          <View style={styles.scheduleCard}>
+            <View style={styles.scheduleHeader}>
+              <Text style={styles.scheduleTitle}>이 날의 일정</Text>
+              <Pressable
+                hitSlop={8}
+                onPress={() =>
+                  router.push({
+                    pathname: "/calendar-time",
+                    params: { date: visitKey },
+                  })
+                }
+              >
+                <Text style={styles.scheduleAddText}>추가</Text>
+              </Pressable>
+            </View>
+
+            {dayVisits.length === 0 ? (
+              <Text style={styles.scheduleEmptyText}>등록된 일정이 없습니다.</Text>
+            ) : (
+              dayVisits.map((visit, i) => (
+                <View
+                  key={visit.id}
+                  style={[styles.scheduleRow, i > 0 && styles.scheduleRowDivider]}
+                >
+                  <View
+                    style={[
+                      styles.scheduleTag,
+                      visit.isHospital
+                        ? styles.scheduleTagHospital
+                        : styles.scheduleTagOther,
+                    ]}
+                  />
+                  <View style={styles.scheduleInfo}>
+                    <Text style={styles.scheduleName} numberOfLines={1}>
+                      {visit.title || visit.place || "제목 없음"}
+                    </Text>
+                    <Text style={styles.scheduleMeta} numberOfLines={1}>
+                      {formatVisitTime(visit)}
+                      {visit.place ? ` · ${visit.place}` : ""}
+                    </Text>
+                  </View>
+                  <Pressable
+                    hitSlop={8}
+                    style={styles.scheduleAction}
+                    onPress={() => openEditSheet(visit)}
+                  >
+                    <EditOutlineIcon size={16} />
+                  </Pressable>
+                  <Pressable
+                    hitSlop={8}
+                    style={styles.scheduleAction}
+                    onPress={() => setPendingDelete(visit)}
+                  >
+                    <TrashIcon size={16} />
+                  </Pressable>
+                </View>
+              ))
+            )}
+          </View>
+
+          {isPrenatalDay && (
+          <>
           <View style={styles.reportCard}>
             <Text style={styles.reportLabelMuted}>당일검사지</Text>
             <Text style={styles.reportNote}>*진료 후 업로드됩니다</Text>
@@ -143,8 +286,42 @@ export default function CalendarDay() {
             )}
           </View>
           )}
+          </>
+          )}
         </ScrollView>
       </SafeAreaView>
+
+      <Modal
+        visible={pendingDelete !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPendingDelete(null)}
+      >
+        <View style={styles.dialogBackdrop}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>일정 삭제</Text>
+            <Text style={styles.dialogQuestion}>이 일정을 삭제하시겠습니까?</Text>
+            <Text style={styles.dialogTarget} numberOfLines={1}>
+              {pendingDelete?.title || pendingDelete?.place || ""}
+            </Text>
+            <Text style={styles.dialogNote}>삭제한 일정은 되돌릴 수 없습니다.</Text>
+
+            <View style={styles.dialogDivider} />
+            <View style={styles.dialogActions}>
+              <Pressable
+                style={styles.dialogAction}
+                onPress={() => setPendingDelete(null)}
+              >
+                <Text style={styles.dialogCancelText}>취소</Text>
+              </Pressable>
+              <View style={styles.dialogActionDivider} />
+              <Pressable style={styles.dialogAction} onPress={confirmDelete}>
+                <Text style={styles.dialogConfirmText}>삭제</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -186,6 +363,156 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Pretendard-Regular",
   },
+  // 하루의 일정 목록 카드
+  scheduleCard: {
+    marginBottom: 11,
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 6,
+    backgroundColor: "#FFFCFD",
+    borderRadius: 14,
+    boxShadow: "0 3px 3px rgba(0, 0, 0, 0.06)",
+  },
+  scheduleHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  scheduleTitle: {
+    color: "#111111",
+    fontSize: 14,
+    fontFamily: "Pretendard-SemiBold",
+  },
+  scheduleAddText: {
+    color: "#FA0C56",
+    fontSize: 13,
+    fontFamily: "Pretendard-SemiBold",
+  },
+  scheduleEmptyText: {
+    paddingVertical: 14,
+    textAlign: "center",
+    color: "#A0A0A0",
+    fontSize: 13,
+    fontFamily: "Pretendard-Medium",
+  },
+  scheduleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  scheduleRowDivider: {
+    borderTopWidth: 1,
+    borderTopColor: "#F5E9EE",
+  },
+  // 산부인과 일정은 키컬러, 그 외에는 중립색으로 한눈에 구분한다.
+  scheduleTag: {
+    width: 3,
+    height: 28,
+    borderRadius: 2,
+    marginRight: 10,
+  },
+  scheduleTagHospital: {
+    backgroundColor: "#FA0C56",
+  },
+  scheduleTagOther: {
+    backgroundColor: "#CFCFCF",
+  },
+  scheduleInfo: {
+    flex: 1,
+  },
+  scheduleName: {
+    color: "#111111",
+    fontSize: 14,
+    fontFamily: "Pretendard-Medium",
+  },
+  scheduleMeta: {
+    marginTop: 2,
+    color: "#A0A0A0",
+    fontSize: 12,
+    fontFamily: "Pretendard-Medium",
+  },
+  scheduleAction: {
+    paddingHorizontal: 6,
+  },
+  // 삭제 확인 다이얼로그 (공유하기 다이얼로그와 같은 스타일)
+  dialogBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dialog: {
+    width: 326,
+    backgroundColor: "#111111",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#CFCFCF",
+    overflow: "hidden",
+  },
+  dialogTitle: {
+    marginTop: 20,
+    textAlign: "center",
+    color: "#FFFCFD",
+    fontSize: 18,
+    lineHeight: 32,
+    fontFamily: "Pretendard-SemiBold",
+  },
+  dialogQuestion: {
+    marginTop: 18,
+    textAlign: "center",
+    color: "#FFFCFD",
+    fontSize: 14,
+    lineHeight: 18,
+    fontFamily: "Pretendard-Regular",
+  },
+  dialogTarget: {
+    marginTop: 6,
+    paddingHorizontal: 24,
+    textAlign: "center",
+    color: "#FF0A68",
+    fontSize: 20,
+    lineHeight: 26,
+    fontFamily: "Pretendard-Medium",
+  },
+  dialogNote: {
+    marginTop: 13,
+    marginBottom: 20,
+    textAlign: "center",
+    color: "#A0A0A0",
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: "Pretendard-Regular",
+  },
+  dialogDivider: {
+    height: 1,
+    backgroundColor: "#707070",
+  },
+  dialogActions: {
+    flexDirection: "row",
+    height: 49,
+  },
+  dialogAction: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dialogActionDivider: {
+    width: 1,
+    backgroundColor: "#707070",
+  },
+  dialogCancelText: {
+    color: "#A0A0A0",
+    fontSize: 16,
+    lineHeight: 26,
+    fontFamily: "Pretendard-Medium",
+  },
+  dialogConfirmText: {
+    color: "#FA0C56",
+    fontSize: 16,
+    lineHeight: 26,
+    fontFamily: "Pretendard-Medium",
+  },
   reportCard: {
     height: 52,
     flexDirection: "row",
@@ -193,6 +520,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     backgroundColor: "#FFFCFD",
     borderRadius: 14,
+    boxShadow: "0 3px 3px rgba(0, 0, 0, 0.06)",
   },
   reportCardSpacing: {
     marginTop: 11,
