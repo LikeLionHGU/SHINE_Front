@@ -25,6 +25,11 @@ const TAB_LABELS: Record<string, string> = {
   settings: "마이",
 };
 
+// analysis(리스트→리포트→상세)와 calendar(리스트→날짜별 상세)처럼 안에
+// 여러 화면이 쌓이는 탭들. 탭바에서 누르면 그 안쪽 어디에 있었든 항상
+// 탭의 첫 화면(index)으로 돌아간다.
+const NESTED_STACK_TABS = new Set(["analysis", "calendar"]);
+
 // Figma: 바텀 탭바 (둥근 상단 모서리 + 그림자 카드형 커스텀 탭바)
 // 사용처: src/app/(tabs)/_layout.tsx 에서 <Tabs tabBar={(props) => <CustomTabBar {...props} />}>
 // 로 연결돼 있어서, (tabs)/ 아래 스크린들은 이 탭바를 자동으로 공유한다.
@@ -49,7 +54,15 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
                   target: route.key,
                   canPreventDefault: true,
                 });
-                if (!focused && !event.defaultPrevented) {
+                if (event.defaultPrevented) return;
+
+                if (NESTED_STACK_TABS.has(route.name)) {
+                  // 이미 그 탭 안(리포트/상세 등)에 있어도 항상 index로 이동.
+                  navigation.navigate(route.name, { screen: "index" });
+                  return;
+                }
+
+                if (!focused) {
                   navigation.navigate(route.name);
                 }
               }}

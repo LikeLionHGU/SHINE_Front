@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, View } from "react-native";
-import Svg, { Path } from "react-native-svg";
+import Svg, { Circle, Path } from "react-native-svg";
 
 export function UserIcon({ size = 18 }: { size?: number }) {
   return (
@@ -407,6 +407,52 @@ export function MyTabIcon({ size = 24, color = "#A0A0A0" }: { size?: number; col
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    </Svg>
+  );
+}
+
+export function SparkleIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <Path
+        d="M7.8 1.5C8.25 4.83 9.96 6.54 13.3 7C9.96 7.45 8.25 9.16 7.8 12.5C7.35 9.16 5.64 7.45 2.3 7C5.64 6.54 7.35 4.83 7.8 1.5Z"
+        fill="#FA0C56"
+      />
+      <Path d="M12.8 11.2V14M11.4 12.6h2.8" stroke="#FF91B8" strokeWidth={1.2} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function UploadArrowIcon({ size = 22, color = "#FFFFFF" }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 17V6M7.5 10.5 12 6l4.5 4.5" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+// Figma: "upload-01" — 검사지 업로드 화면의 "사진 불러오기" 버튼 아이콘
+export function UploadCloudIcon({ size = 24, color = "#707070" }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 15V4M12 4L8.5 7.5M12 4l3.5 3.5" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M5 14v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export type IngredientIconName = "egg" | "salmon" | "spinach" | "mushroom";
+
+export function IngredientIcon({ name, size = 38 }: { name: IngredientIconName; size?: number }) {
+  const common = { stroke: "#FA0C56", strokeWidth: 1.6, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  return (
+    <Svg width={size} height={size} viewBox="0 0 40 40" fill="none">
+      {name === "egg" && <Path d="M20 5.5c-6.6 0-11 10.8-11 18.3C9 30.4 13.9 35 20 35s11-4.6 11-11.2C31 16.3 26.6 5.5 20 5.5Z" fill="#FFF" {...common} />}
+      {name === "egg" && <Circle cx="20" cy="24" r="5.2" fill="#FFC74D" />}
+      {name === "salmon" && <Path d="M6 21c5.2-8 14.8-10.2 24-5.8L35 11v14l-5-4.2C20.8 25.2 11.2 23 6 15c-1.4 2-1.4 4 0 6Z" fill="#FFB1CB" {...common} />}
+      {name === "salmon" && <Circle cx="12.5" cy="18" r="1.2" fill="#FA0C56" />}
+      {name === "spinach" && <Path d="M20 34V18M20 27c-7.7-.4-12-5-12-12 7.7.4 12 5 12 12Zm0-6c7.7-.4 12-5 12-12-7.7.4-12 5-12 12Z" fill="#DDF3CD" {...common} />}
+      {name === "mushroom" && <Path d="M8 20c0-7 5.4-12 12-12s12 5 12 12H8Zm8.3 0v11.5h7.4V20" fill="#FFE5EE" {...common} />}
     </Svg>
   );
 }
