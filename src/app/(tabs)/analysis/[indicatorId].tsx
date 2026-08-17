@@ -2,26 +2,47 @@ import { BackChevronIcon, CloseIcon, UpTriangleIcon } from "@/components/icons";
 import { StatusBadge } from "@/components/status-badge";
 import { TrendChart } from "@/components/trend-chart";
 import { centeredContentStyle, MAX_CONTENT_WIDTH } from "@/lib/layout";
-import { getTrendIndicator } from "@/lib/report";
+import { getTrend } from "@/lib/api";
+import type { TrendIndicator } from "@/lib/report";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // Figma(node 837:5500 분석_개별 상세 페이지): 선택한 지표의 추이 그래프 +
-// 종합 추이 상세 설명. 실제 지표 추출 API가 붙기 전까지는 데모 데이터
-// (lib/report.ts DEMO_TREND_INDICATORS)를 쓴다.
+// 종합 추이 상세 설명. 지표는 서버(GET /api/v1/app/trends/{id})에서 받아온다.
+// id는 검사 항목 코드 소문자다(hb, wbc, ferritin, vit_d, tsh).
 export default function AnalysisDetail() {
   const router = useRouter();
   const { indicatorId } = useLocalSearchParams<{ indicatorId: string }>();
   const { width: windowWidth } = useWindowDimensions();
-  const indicator = indicatorId ? getTrendIndicator(indicatorId) : null;
+  const [indicator, setIndicator] = useState<TrendIndicator | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!indicatorId) {
+      setLoading(false);
+      return;
+    }
+    let active = true;
+    setLoading(true);
+    getTrend(indicatorId).then((result) => {
+      if (!active) return;
+      setIndicator(result);
+      setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [indicatorId]);
 
   // 최근 두 검사 사이의 변화 방향으로 화살표를 결정한다.
-  const trendingUp = indicator
-    ? indicator.history[indicator.history.length - 1].value >= indicator.history[indicator.history.length - 2].value
-    : true;
+  // 측정이 1회뿐이면 비교할 이전 값이 없어 위쪽으로 둔다.
+  const history = indicator?.history ?? [];
+  const trendingUp =
+    history.length < 2 || history[history.length - 1].value >= history[history.length - 2].value;
 
   function goBack() {
     if (router.canGoBack()) router.back();
@@ -43,7 +64,9 @@ export default function AnalysisDetail() {
             </Pressable>
           </View>
           <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>지표를 찾을 수 없어요</Text>
+            <Text style={styles.emptyTitle}>
+              {loading ? "지표를 불러오는 중이에요" : "지표를 찾을 수 없어요"}
+            </Text>
           </View>
         </SafeAreaView>
       </View>
@@ -63,7 +86,8 @@ export default function AnalysisDetail() {
           <Pressable hitSlop={8} onPress={goBack}>
             <BackChevronIcon size={24} />
           </Pressable>
-          <Text style={styles.headerTitle}>분석</Text>
+          {/* 절대 위치라 헤더 전체를 덮는다 — pointerEvents를 꺼야 뒤로가기 버튼이 눌린다. */}
+          <Text style={styles.headerTitle} pointerEvents="none">분석</Text>
           <Pressable hitSlop={8} onPress={() => router.push("/(tabs)/home")}>
             <CloseIcon size={24} />
           </Pressable>

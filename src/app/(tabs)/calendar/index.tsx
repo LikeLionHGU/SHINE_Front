@@ -89,12 +89,20 @@ function buildMonthWeeks(
   const cells: DayCell[] = [];
   for (let i = 0; i < firstWeekday; i++) cells.push(null);
   for (let day = 1; day <= daysInMonth; day++) {
+    // 동그라미는 "검사지를 올린 날"(채운 점)과 "산부인과 진료가 있는 날"(빈 원)에만 찍는다.
+    //
+    // 서버 marks의 scheduled를 그대로 믿으면, 이비인후과처럼 산부인과가 아닌 일정에도
+    // 핑크 동그라미가 찍힌다. 일정 종류는 getVisits로 이미 정확히 알고 있으므로
+    // 서버 marks는 uploaded(검사지)만 신뢰하고, 진료 표시는 로컬 일정으로 판단한다.
+    const uploaded = monthMarks.marks[day] === "uploaded";
     cells.push({
       day,
-      // 서버가 내려준 검사 기록이 우선, 없으면 등록한 산부인과 일정으로 표시
-      dot:
-        monthMarks.marks[day] ??
-        (hospitalDays.has(day) ? ("scheduled" as DayMark) : undefined),
+      dot: uploaded
+        ? ("uploaded" as DayMark)
+        : hospitalDays.has(day)
+          ? ("scheduled" as DayMark)
+          : undefined,
+      // 산부인과가 아닌 일정은 동그라미 대신 제목 텍스트로 보여준다.
       appointment: otherDayLabels[day] ?? monthMarks.labels[day],
     });
   }

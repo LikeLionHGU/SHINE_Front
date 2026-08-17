@@ -1,17 +1,35 @@
 import { BackChevronIcon, ChevronRightIcon, XXLogoIcon } from "@/components/icons";
 import { centeredContentStyle } from "@/lib/layout";
-import { DEMO_RECORDS } from "@/lib/report";
+import { getRecords } from "@/lib/api";
+import type { RecordEntry } from "@/lib/report";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // Figma(node 837:4436 기록): 지금까지 업로드한 검사지들의 타임라인.
-// 항목을 누르면 그날의 "쉬운 번역본"으로 이동한다. 실제로는 검사지마다
-// 별도 리포트가 저장돼야 하지만, 지금은 마지막 리포트 1건만 보관하는
-// 구조라 목록 자체는 데모 데이터(lib/report.ts DEMO_RECORDS)를 쓴다.
+// 항목을 누르면 그날의 "쉬운 번역본"으로 이동한다.
+// 목록은 서버(GET /api/v1/app/records)에서 받아온다 — 서버가 없거나 요청이
+// 실패하면 @/lib/api가 데모 데이터로 되돌린다.
 export default function Record() {
   const router = useRouter();
+  const [records, setRecords] = useState<RecordEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      getRecords().then((result) => {
+        if (!active) return;
+        setRecords(result);
+        setLoading(false);
+      });
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
 
   function goBack() {
     if (router.canGoBack()) router.back();
@@ -37,7 +55,7 @@ export default function Record() {
           <Text style={styles.heading}>차곡차곡 쌓인{"\n"}나의 건강 기록</Text>
 
           <View style={styles.timeline}>
-            {DEMO_RECORDS.map((record, index) => (
+            {records.map((record, index) => (
               <View key={record.id}>
                 {index !== 0 && <View style={styles.connector} />}
                 <Pressable
@@ -45,7 +63,12 @@ export default function Record() {
                   onPress={() =>
                     // from=record를 같이 넘겨서, report.tsx의 뒤로가기가 분석 탭
                     // 안으로 파고들지 않고 이 기록 화면으로 되돌아오게 한다.
-                    router.push({ pathname: "/(tabs)/analysis/report", params: { from: "record" } })
+                    // recordId를 같이 넘겨야 report.tsx가 "마지막에 올린 검사지"가
+                    // 아니라 방금 누른 그 검사지를 서버에서 불러온다.
+                    router.push({
+                      pathname: "/(tabs)/analysis/report",
+                      params: { from: "record", recordId: record.id },
+                    })
                   }
                 >
                   <View style={styles.dateCol}>
@@ -62,6 +85,9 @@ export default function Record() {
                 </Pressable>
               </View>
             ))}
+            {!loading && records.length === 0 && (
+              <Text style={styles.emptyText}>아직 업로드한 검사지가 없어요.</Text>
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -109,5 +135,6 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   cardFeatured: { backgroundColor: "#FFFFFF" },
+  emptyText: { paddingVertical: 32, textAlign: "center", color: "#A0A0A0", fontFamily: "Pretendard-Regular", fontSize: 14 },
   cardText: { flex: 1, color: "#111", fontFamily: "Pretendard-Regular", fontSize: 14, lineHeight: 20, letterSpacing: -0.42 },
 });

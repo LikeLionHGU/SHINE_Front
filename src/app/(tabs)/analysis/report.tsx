@@ -6,10 +6,12 @@ import {
 } from "@/components/icons";
 import { StatusBadge } from "@/components/status-badge";
 import { centeredContentStyle, centeredSheetStyle } from "@/lib/layout";
+import { getQuestionsBySheet, getRecordDetail } from "@/lib/api";
 import {
   DEMO_SUMMARY,
   loadLastReport,
-  type LastReport,
+  type ParsedTestItem,
+  type ReportFood,
 } from "@/lib/report";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
@@ -46,10 +48,24 @@ const DEFAULT_QUESTIONS = ["Ex) 당 수치가 올라가고 있는데 괜찮나�
 // 검사지 업로드 직후(scan/analyzing.tsx → dismissTo)와 리스트 상단 날짜를
 // 눌렀을 때, 그리고 기록 탭(record.tsx, from=record 파라미터와 함께)에서
 // 도달하는 하위 화면이다.
+/**
+ * 이 화면이 실제로 그리는 것. 방금 올린 검사지는 로컬 사진(uri)이 있지만,
+ * 기록 탭에서 연 지난 검사지는 서버 데이터라 사진이 없어 uri가 비어 있다.
+ */
+type ReportView = {
+  uri?: string;
+  items?: ParsedTestItem[];
+  summary?: string;
+  questions?: string[];
+  foods?: ReportFood[];
+  /** 서버에서 불러온 지난 검사지인지. 이때는 없는 값을 데모로 채우지 않는다. */
+  fromServer?: boolean;
+};
+
 export default function AnalysisReport() {
   const router = useRouter();
-  const { from } = useLocalSearchParams<{ from?: string }>();
-  const [report, setReport] = useState<LastReport | null>(null);
+  const { from, recordId } = useLocalSearchParams<{ from?: string; recordId?: string }>();
+  const [report, setReport] = useState<ReportView | null>(null);
   const [checking, setChecking] = useState(true);
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [ingredientsOpen, setIngredientsOpen] = useState(true);
@@ -74,7 +90,25 @@ export default function AnalysisReport() {
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      loadLastReport().then((value) => {
+      // recordId가 있으면 기록 탭에서 지난 검사지를 연 것이다. 그때는 로컬에
+      // 남은 "마지막 리포트"가 아니라 그 검사지를 서버에서 불러와야 한다.
+      // (로컬은 1건만 보관해서, 예전엔 어느 기록을 눌러도 마지막 것만 떴다.)
+      const load: Promise<ReportView | null> = recordId
+        ? Promise.all([getRecordDetail(recordId), getQuestionsBySheet(recordId)]).then(
+            ([detail, questions]) =>
+              detail
+                ? {
+                    items: detail.items,
+                    summary: detail.summary,
+                    // 그 검사지에 달린 추천 질문. 없으면 질문 카드가 안내 문구로 바뀐다.
+                    questions: questions.map((q) => q.content),
+                    fromServer: true,
+                  }
+                : null,
+          )
+        : loadLastReport();
+
+      load.then((value) => {
         if (active) {
           setReport(value);
           setChecking(false);
@@ -83,7 +117,7 @@ export default function AnalysisReport() {
       return () => {
         active = false;
       };
-    }, []),
+    }, [recordId]),
   );
 
   const activeItem = activeItemIndex != null ? (report?.items?.[activeItemIndex] ?? null) : null;
@@ -93,6 +127,7 @@ export default function AnalysisReport() {
   const detail = activeItem
     ? {
         title: activeItem.name,
+        originalName: activeItem.originalName,
         status: activeItem.status,
         definition: activeItem.definition || "이 항목에 대한 설명을 아직 준비하지 못했어요.",
         verdict: activeItem.verdict || `이번 수치(${activeItem.value || "정보 없음"})에 대한 자세한 설명을 아직 준비하지 못했어요.`,
@@ -148,11 +183,15 @@ export default function AnalysisReport() {
             {/* 이미지 위 마커는 OCR이 추정한 위치가 부정확해서(항목 텍스트와
                 안 맞는 곳에 찍힘) 뺐다 — 항목 상세는 아래 종합 분석 표의
                 행을 눌러서만 연다. */}
-            <Text style={styles.sectionTitle}>검사 결과칸</Text>
-            <View style={[styles.imageWrap, { aspectRatio: imageAspect }]}>
-              <Image source={{ uri: report.uri }} style={[styles.image, styles.scanFilter]} resizeMode="contain" />
-            </View>
-            <Text style={styles.zoomHint}>*두 손가락으로 확대/축소를 해보세요</Text>
+            {report.uri && (
+              <>
+                <Text style={styles.sectionTitle}>검사 결과칸</Text>
+                <View style={[styles.imageWrap, { aspectRatio: imageAspect }]}>
+                  <Image source={{ uri: report.uri }} style={[styles.image, styles.scanFilter]} resizeMode="contain" />
+                </View>
+                <Text style={styles.zoomHint}>*두 손가락으로 확대/축소를 해보세요</Text>
+              </>
+            )}
 
             <View style={styles.card}>
               <Pressable style={styles.cardHeader} onPress={() => setSummaryOpen((v) => !v)}>
@@ -167,7 +206,12 @@ export default function AnalysisReport() {
                     <>
                       {/* generateReportInsights(lib/insights.ts)가 검사항목을 바탕으로
                           작성한 종합 소견. 생성 전이거나 실패했으면 데모 문구로 대체한다. */}
-                      <Text style={styles.summaryText}>{report.summary || DEMO_SUMMARY}</Text>
+                      <Text style={styles.summaryText}>
+                        {report.summary ||
+                          (report.fromServer
+                            ? "이 검사지에는 아직 종합 소견이 저장되지 않았어요."
+                            : DEMO_SUMMARY)}
+                      </Text>
                       <View style={styles.table}>
                         <View style={styles.tableHeaderRow}>
                           <Text style={[styles.tableHeaderCell, styles.colName]}>검사항목</Text>
@@ -184,9 +228,17 @@ export default function AnalysisReport() {
                             ]}
                             onPress={() => setActiveItemIndex(i)}
                           >
-                            <Text style={[styles.tableCell, styles.colName]} numberOfLines={2}>
-                              {item.name}
-                            </Text>
+                            <View style={styles.colName}>
+                              <Text style={styles.tableCell} numberOfLines={2}>
+                                {item.name}
+                              </Text>
+                              {/* 검사지에 인쇄된 원문 항목명. 종이와 대조할 수 있게 같이 보여준다. */}
+                              {item.originalName && (
+                                <Text style={styles.tableCellOriginal} numberOfLines={1}>
+                                  {item.originalName}
+                                </Text>
+                              )}
+                            </View>
                             <Text style={[styles.tableCell, styles.colValue]} numberOfLines={2}>
                               {item.value || "-"}
                             </Text>
@@ -198,7 +250,9 @@ export default function AnalysisReport() {
                       </View>
                     </>
                   ) : (
-                    <Text style={styles.summaryText}>{DEMO_SUMMARY}</Text>
+                    <Text style={styles.summaryText}>
+                      {report.fromServer ? "검사 항목을 불러오지 못했어요." : DEMO_SUMMARY}
+                    </Text>
                   )}
                 </>
               )}
@@ -206,13 +260,22 @@ export default function AnalysisReport() {
 
             <View style={styles.questionCard}>
               <Text style={styles.cardTitle}>다음 진료 추천 질문</Text>
-              {(report.questions && report.questions.length > 0 ? report.questions : DEFAULT_QUESTIONS).map(
-                (q, i) => (
+              {report.questions && report.questions.length > 0 ? (
+                report.questions.map((q, i) => (
                   <View key={i} style={styles.exampleRow}>
                     <SparkleIcon />
                     <Text style={styles.example}>{q}</Text>
                   </View>
-                ),
+                ))
+              ) : report.fromServer ? (
+                <Text style={styles.cardHint}>이 검사지에 저장된 추천 질문이 없어요.</Text>
+              ) : (
+                DEFAULT_QUESTIONS.map((q, i) => (
+                  <View key={i} style={styles.exampleRow}>
+                    <SparkleIcon />
+                    <Text style={styles.example}>{q}</Text>
+                  </View>
+                ))
               )}
               <View style={styles.inputWrap}>
                 <TextInput
@@ -234,16 +297,20 @@ export default function AnalysisReport() {
                 </View>
               </Pressable>
               {ingredientsOpen && (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ingredients}>
-                  {(report.foods && report.foods.length > 0
-                    ? report.foods
-                    : DEMO_INGREDIENTS.map((name) => ({ name, reason: "" }))
-                  ).map((food) => (
-                    <View key={food.name} style={styles.ingredient}>
-                      <Text style={styles.ingredientName}>{food.name}</Text>
-                    </View>
-                  ))}
-                </ScrollView>
+                report.foods?.length || !report.fromServer ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ingredients}>
+                    {(report.foods && report.foods.length > 0
+                      ? report.foods
+                      : DEMO_INGREDIENTS.map((name) => ({ name, reason: "" }))
+                    ).map((food) => (
+                      <View key={food.name} style={styles.ingredient}>
+                        <Text style={styles.ingredientName}>{food.name}</Text>
+                      </View>
+                    ))}
+                  </ScrollView>
+                ) : (
+                  <Text style={styles.cardHint}>이 검사지에 저장된 추천 재료가 없어요.</Text>
+                )
               )}
             </View>
           </ScrollView>
@@ -269,6 +336,9 @@ export default function AnalysisReport() {
               </Pressable>
               <View style={styles.sheetTitleRow}>
                 <Text style={styles.sheetTitle}>{detail.title}</Text>
+                {detail.originalName && (
+                  <Text style={styles.sheetTitleOriginal}>{detail.originalName}</Text>
+                )}
                 <StatusBadge status={detail.status} />
               </View>
               <Text style={styles.sheetDefinition}>{detail.definition}</Text>
@@ -334,7 +404,9 @@ const styles = StyleSheet.create({
   },
   tableRowLast: { borderBottomWidth: 0 },
   tableCell: { color: "#111", fontFamily: "Pretendard-Regular", fontSize: 13, lineHeight: 18, paddingRight: 6 },
-  colName: { flex: 1.15 },
+  colName: { flex: 1.15, paddingRight: 6 },
+  tableCellOriginal: { marginTop: 1, color: "#A0A0A0", fontFamily: "Pretendard-Regular", fontSize: 11, lineHeight: 15 },
+  cardHint: { paddingVertical: 8, paddingBottom: 14, color: "#A0A0A0", fontFamily: "Pretendard-Regular", fontSize: 13, lineHeight: 20 },
   colValue: { flex: 0.95 },
   colStatus: { width: 56, alignItems: "flex-start" },
 
@@ -377,6 +449,7 @@ const styles = StyleSheet.create({
   sheetClose: { position: "absolute", right: 20, top: 16 },
   sheetTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   sheetTitle: { color: "#111", fontFamily: "Pretendard-Medium", fontSize: 16 },
+  sheetTitleOriginal: { flex: 1, color: "#A0A0A0", fontFamily: "Pretendard-Regular", fontSize: 12 },
   sheetDefinition: { color: "#111", fontFamily: "Pretendard-Regular", fontSize: 12, lineHeight: 18 },
   sheetDivider: { height: StyleSheet.hairlineWidth, backgroundColor: "#E5E5E5" },
   sheetVerdict: { color: "#111", fontFamily: "Pretendard-Regular", fontSize: 12, lineHeight: 18 },

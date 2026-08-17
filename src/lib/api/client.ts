@@ -1,5 +1,14 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
+  DEMO_RECORDS,
+  DEMO_TREND_INDICATORS,
+  getTrendIndicator as getDemoTrendIndicator,
+  type IndicatorStatus,
+  type ParsedTestItem,
+  type RecordEntry,
+  type TrendIndicator,
+} from "@/lib/report";
+import {
   EMPTY_VISIT_DETAIL,
   MOCK_LATEST_REPORT,
   MOCK_MARKS_MONTH,
@@ -9,13 +18,19 @@ import {
   MOCK_SUGGESTED_QUESTIONS,
   MOCK_VISITS,
 } from "./mock-data";
-import { setAuthToken } from "./http";
+import { API_BASE_URL, apiRequest, setAuthToken, withFallback } from "./http";
 import type {
   AuthResult,
+  Home,
+  HomeQuestion,
+  RecordDetail,
+  Report,
   CalendarMonthMarks,
   CalendarVisit,
   LoginRequest,
   PregnancyInfo,
+  ReportResult,
+  ReportSubmission,
   SignupRequest,
   UserProfile,
   VisitDate,
@@ -25,12 +40,12 @@ import type {
 /**
  * 화면이 쓰는 데이터 접근 계층.
  *
- * 지금은 목 데이터와 기기 저장소로 동작한다. 서버가 준비되면 각 함수 본문을
- * apiRequest 호출로 바꾸기만 하면 되고, 화면 코드는 건드릴 필요가 없다.
+ * 실제 백엔드(API 명세서 v2)에 붙어 있다. EXPO_PUBLIC_API_BASE_URL이 비어 있거나
+ * 요청이 실패하면 withFallback이 예전 목 데이터/기기 저장소로 되돌리므로,
+ * 서버가 안 떠 있어도 화면은 그대로 동작한다(콘솔에 경고가 남는다).
  *
- *   export async function getUserProfile(): Promise<UserProfile> {
- *     return apiRequest<UserProfile>("/me");
- *   }
+ * 엔드포인트는 명세서 12절 "APP — 프론트 호환 계층"을 쓴다. 응답이 이미
+ * types.ts 모양(날짜 "26.08.24", 시간 meridiem/hour/minute)이라 변환이 거의 없다.
  */
 
 const VISITS_KEY = "shine.calendar.visits.v1";
@@ -39,62 +54,118 @@ const QUESTIONS_KEY = "shine.calendar.questions.v1";
 
 /* ---------------------------------------------------------------- 인증 */
 
+type TokenResponse = {
+  accessToken: string;
+  refreshToken?: string | null;
+  tokenType?: string;
+  expiresIn?: number;
+};
+
 /** 로그인. 성공하면 토큰을 저장해 이후 요청에 자동으로 붙는다. */
 export async function login(request: LoginRequest): Promise<AuthResult> {
-  // TODO(api): POST /auth/login
-  //   const result = await apiRequest<AuthResult>("/auth/login", {
-  //     method: "POST", body: request, skipAuth: true,
-  //   });
-  const result: AuthResult = { token: "mock-token", profile: MOCK_PROFILE };
-  await setAuthToken(result.token);
-  return result;
+  const tokens = await apiRequest<TokenResponse>("/auth/login", {
+    method: "POST",
+    skipAuth: true,
+    body: {
+      loginId: request.accountId,
+      password: request.password,
+      // 자동 로그인일 때만 서버가 refreshToken을 발급한다.
+      autoLogin: request.autoLogin ?? false,
+    },
+  });
+
+  await setAuthToken(tokens.accessToken, tokens.refreshToken ?? null);
+  return { token: tokens.accessToken, profile: await getUserProfile() };
 }
 
-/** 회원가입. 로그인과 마찬가지로 토큰을 저장한다. */
+/** 회원가입. 가입 직후 바로 로그인해서 토큰까지 받아둔다. */
 export async function signup(request: SignupRequest): Promise<AuthResult> {
-  // TODO(api): POST /auth/signup
-  const result: AuthResult = {
-    token: "mock-token",
-    profile: {
-      ...MOCK_PROFILE,
+  await apiRequest("/auth/signup", {
+    method: "POST",
+    skipAuth: true,
+    body: {
       name: request.name,
-      phone: request.phone,
+      loginId: request.accountId,
+      password: request.password,
+      pregnancyWeek: request.pregnancyWeek,
+      phoneNumber: request.phone,
       email: request.email,
-      guardianEmail: request.guardianEmail,
+      // 선택 항목이라 빈 문자열 대신 생략한다.
+      ...(request.guardianEmail.trim() ? { guardianEmail: request.guardianEmail.trim() } : {}),
     },
-  };
-  await setAuthToken(result.token);
-  // 목 구현에서는 가입 정보를 기기에 남겨 캘린더 주차 계산에 쓴다.
-  await savePregnancyInfo(request.pregnancyWeek);
+  });
+
+  // 가입 응답에는 토큰이 없다(명세서 2절) — 같은 자격증명으로 이어서 로그인한다.
+  const result = await login({
+    accountId: request.accountId,
+    password: request.password,
+    autoLogin: true,
+  });
+
+  // 캘린더 주차 계산이 서버 응답을 기다리지 않아도 되도록 기기에도 남겨둔다.
+  await cachePregnancyInfo(request.pregnancyWeek);
   return result;
 }
 
 /** 로그아웃. 저장된 토큰을 지운다. */
 export async function logout(): Promise<void> {
-  // TODO(api): POST /auth/logout
+  try {
+    await apiRequest("/auth/logout", { method: "POST" });
+  } catch (error) {
+    // 서버 호출이 실패해도 기기에서는 반드시 로그아웃시킨다.
+    console.warn("[api] 로그아웃 요청 실패:", error);
+  }
   await setAuthToken(null);
 }
 
 /* ------------------------------------------------------------ 사용자 정보 */
 
-/** 마이 페이지 프로필 */
+/** 마이 페이지 프로필 — GET /api/v1/app/me */
 export async function getUserProfile(): Promise<UserProfile> {
-  // TODO(api): GET /me
-  return MOCK_PROFILE;
+  return withFallback("getUserProfile", () => apiRequest<UserProfile>("/app/me"), () => MOCK_PROFILE);
 }
 
 /* -------------------------------------------------------------- 임신 정보 */
 
-/** 회원가입에서 받은 임신 주차 저장 */
+/** 임신 주차 저장 — PATCH /api/v1/users/me/pregnancy */
 export async function savePregnancyInfo(week: number): Promise<void> {
-  // TODO(api): PUT /me/pregnancy
+  await cachePregnancyInfo(week);
+  await withFallback(
+    "savePregnancyInfo",
+    async () => {
+      await apiRequest("/users/me/pregnancy", { method: "PATCH", body: { pregnancyWeek: week } });
+    },
+    () => undefined,
+  );
+}
+
+async function cachePregnancyInfo(week: number) {
   const info: PregnancyInfo = { week, recordedAt: new Date().toISOString() };
   await AsyncStorage.setItem(PREGNANCY_KEY, JSON.stringify(info));
 }
 
-/** 캘린더 주차 계산의 기준이 되는 임신 정보 */
+/**
+ * 캘린더 주차 계산의 기준이 되는 임신 정보 — GET /api/v1/users/me
+ *
+ * 서버는 최종월경일 하나만 저장하고 매번 "오늘 기준 주수"를 계산해서 준다.
+ * 캘린더(lib/pregnancy.ts)는 "기준 시점 + 그때의 주차"로 다른 주를 역산하므로,
+ * 받은 주차의 기준 시점은 오늘이 된다.
+ */
 export async function getPregnancyInfo(): Promise<PregnancyInfo | null> {
-  // TODO(api): GET /me/pregnancy
+  return withFallback(
+    "getPregnancyInfo",
+    async () => {
+      const me = await apiRequest<{ pregnancyWeek?: number }>("/users/me");
+      if (typeof me?.pregnancyWeek !== "number") return readCachedPregnancyInfo();
+      const info: PregnancyInfo = { week: me.pregnancyWeek, recordedAt: new Date().toISOString() };
+      await AsyncStorage.setItem(PREGNANCY_KEY, JSON.stringify(info));
+      return info;
+    },
+    readCachedPregnancyInfo,
+  );
+}
+
+async function readCachedPregnancyInfo(): Promise<PregnancyInfo | null> {
   const raw = await AsyncStorage.getItem(PREGNANCY_KEY);
   if (!raw) return null;
   try {
@@ -108,21 +179,34 @@ export async function getPregnancyInfo(): Promise<PregnancyInfo | null> {
 
 /** 보호자에게 공유할 때 쓰는 메일 주소 */
 export async function getGuardianEmail(): Promise<string> {
-  // TODO(api): GET /me → guardianEmail
-  return MOCK_PROFILE.guardianEmail;
+  const profile = await getUserProfile();
+  return profile.guardianEmail ?? "";
 }
 
+/* ---------------------------------------------------------------- 캘린더 */
+
 /**
- * 캘린더 한 달치 검사 기록(원 표시·라벨).
- * 사용자가 등록한 일정은 getVisits로 따로 받아 화면에서 합친다.
+ * 캘린더 한 달치 검사 기록(원 표시·라벨) — GET /api/v1/app/calendar/marks
+ *
+ * 호출부는 Date.getMonth() 값(0~11)을 그대로 넘기지만 서버는 1~12를 받는다.
  */
 export async function getCalendarMonthMarks(
   year: number,
   month: number,
 ): Promise<CalendarMonthMarks> {
-  // TODO(api): GET /calendar/marks?year=&month=
-  const isMockMonth = year === MOCK_MARKS_YEAR && month === MOCK_MARKS_MONTH;
-  return isMockMonth ? MOCK_MONTH_MARKS : { marks: {}, labels: {} };
+  return withFallback(
+    "getCalendarMonthMarks",
+    async () => {
+      const result = await apiRequest<Partial<CalendarMonthMarks>>(
+        `/app/calendar/marks?year=${year}&month=${month + 1}`,
+      );
+      return { marks: result?.marks ?? {}, labels: result?.labels ?? {} };
+    },
+    () => {
+      const isMockMonth = year === MOCK_MARKS_YEAR && month === MOCK_MARKS_MONTH;
+      return isMockMonth ? MOCK_MONTH_MARKS : { marks: {}, labels: {} };
+    },
+  );
 }
 
 /** 목록은 항상 빠른 날짜·시간 순으로 보여준다. */
@@ -135,9 +219,16 @@ function sortVisits(visits: CalendarVisit[]) {
   });
 }
 
-/** 등록한 일정 전체 */
+/** 등록한 일정 전체 — GET /api/v1/app/visits */
 export async function getVisits(): Promise<CalendarVisit[]> {
-  // TODO(api): GET /visits
+  return withFallback(
+    "getVisits",
+    async () => sortVisits((await apiRequest<CalendarVisit[]>("/app/visits")) ?? []),
+    readStoredVisits,
+  );
+}
+
+async function readStoredVisits(): Promise<CalendarVisit[]> {
   const stored = await AsyncStorage.getItem(VISITS_KEY);
   if (!stored) return MOCK_VISITS;
   try {
@@ -149,73 +240,126 @@ export async function getVisits(): Promise<CalendarVisit[]> {
 
 /** 하루에 등록된 일정 (시간 순) */
 export async function getVisitsByDate(date: VisitDate): Promise<CalendarVisit[]> {
-  // TODO(api): GET /visits?date=
   const visits = await getVisits();
   return visits.filter((visit) => visit.date === date);
 }
 
-/** 일정 추가·수정 */
-export async function saveVisit(visit: CalendarVisit): Promise<void> {
-  // TODO(api): POST /visits (신규) 또는 PUT /visits/:id (수정)
-  const visits = await getVisits();
-  const exists = visits.some((item) => item.id === visit.id);
-  const next = exists
-    ? visits.map((item) => (item.id === visit.id ? visit : item))
-    : [...visits, visit];
-  await AsyncStorage.setItem(VISITS_KEY, JSON.stringify(next));
+/**
+ * 일정 추가·수정 — POST /api/v1/app/visits
+ *
+ * id는 서버가 발급한다. 새 일정이면 프론트가 만든 임시 id(`visit-<timestamp>`)는
+ * 버려지고 서버 id가 담긴 일정이 돌아오므로, 저장 후에는 항상 getVisits로 다시 읽는다.
+ */
+export async function saveVisit(visit: CalendarVisit): Promise<CalendarVisit> {
+  return withFallback(
+    "saveVisit",
+    async () => (await apiRequest<CalendarVisit>("/app/visits", { method: "POST", body: visit })) ?? visit,
+    async () => {
+      const visits = await readStoredVisits();
+      const exists = visits.some((item) => item.id === visit.id);
+      const next = exists
+        ? visits.map((item) => (item.id === visit.id ? visit : item))
+        : [...visits, visit];
+      await AsyncStorage.setItem(VISITS_KEY, JSON.stringify(next));
+      return visit;
+    },
+  );
 }
 
-/** 일정 삭제 */
+/** 일정 삭제 — DELETE /api/v1/app/visits/{id} */
 export async function deleteVisit(id: string): Promise<void> {
-  // TODO(api): DELETE /visits/:id
-  const visits = await getVisits();
-  const next = visits.filter((visit) => visit.id !== id);
-  await AsyncStorage.setItem(VISITS_KEY, JSON.stringify(next));
+  await withFallback(
+    "deleteVisit",
+    async () => {
+      await apiRequest(`/app/visits/${encodeURIComponent(id)}`, { method: "DELETE" });
+    },
+    async () => {
+      const visits = await readStoredVisits();
+      await AsyncStorage.setItem(VISITS_KEY, JSON.stringify(visits.filter((v) => v.id !== id)));
+    },
+  );
 }
 
 /**
- * 특정 날짜의 진료 상세.
- *
- * 이전 검사지는 "다음 진료"까지만 존재한다. 그 뒤에 잡힌 일정은 아직 직전
- * 진료가 끝나지 않았으므로 검사지도 질문도 준비되지 않은 상태로 내려준다.
+ * 특정 날짜의 진료 상세 — GET /api/v1/app/visits/{date}/detail
+ * `date`는 "26.08.24" 형식이다.
  */
 export async function getVisitDetail(date: VisitDate): Promise<VisitDetail> {
-  // TODO(api): GET /visits/:date/detail
-  const visits = await getVisits();
+  return withFallback(
+    "getVisitDetail",
+    async () => {
+      const detail = await apiRequest<VisitDetail>(`/app/visits/${encodeURIComponent(date)}/detail`);
+      return {
+        todayReport: withAbsoluteUrl(detail?.todayReport ?? null),
+        previousReport: withAbsoluteUrl(detail?.previousReport ?? null),
+        suggestedQuestions: detail?.suggestedQuestions ?? [],
+        questions: detail?.questions ?? [],
+      };
+    },
+    () => readStoredVisitDetail(date),
+  );
+}
+
+/**
+ * 검사지 참조를 화면이 쓸 수 있게 다듬는다.
+ * - 이미지 경로가 `/api/v1/...` 상대 경로라 앞에 호스트를 붙이고
+ * - 그 경로에 박혀 있는 검사지 id를 뽑아둔다. 이 id가 있어야 카드를 눌러
+ *   분석 화면으로 넘어갈 수 있다. (응답에 id 필드가 따로 없다)
+ */
+function withAbsoluteUrl(report: Report | null): Report | null {
+  if (!report) return null;
+  const matched = report.url?.match(/test-sheets\/(\d+)\//);
+  const testSheetId = matched ? Number(matched[1]) : report.testSheetId;
+  const url =
+    report.url && !/^https?:\/\//.test(report.url) ? `${API_BASE_URL}${report.url}` : report.url;
+  return { ...report, url, testSheetId };
+}
+
+async function readStoredVisitDetail(date: VisitDate): Promise<VisitDetail> {
+  const visits = await readStoredVisits();
   const today = formatVisitDate(new Date());
   const nextVisit = visits.find((visit) => visit.date >= today);
   const reportReady = !nextVisit || date <= nextVisit.date;
-
   if (!reportReady) return EMPTY_VISIT_DETAIL;
 
   return {
     todayReport: null,
     previousReport: MOCK_LATEST_REPORT,
     suggestedQuestions: MOCK_SUGGESTED_QUESTIONS,
-    questions: await getVisitQuestions(date),
+    questions: await readStoredQuestions(date),
   };
 }
 
 /** 그 날 진료에서 직접 물어보려고 적어둔 질문 */
 export async function getVisitQuestions(date: VisitDate): Promise<string[]> {
-  // TODO(api): GET /visits/:date/questions
-  const raw = await AsyncStorage.getItem(QUESTIONS_KEY);
-  if (!raw) return [];
-  try {
-    const byDate = JSON.parse(raw) as Record<string, string[]>;
-    return byDate[date] ?? [];
-  } catch {
-    return [];
-  }
+  const detail = await getVisitDetail(date);
+  return detail.questions;
 }
 
-/** 질문 목록 저장 (빈 칸은 제외하고 보관한다) */
-export async function saveVisitQuestions(
-  date: VisitDate,
-  questions: string[],
-): Promise<void> {
-  // TODO(api): PUT /visits/:date/questions
+/**
+ * 질문 목록 저장 (빈 칸은 제외하고 보관한다).
+ *
+ * 호환 계층에는 질문 전용 엔드포인트가 없고, 일정에 붙은 `questions` 배열을
+ * 통째로 교체하는 방식이다 — 그 날 일정을 찾아 같이 저장한다.
+ * 일정이 없는 날은 서버에 붙일 곳이 없어 기기에만 남긴다.
+ */
+export async function saveVisitQuestions(date: VisitDate, questions: string[]): Promise<void> {
   const cleaned = questions.map((q) => q.trim()).filter(Boolean);
+  await cacheQuestions(date, cleaned);
+
+  await withFallback(
+    "saveVisitQuestions",
+    async () => {
+      const dayVisits = await getVisitsByDate(date);
+      const target = dayVisits.find((visit) => visit.isHospital) ?? dayVisits[0];
+      if (!target) return;
+      await apiRequest("/app/visits", { method: "POST", body: { ...target, questions: cleaned } });
+    },
+    () => undefined,
+  );
+}
+
+async function cacheQuestions(date: VisitDate, cleaned: string[]) {
   const raw = await AsyncStorage.getItem(QUESTIONS_KEY);
   let byDate: Record<string, string[]> = {};
   try {
@@ -226,6 +370,190 @@ export async function saveVisitQuestions(
   byDate[date] = cleaned;
   await AsyncStorage.setItem(QUESTIONS_KEY, JSON.stringify(byDate));
 }
+
+async function readStoredQuestions(date: VisitDate): Promise<string[]> {
+  const raw = await AsyncStorage.getItem(QUESTIONS_KEY);
+  if (!raw) return [];
+  try {
+    return (JSON.parse(raw) as Record<string, string[]>)[date] ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/* ------------------------------------------------------------ 기록 · 분석 */
+
+/** 기록 탭 타임라인 — GET /api/v1/app/records */
+export async function getRecords(): Promise<RecordEntry[]> {
+  return withFallback(
+    "getRecords",
+    async () => (await apiRequest<RecordEntry[]>("/app/records")) ?? [],
+    () => DEMO_RECORDS,
+  );
+}
+
+/**
+ * 지난 검사지 한 건 — GET /api/v1/test-sheets/{id}
+ *
+ * `/app/records`는 목록만 주기 때문에 상세는 이쪽을 쓴다. 응답이 `results[]`
+ * (itemName·statusLabel·description) 구조라 화면이 쓰는 ParsedTestItem으로 옮긴다.
+ */
+export async function getRecordDetail(id: string): Promise<RecordDetail | null> {
+  return withFallback(
+    "getRecordDetail",
+    async () => {
+      const sheet = await apiRequest<TestSheetDetailResponse>(
+        `/test-sheets/${encodeURIComponent(id)}`,
+      );
+      return sheet ? toRecordDetail(sheet) : null;
+    },
+    () => null,
+  );
+}
+
+type TestResultResponse = {
+  itemName?: string | null;
+  itemNameEn?: string | null;
+  ocrLabel?: string | null;
+  rawValue?: string | null;
+  numberValue?: number | null;
+  textValue?: string | null;
+  unit?: string | null;
+  normalMin?: number | null;
+  normalMax?: number | null;
+  statusLabel?: string | null;
+  description?: string | null;
+};
+
+type TestSheetDetailResponse = {
+  testSheetId: number;
+  testDate?: string | null;
+  pregnancyWeek?: number | null;
+  hospitalName?: string | null;
+  summary?: { summaryForMom?: string | null } | null;
+  results?: TestResultResponse[] | null;
+};
+
+const STATUS_LABELS: IndicatorStatus[] = ["안심", "주의", "위험"];
+
+function toRecordDetail(sheet: TestSheetDetailResponse): RecordDetail {
+  return {
+    testSheetId: sheet.testSheetId,
+    testDate: sheet.testDate ?? "",
+    week: sheet.pregnancyWeek != null ? `${sheet.pregnancyWeek}주차` : "",
+    hospitalName: sheet.hospitalName ?? null,
+    summary: sheet.summary?.summaryForMom ?? "",
+    items: (sheet.results ?? []).map(toParsedItem),
+  };
+}
+
+function toParsedItem(result: TestResultResponse): ParsedTestItem {
+  const label = result.statusLabel?.trim() ?? "";
+  const name = result.itemName?.trim() || result.ocrLabel?.trim() || "";
+  const printed = result.ocrLabel?.trim() || result.itemNameEn?.trim() || "";
+  return {
+    // 매칭이 안 된 항목은 카탈로그 대표명이 없어 OCR 원문을 그대로 보여준다.
+    name,
+    // 대표명과 같은 글자면 두 번 보여줄 이유가 없다.
+    originalName: printed && printed !== name ? printed : undefined,
+    value: formatResultValue(result),
+    // statusLabel이 없으면 서버가 판정하지 못한 항목(UNKNOWN)이다.
+    status: STATUS_LABELS.includes(label as IndicatorStatus) ? (label as IndicatorStatus) : "미분류",
+    definition: result.description?.trim() ?? "",
+    // 이 응답에는 판정 문장(verdict)이 없다. 진단처럼 읽힐 문장을 만들지 않고
+    // 측정치와 참고치를 그대로 다시 적어주기만 한다.
+    verdict: composeVerdict(result),
+  };
+}
+
+/** "12.2 g/dL (11~15)" 형태로 합친다. */
+function formatResultValue(result: TestResultResponse): string {
+  const base =
+    result.rawValue?.trim() ||
+    (result.numberValue != null ? String(result.numberValue) : "") ||
+    result.textValue?.trim() ||
+    "";
+  if (!base) return "";
+  const withUnit = result.unit?.trim() ? `${base} ${result.unit.trim()}` : base;
+  const hasRange = result.normalMin != null && result.normalMax != null;
+  return hasRange ? `${withUnit} (${result.normalMin}~${result.normalMax})` : withUnit;
+}
+
+function composeVerdict(result: TestResultResponse): string {
+  const value = formatResultValue(result);
+  if (!value) return "";
+  const hasRange = result.normalMin != null && result.normalMax != null;
+  const range = hasRange ? ` 이 검사의 참고 범위는 ${result.normalMin}~${result.normalMax}예요.` : "";
+  return `이번에 기록된 수치는 ${value}예요.${range}`;
+}
+
+/** 분석 탭 지표 목록 — GET /api/v1/app/trends */
+export async function getTrends(): Promise<TrendIndicator[]> {
+  return withFallback(
+    "getTrends",
+    async () => (await apiRequest<TrendIndicator[]>("/app/trends")) ?? [],
+    () => DEMO_TREND_INDICATORS,
+  );
+}
+
+/**
+ * 지표 하나의 추이 상세 — GET /api/v1/app/trends/{id}
+ * id는 검사 항목 코드 소문자다 (`hb`, `wbc`, `ferritin`, `vit_d`, `tsh`).
+ */
+export async function getTrend(id: string): Promise<TrendIndicator | null> {
+  return withFallback(
+    "getTrend",
+    async () => (await apiRequest<TrendIndicator>(`/app/trends/${encodeURIComponent(id)}`)) ?? null,
+    () => getDemoTrendIndicator(id),
+  );
+}
+
+/* ---------------------------------------------------------------- 홈 */
+
+/**
+ * 홈 화면 전체 — GET /api/v1/home
+ *
+ * 인사말·최신 검사지 요약·추천 질문·추천 재료·주간 캘린더를 한 번에 준다.
+ * 검사지가 없으면 latestSheet는 null이고 questions·nutritions는 빈 배열이다.
+ */
+export async function getHome(): Promise<Home | null> {
+  return withFallback("getHome", async () => (await apiRequest<Home>("/home")) ?? null, () => null);
+}
+
+/**
+ * 특정 검사지에 달린 질문 — GET /api/v1/questions?testSheetId=
+ * 기록 탭에서 지난 검사지를 열었을 때 그때의 추천 질문을 보여주는 데 쓴다.
+ */
+export async function getQuestionsBySheet(testSheetId: string | number): Promise<HomeQuestion[]> {
+  return withFallback(
+    "getQuestionsBySheet",
+    async () => {
+      const result = await apiRequest<{ items?: HomeQuestion[] } | HomeQuestion[]>(
+        `/questions?testSheetId=${encodeURIComponent(String(testSheetId))}`,
+      );
+      // 목록 응답이 { items: [...] } 인지 배열인지 명세가 갈려서 둘 다 받는다.
+      if (Array.isArray(result)) return result;
+      return result?.items ?? [];
+    },
+    () => [],
+  );
+}
+
+/* ------------------------------------------------------------ 검사지 업로드 */
+
+/**
+ * 프론트 OCR·AI 결과를 서버에 보낸다 — POST /api/v1/reports
+ *
+ * 돌아오는 값은 서버가 **임신 기준으로 다시 판정한** 교정본이다.
+ * (검사지에 인쇄된 참고치는 비임신 기준인 경우가 많아, 혈색소 11.5처럼
+ * OCR이 "주의"로 본 값이 "안심"으로 바뀐다 — 명세서 6절.)
+ * 화면에는 이 교정본을 보여준다.
+ */
+export async function submitReport(submission: ReportSubmission): Promise<ReportResult> {
+  return apiRequest<ReportResult>("/reports", { method: "POST", body: submission });
+}
+
+/* ---------------------------------------------------------------- 유틸 */
 
 /** Date → "YY.MM.DD" */
 export function formatVisitDate(value: Date): VisitDate {

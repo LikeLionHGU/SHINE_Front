@@ -3,9 +3,10 @@ import {
   SparkleIcon,
   XXLogoIcon,
 } from "@/components/icons";
+import { getHome, type Home } from "@/lib/api";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -16,10 +17,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { centeredContentStyle } from "@/lib/layout";
-
-const INGREDIENTS = ["달걀", "연어", "시금치", "버섯"];
-
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 // Figma(node 671:3009 "image 54 1")는 단일 이미지 애셋(은은한 핑크 글로우)이라
 // 별도 삽화 없이 그라디언트로 재현한다. 실제 PNG 애셋을 쓰고 싶다면 Figma에서
@@ -37,13 +34,33 @@ function UploadGlow() {
   );
 }
 
+// 홈은 GET /api/v1/home 한 번으로 인사말·최신 검사지 요약·추천 질문·추천 재료·
+// 주간 캘린더를 전부 받는다. 검사지를 아직 안 올렸으면 latestSheet가 null이고
+// questions·nutritions가 빈 배열로 오는데, 그때는 각 카드가 안내 문구로 바뀐다.
 export default function Home() {
   const router = useRouter();
   const [question, setQuestion] = useState("");
-  const days = useMemo(
-    () => [15, 16, 17, 18, 19, 20, 21].map((date, index) => ({ date, day: WEEKDAYS[index] })),
-    [],
+  const [home, setHome] = useState<Home | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      getHome().then((result) => {
+        if (!active) return;
+        setHome(result);
+        setLoading(false);
+      });
+      return () => {
+        active = false;
+      };
+    }, []),
   );
+
+  const latestSheet = home?.latestSheet ?? null;
+  const questions = home?.questions ?? [];
+  const nutritions = home?.nutritions ?? [];
+  const days = home?.weeklyCalendar ?? [];
 
   return (
     <View style={styles.container}>
@@ -56,7 +73,7 @@ export default function Home() {
           keyboardShouldPersistTaps="handled"
         >
           <XXLogoIcon width={65} />
-          <Text style={styles.heading}>지금 내 몸은 어떻게{"\n"}변하고 있을까요?</Text>
+          <Text style={styles.heading}>{home?.greeting || "지금 내 몸은 어떻게\n변하고 있을까요?"}</Text>
 
           <Pressable style={({ pressed }) => [styles.uploadCard, pressed && styles.pressed]} onPress={() => router.push("/(modals)/scan")}>
             <UploadGlow />
@@ -68,8 +85,20 @@ export default function Home() {
           </Pressable>
 
           <View style={styles.questionCard}>
-            <View style={styles.exampleRow}><SparkleIcon /><Text style={styles.example}>Ex) 당 수치가 올라가고 있는데 괜찮나요?</Text></View>
-            <View style={styles.exampleRow}><SparkleIcon /><Text style={styles.example}>Ex) 비타민 D 수치가 떨어지고 있는데 괜찮나요?</Text></View>
+            {loading ? (
+              <Text style={styles.cardHint}>질문을 불러오는 중이에요...</Text>
+            ) : questions.length > 0 ? (
+              questions.slice(0, 2).map((item) => (
+                <View key={item.questionId} style={styles.exampleRow}>
+                  <SparkleIcon />
+                  <Text style={styles.example} numberOfLines={1}>{item.content}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.cardHint}>
+                검사지를 올리면 진료 때 여쭤볼 질문을 추천해드려요.
+              </Text>
+            )}
             <View style={styles.inputWrap}>
               <TextInput
                 value={question}
@@ -83,37 +112,50 @@ export default function Home() {
             </View>
           </View>
 
-          <Pressable style={({ pressed }) => [styles.analysisCard, pressed && styles.pressed]} onPress={() => router.push("/(tabs)/analysis")}>
+          <Pressable style={({ pressed }) => [styles.analysisCard, pressed && styles.pressed]} onPress={() =>
+              latestSheet
+                ? router.push({
+                    pathname: "/(tabs)/analysis/report",
+                    params: { recordId: String(latestSheet.testSheetId) },
+                  })
+                : router.push("/(tabs)/analysis")
+            }
+          >
             <View style={styles.analysisLink}><Text style={styles.sectionTitle}>분석</Text><ChevronRightIcon size={20} /></View>
-            <Text style={styles.analysisText}>쉬운 번역본 두줄이 요약되어 적힙니다.{"\n"}관련 결과 전체적으로 안정적인 수치를 띄...</Text>
+            <Text style={styles.analysisText} numberOfLines={2}>
+              {latestSheet?.summaryPreview || "검사지를 올리면 쉬운 번역본 요약을 여기서 볼 수 있어요."}
+            </Text>
           </Pressable>
 
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>추천 재료</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ingredients}>
-              {INGREDIENTS.map((name) => (
-                <View key={name} style={styles.ingredient}>
-                  <Text style={styles.ingredientName}>{name}</Text>
+              {nutritions.map((food) => (
+                <View key={`${food.name}-${food.nutrient}`} style={styles.ingredient}>
+                  <Text style={styles.ingredientName} numberOfLines={1}>{food.name}</Text>
                 </View>
               ))}
-              <View style={styles.moreDots}><View style={styles.dot} /><View style={[styles.dot, styles.dotMuted]} /><View style={[styles.dot, styles.dotFaint]} /></View>
+              {!loading && nutritions.length === 0 && (
+                <Text style={styles.cardHint}>
+                  {latestSheet
+                    ? "이번 검사에서는 특별히 보충할 항목이 없어요."
+                    : "검사지를 올리면 맞춤 재료를 추천해드려요."}
+                </Text>
+              )}
             </ScrollView>
           </View>
 
           <Pressable style={({ pressed }) => [styles.calendarCard, pressed && styles.pressed]} onPress={() => router.push("/(tabs)/calendar")}>
             <Text style={styles.sectionTitle}>캘린더</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.days}>
-              {days.map(({ date, day }) => {
-                const selected = date === 16;
-                return (
-                  <View key={date} style={[styles.dayCard, selected && styles.dayCardSelected]}>
-                    <Text style={[styles.dayNumber, selected && styles.daySelectedText]}>{date}</Text>
-                    <Text style={[styles.dayLabel, selected && styles.daySelectedText]}>{day}</Text>
-                    {selected && <View style={styles.eventDot} />}
-                    {date === 18 && <Text style={styles.appointment}>이비인후..</Text>}
-                  </View>
-                );
-              })}
+              {days.map((item) => (
+                <View key={item.date} style={[styles.dayCard, item.isToday && styles.dayCardSelected]}>
+                  <Text style={[styles.dayNumber, item.isToday && styles.daySelectedText]}>{item.day}</Text>
+                  <Text style={[styles.dayLabel, item.isToday && styles.daySelectedText]}>{item.dayOfWeek}</Text>
+                  {item.hasAppointment && <View style={styles.eventDot} />}
+                  {item.label && <Text style={styles.appointment} numberOfLines={1}>{item.label}</Text>}
+                </View>
+              ))}
             </ScrollView>
           </Pressable>
         </ScrollView>
@@ -150,7 +192,8 @@ const styles = StyleSheet.create({
   uploadButtonText: { color: "#111", fontFamily: "Pretendard-SemiBold", fontSize: 12 },
   questionCard: { height: 113, paddingHorizontal: 18, paddingTop: 11, borderRadius: 14, backgroundColor: "#FFFCFD", ...shadow },
   exampleRow: { height: 21, flexDirection: "row", alignItems: "center", gap: 9 },
-  example: { color: "#707070", fontFamily: "Pretendard-Medium", fontSize: 14 },
+  example: { color: "#707070", fontFamily: "Pretendard-Medium", fontSize: 14, flex: 1 },
+  cardHint: { paddingVertical: 6, color: "#A0A0A0", fontFamily: "Pretendard-Regular", fontSize: 13, lineHeight: 20 },
   inputWrap: { height: 41, marginTop: 7, borderRadius: 8, flexDirection: "row", alignItems: "center", backgroundColor: "#FFF0F6" },
   input: { flex: 1, height: "100%", paddingHorizontal: 15, color: "#111", fontFamily: "Pretendard-Medium", fontSize: 14 },
   send: { marginRight: 14, color: "#FA0C56", fontFamily: "Pretendard-SemiBold", fontSize: 18 },

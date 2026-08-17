@@ -26,6 +26,8 @@ const PREGNANCY_WEEKS = Array.from({ length: 42 }, (_, i) => i + 1);
 // 폼 상태로 처리한다 (플레이스홀더 vs 입력값 텍스트).
 export default function Signup() {
   const router = useRouter();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
   const [name, setName] = useState("");
   const [id, setId] = useState("");
   const [password, setPassword] = useState("");
@@ -193,24 +195,35 @@ export default function Signup() {
         </ScrollView>
 
         <View style={styles.bottomArea}>
+          {error !== "" && <Text style={styles.errorText}>{error}</Text>}
           <Pressable
             style={[styles.submitButton, canSubmit && styles.submitButtonEnabled]}
-            disabled={!canSubmit}
+            disabled={!canSubmit || submitting}
             onPress={async () => {
-              // 캘린더의 주차 표시는 여기서 보낸 주차를 기준으로 계산된다.
-              await signup({
-                name,
-                accountId: id,
-                password,
-                phone,
-                email: ownEmail,
-                guardianEmail,
-                pregnancyWeek,
-              });
-              router.replace("/home");
+              if (submitting) return;
+              setSubmitting(true);
+              setError("");
+              try {
+                // 캘린더의 주차 표시는 여기서 보낸 주차를 기준으로 계산된다.
+                await signup({
+                  name,
+                  accountId: id,
+                  password,
+                  phone,
+                  email: ownEmail,
+                  guardianEmail,
+                  pregnancyWeek,
+                });
+                router.replace("/home");
+              } catch (e) {
+                // 아이디 중복(DUPLICATE_LOGIN_ID)·검증 실패 등 서버 메시지를 그대로 보여준다.
+                setError(e instanceof Error ? e.message : "회원가입에 실패했어요.");
+              } finally {
+                setSubmitting(false);
+              }
             }}
           >
-            <Text style={styles.submitButtonText}>완료</Text>
+            <Text style={styles.submitButtonText}>{submitting ? "가입 중..." : "완료"}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -351,6 +364,13 @@ const styles = StyleSheet.create({
   bottomArea: {
     paddingHorizontal: 16,
     paddingBottom: 8,
+  },
+  errorText: {
+    marginBottom: 8,
+    textAlign: "center",
+    color: "#FA0C56",
+    fontSize: 13,
+    fontFamily: "Pretendard-Medium",
   },
   submitButton: {
     height: 46,

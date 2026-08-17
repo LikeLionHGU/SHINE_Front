@@ -1,11 +1,12 @@
 import { StyleSheet, Text, View } from "react-native";
 import type { IndicatorStatus } from "@/lib/report";
 
-// Figma(node 671:4531 Frame2085671652): 지표 판정 배지 3종.
+// Figma(node 671:4531 Frame2085671652): 지표 판정 배지 3종 + 판정 불가(회색).
 const STATUS_COLORS: Record<IndicatorStatus, string> = {
   안심: "#CDFFD1",
   주의: "#FFEECD",
   위험: "#FFCDCD",
+  미분류: "#EDEDED",
 };
 
 export function StatusBadge({ status }: { status: IndicatorStatus }) {

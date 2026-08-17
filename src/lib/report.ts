@@ -21,6 +21,10 @@ export type LastReport = {
   questions?: string[];
   /** 부족하거나 신경 써야 할 성분을 보완하는 데 도움되는 추천 음식. 생성 실패 시 없을 수 있다. */
   foods?: ReportFood[];
+  /** 서버(POST /api/v1/reports)가 발급한 검사지 id. 서버 전송에 실패했으면 없다. */
+  testSheetId?: number;
+  /** 서버가 계산한 검사 당시 임신 주차 스냅샷("12주차"). 서버 전송에 실패했으면 없다. */
+  week?: string;
 };
 
 export async function saveLastReport(data: {
@@ -30,6 +34,8 @@ export async function saveLastReport(data: {
   summary?: string;
   questions?: string[];
   foods?: ReportFood[];
+  testSheetId?: number;
+  week?: string;
 }) {
   const report: LastReport = { ...data, uploadedAt: new Date().toISOString() };
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(report));
@@ -78,7 +84,9 @@ export function takePendingScan(uri: string): PendingScan | null {
 export const DEMO_SUMMARY =
   "관련 결과 전체적으로 안정적인 수치를 띄며 B형·C형 간염, 매독, HIV 검사에서 모두 이상이 발견되지 않았어요.\n지금 시기에는 비타민 D를 충분히 보충해주는 것이 좋아요.";
 
-export type IndicatorStatus = "안심" | "주의" | "위험";
+// "미분류"는 서버가 판정하지 못한 항목(카탈로그 미매칭, 혈액형처럼 정상/이상 개념이
+// 없는 항목)이다. OCR은 이 값을 만들지 않고, 지난 검사지를 서버에서 불러올 때만 나온다.
+export type IndicatorStatus = "안심" | "주의" | "위험" | "미분류";
 
 // lib/ocr.ts(OpenAI Vision)가 검사지 사진에서 실제로 읽어낸 한 줄.
 // definition/verdict는 report.tsx의 지표 상세 하단 시트(기존 DEMO_INDICATORS와
@@ -94,6 +102,12 @@ export type ParsedTestItem = {
   definition: string;
   /** 이번에 읽은 수치가 왜 이 상태로 판정됐는지에 대한 설명 (1~2문장) */
   verdict: string;
+  /**
+   * 검사지에 실제로 인쇄돼 있던 원문 항목명 (예: "Hemoglobin", "혈색소(헤모글로빈)").
+   * 서버가 카탈로그 대표명("혈색소")으로 바꿔주기 때문에, 사용자가 손에 든 종이와
+   * 대조할 수 있도록 원문을 같이 들고 다닌다. 대표명과 같으면 비워둔다.
+   */
+  originalName?: string;
 };
 
 export type IndicatorDetail = {

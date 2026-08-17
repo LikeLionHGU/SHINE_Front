@@ -28,6 +28,7 @@ import {
   saveVisitQuestions,
   type CalendarVisit,
   type DayMark,
+  type Report,
   type VisitDetail,
 } from "@/lib/api";
 
@@ -75,6 +76,7 @@ export default function CalendarDay() {
     hasAddedQuestion && questions[questions.length - 1].trim().length > 0;
 
   const [detail, setDetail] = useState<VisitDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(true);
   // 하루에 여러 일정이 있을 수 있어, 각각을 따로 수정·삭제한다.
   const [dayVisits, setDayVisits] = useState<CalendarVisit[]>([]);
   const [pendingDelete, setPendingDelete] = useState<CalendarVisit | null>(null);
@@ -85,9 +87,11 @@ export default function CalendarDay() {
 
   useEffect(() => {
     let active = true;
+    setDetailLoading(true);
     getVisitDetail(visitKey).then((result) => {
       if (!active) return;
       setDetail(result);
+      setDetailLoading(false);
       // 저장해둔 질문이 있으면 이어서 편집할 수 있게 채운다.
       setQuestions(result.questions.length > 0 ? [...result.questions, ""] : [""]);
     });
@@ -143,6 +147,19 @@ export default function CalendarDay() {
     });
   };
 
+  /**
+   * 검사지 카드를 누르면 그 검사지의 분석 화면으로 넘어간다.
+   * id는 서버가 준 이미지 경로에서 뽑아낸 값이라(응답에 별도 필드가 없다)
+   * 없을 수도 있는데, 그때는 눌러도 아무 일도 일어나지 않게 둔다.
+   */
+  const openReport = (report: Report | null) => {
+    if (!report?.testSheetId) return;
+    router.push({
+      pathname: "/(tabs)/analysis/report",
+      params: { recordId: String(report.testSheetId) },
+    });
+  };
+
   const confirmDelete = async () => {
     if (!pendingDelete) return;
     await deleteVisit(pendingDelete.id);
@@ -152,6 +169,7 @@ export default function CalendarDay() {
 
   // 검사지가 아직 없는 일정은 질문도 준비되지 않은 상태로 보여준다.
   const previousReport = detail?.previousReport ?? null;
+  const todayReport = detail?.todayReport ?? null;
   const suggestedQuestions = detail?.suggestedQuestions ?? [];
 
   // 산부인과 진료일에만 검사지·질문 카드를 노출한다.
@@ -239,13 +257,24 @@ export default function CalendarDay() {
 
           {isPrenatalDay && (
           <>
-          <View style={styles.reportCard}>
-            <Text style={styles.reportLabelMuted}>당일검사지</Text>
-            <Text style={styles.reportNote}>*진료 후 업로드됩니다</Text>
-          </View>
+          {todayReport ? (
+            <Pressable style={styles.reportCard} onPress={() => openReport(todayReport)}>
+              <Text style={styles.reportLabel}>당일검사지</Text>
+              <Text style={styles.reportDate}>{todayReport.date}</Text>
+              <ChevronRightIcon size={20} />
+            </Pressable>
+          ) : (
+            <View style={styles.reportCard}>
+              <Text style={styles.reportLabelMuted}>당일검사지</Text>
+              <Text style={styles.reportNote}>*진료 후 업로드됩니다</Text>
+            </View>
+          )}
 
           {previousReport ? (
-            <Pressable style={[styles.reportCard, styles.reportCardSpacing]}>
+            <Pressable
+              style={[styles.reportCard, styles.reportCardSpacing]}
+              onPress={() => openReport(previousReport)}
+            >
               <Text style={styles.reportLabel}>이전검사지</Text>
               <Text style={styles.reportDate}>{previousReport.date}</Text>
               <ChevronRightIcon size={20} />
@@ -257,7 +286,11 @@ export default function CalendarDay() {
             </View>
           )}
 
-          {!previousReport ? (
+          {detailLoading ? (
+            <View style={[styles.questionCard, styles.questionCardEmpty]}>
+              <Text style={styles.questionEmptyText}>질문을 불러오는 중이에요...</Text>
+            </View>
+          ) : !previousReport ? (
             <View style={[styles.questionCard, styles.questionCardEmpty]}>
               <Text style={styles.questionEmptyText}>
                 검사지 업로드 후 관련 질문을 확인하실 수 있습니다

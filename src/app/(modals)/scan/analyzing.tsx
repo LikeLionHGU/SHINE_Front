@@ -2,6 +2,7 @@ import { saveLastReport, takePendingScan, type ParsedTestItem, type ReportFood }
 import { parseTestReport } from "@/lib/ocr";
 import { generateReportInsights } from "@/lib/insights";
 import { scanDocumentImage } from "@/lib/scan";
+import { submitReport } from "@/lib/api";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
@@ -18,9 +19,16 @@ const MIN_VISIBLE_MS = 1200;
 // (date-confirm을 거치지 않고 이 화면으로 바로 들어온 경우를 대비해, pendingScan이
 // 없으면 예전처럼 scanDocumentImage + parseTestReport를 직접 실행하는 방어 경로도
 // 남겨뒀다.) 검사항목이 있으면 generateReportInsights(lib/insights.ts)로 종합
-// 소견/추천 질문/추천 음식까지 생성해서 함께 저장한다 — report.tsx의 "종합 분석",
-// "질문 입력하기", "추천 재료" 칸이 이 값을 보여준다. 처리가 너무 빨리 끝나도
-// 애니메이션이 최소 MIN_VISIBLE_MS만큼은 보이도록 한다.
+// 소견/추천 질문/추천 음식까지 생성한다.
+//
+// 그렇게 만든 결과 전체를 서버(POST /api/v1/reports)로 보내고, 서버가 **임신 기준으로
+// 다시 판정한 교정본**을 받아 저장한다 — 검사지에 인쇄된 참고치는 비임신 기준인
+// 경우가 많아서(혈색소 11.5 → 검사지 기준 "주의", 임신 기준 "안심") 화면에는
+// 서버 판정을 보여줘야 맞다. 항목명도 카탈로그 대표명("헤모글로빈" → "혈색소")으로
+// 통일돼 돌아온다. 전송이 실패하면 프론트 OCR 결과 그대로 저장해 화면은 살려둔다.
+//
+// report.tsx의 "종합 분석", "질문 입력하기", "추천 재료" 칸이 이 값을 보여준다.
+// 처리가 너무 빨리 끝나도 애니메이션이 최소 MIN_VISIBLE_MS만큼은 보이도록 한다.
 export default function ScanAnalyzing() {
   const router = useRouter();
   const { uri, testDate } = useLocalSearchParams<{ uri?: string; testDate?: string }>();
@@ -64,6 +72,7 @@ export default function ScanAnalyzing() {
           try {
             const result = await parseTestReport(finalUri);
             items = result.items;
+            resolvedTestDate = resolvedTestDate ?? toStoredDate(result.reportDate);
           } catch (error) {
             // OCR 파싱이 실패해도(키 미설정, 네트워크 오류 등) 스캔 자체는
             // 계속 진행한다 — 종합분석 칸은 기본 문구로 대체된다.
@@ -90,13 +99,60 @@ export default function ScanAnalyzing() {
         }
       }
 
+      // 서버에 올리고 교정본을 받아온다. 검사항목이 하나도 없으면 보낼 게 없다.
+      let testSheetId: number | undefined;
+      let week: string | undefined;
+
+      if (items && items.length > 0) {
+        try {
+          const corrected = await submitReport({
+            testDate: resolvedTestDate,
+            items,
+            summary,
+            questions,
+            foods,
+          });
+
+          // 서버가 임신 기준으로 다시 판정하고 대표명·검수된 설명으로 바꿔준 값으로 교체한다.
+          // 이때 항목명이 "헤모글로빈" → "혈색소"로 바뀌므로, 사용자가 손에 든 검사지와
+          // 대조할 수 있도록 OCR이 읽은 원문명을 같이 붙여둔다. 서버가 원문을 돌려주지
+          // 않아서 순서로 짝짓는데, 개수가 다르면 잘못 붙을 수 있으니 그때는 포기한다.
+          if (corrected?.items?.length) {
+            const ocrNames = items?.map((item) => item.name) ?? [];
+            const sameLength = ocrNames.length === corrected.items.length;
+            items = corrected.items.map((item, i) => {
+              const printed = sameLength ? ocrNames[i] : undefined;
+              return printed && printed !== item.name ? { ...item, originalName: printed } : item;
+            });
+          }
+          if (corrected?.summary) summary = corrected.summary;
+          if (corrected?.questions?.length) questions = corrected.questions;
+          if (corrected?.foods?.length) foods = corrected.foods;
+          if (corrected?.testDate) resolvedTestDate = corrected.testDate;
+          testSheetId = corrected?.testSheetId;
+          week = corrected?.week;
+        } catch (error) {
+          // 서버 전송이 실패해도(로그인 만료, 서버 미기동 등) 프론트 OCR 결과로
+          // 화면은 그대로 보여준다. 다만 판정은 검사지 인쇄 기준이라 임신 기준과
+          // 다를 수 있다.
+          console.warn("[scan] 검사지 서버 전송 실패:", error);
+        }
+      }
+
       await minVisible;
       if (cancelled) return;
 
       if (finalUri) {
-        await saveLastReport({ uri: finalUri, items, testDate: resolvedTestDate, summary, questions, foods }).catch(
-          () => {},
-        );
+        await saveLastReport({
+          uri: finalUri,
+          items,
+          testDate: resolvedTestDate,
+          summary,
+          questions,
+          foods,
+          testSheetId,
+          week,
+        }).catch(() => {});
       }
       router.dismissTo("/(tabs)/analysis/report");
     })();
@@ -122,6 +178,14 @@ export default function ScanAnalyzing() {
       </SafeAreaView>
     </View>
   );
+}
+
+/** OCR이 읽은 "2026-08-20" → 앱이 쓰는 "26.08.20". 못 읽었으면 undefined. */
+function toStoredDate(reportDate: string | null): string | undefined {
+  if (!reportDate) return undefined;
+  const [year, month, day] = reportDate.split("-");
+  if (!year || !month || !day) return undefined;
+  return `${year.slice(2)}.${month}.${day}`;
 }
 
 const styles = StyleSheet.create({

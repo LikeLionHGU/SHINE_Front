@@ -2,40 +2,53 @@ import { BackChevronIcon, ChevronRightIcon } from "@/components/icons";
 import { StatusBadge } from "@/components/status-badge";
 import { MiniTrendLine } from "@/components/trend-chart";
 import { centeredContentStyle } from "@/lib/layout";
-import { DEMO_TREND_INDICATORS, loadLastReport, type LastReport } from "@/lib/report";
+import { getTrends } from "@/lib/api";
+import type { TrendIndicator } from "@/lib/report";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// DEMO_TREND_INDICATORS의 모든 지표가 같은 4개 날짜(4월 20일~8월 1일)를 x축으로
-// 공유해서, 그중 아무 지표의 history나 날짜 목록으로 쓸 수 있다. 최신 날짜가
-// 마지막 항목이라 기본 선택값은 배열의 끝이다.
-const DATE_LABELS = DEMO_TREND_INDICATORS[0]?.history.map((point) => point.date) ?? [];
-
 // Figma(node 837:4354 분석): "분석" 탭의 실제 진입 화면 — 검사지에서 뽑힌
-// 지표들을 한눈에 볼 수 있는 리스트. 상단 날짜 옆 화살표로 지난 검사 날짜를
-// 오갈 수 있다(실제 지표 추출 API가 붙기 전까지는 지표 값 자체는 데모 데이터
-// DEMO_TREND_INDICATORS로 고정 — 날짜 이동은 라벨만 바뀐다). 행을 누르면
-// 개별 추이 상세([indicatorId].tsx, node 837:5500)로 이동한다.
+// 지표들을 한눈에 볼 수 있는 리스트. 지표는 서버(GET /api/v1/app/trends)에서
+// 받아온다 — 꺾은선을 그릴 수 있는 정량 항목만 오고, 각 지표의 history가
+// 지금까지 올린 검사지의 날짜별 값이다. 상단 날짜 옆 화살표로 지난 검사
+// 날짜를 오갈 수 있다(라벨 이동). 행을 누르면 개별 추이 상세
+// ([indicatorId].tsx, node 837:5500)로 이동한다.
 export default function Analysis() {
   const router = useRouter();
-  const [report, setReport] = useState<LastReport | null>(null);
   const [checking, setChecking] = useState(true);
   const [query, setQuery] = useState("");
-  const [dateIndex, setDateIndex] = useState(Math.max(0, DATE_LABELS.length - 1));
-  const canGoPrevDate = dateIndex > 0;
-  const canGoNextDate = dateIndex < DATE_LABELS.length - 1;
+  const [indicators, setIndicators] = useState<TrendIndicator[]>([]);
+  const [dateIndex, setDateIndex] = useState(0);
+
+  // 모든 지표가 같은 검사일들을 x축으로 공유하므로, 가장 많은 점을 가진
+  // 지표의 날짜 목록을 상단 날짜 네비게이션의 기준으로 쓴다.
+  const dateLabels = useMemo(() => {
+    const longest = indicators.reduce<TrendIndicator | null>(
+      (best, item) => (!best || item.history.length > best.history.length ? item : best),
+      null,
+    );
+    return longest?.history.map((point) => point.date) ?? [];
+  }, [indicators]);
+
+  const safeDateIndex = Math.min(dateIndex, Math.max(0, dateLabels.length - 1));
+  const canGoPrevDate = safeDateIndex > 0;
+  const canGoNextDate = safeDateIndex < dateLabels.length - 1;
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      loadLastReport().then((value) => {
-        if (active) {
-          setReport(value);
-          setChecking(false);
-        }
+      // 빈 상태 판단 기준은 "이 기기에서 올린 검사지"가 아니라 서버에 쌓인 지표다.
+      // 로컬 리포트로 막아두면 기기를 바꾸거나 앱을 다시 깔았을 때, 서버에
+      // 검사지가 있는데도 분석 탭이 빈 화면으로 뜬다.
+      getTrends().then((result) => {
+        if (!active) return;
+        setIndicators(result);
+        // 최신 검사일이 배열의 끝이라 기본 선택값은 마지막 항목이다.
+        setDateIndex(Math.max(0, (result[0]?.history.length ?? 1) - 1));
+        setChecking(false);
       });
       return () => {
         active = false;
@@ -45,9 +58,9 @@ export default function Analysis() {
 
   const filtered = useMemo(() => {
     const q = query.trim();
-    if (!q) return DEMO_TREND_INDICATORS;
-    return DEMO_TREND_INDICATORS.filter((item) => item.title.includes(q));
-  }, [query]);
+    if (!q) return indicators;
+    return indicators.filter((item) => item.title.includes(q));
+  }, [indicators, query]);
 
   function goBack() {
     if (router.canGoBack()) router.back();
@@ -66,7 +79,7 @@ export default function Analysis() {
           <View style={{ width: 24 }} />
         </View>
 
-        {!checking && !report && (
+        {!checking && indicators.length === 0 && (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>아직 분석된 검사지가 없어요</Text>
             <Text style={styles.emptyBody}>검사지를 업로드하면 지표별 추이를 볼 수 있어요.</Text>
@@ -79,7 +92,7 @@ export default function Analysis() {
           </View>
         )}
 
-        {report && (
+        {indicators.length > 0 && (
           <ScrollView style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             <View style={styles.dateNav}>
               <Pressable
@@ -90,12 +103,12 @@ export default function Analysis() {
                 <BackChevronIcon size={24} color={canGoPrevDate ? "#414141" : "#D8D8D8"} />
               </Pressable>
               <Pressable onPress={() => router.push("/(tabs)/analysis/report")} hitSlop={6}>
-                <Text style={styles.dateHeading}>{DATE_LABELS[dateIndex] ?? ""}</Text>
+                <Text style={styles.dateHeading}>{dateLabels[safeDateIndex] ?? ""}</Text>
               </Pressable>
               <Pressable
                 hitSlop={8}
                 disabled={!canGoNextDate}
-                onPress={() => setDateIndex((i) => Math.min(DATE_LABELS.length - 1, i + 1))}
+                onPress={() => setDateIndex((i) => Math.min(dateLabels.length - 1, i + 1))}
               >
                 <View style={{ transform: [{ rotate: "180deg" }] }}>
                   <BackChevronIcon size={24} color={canGoNextDate ? "#414141" : "#D8D8D8"} />

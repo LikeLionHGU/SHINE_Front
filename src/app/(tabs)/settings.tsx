@@ -15,7 +15,7 @@ import {
   ToggleSwitch,
   XXLogoIcon,
 } from "@/components/icons";
-import { getUserProfile, type UserProfile } from "@/lib/api";
+import { getUserProfile, logout, type UserProfile } from "@/lib/api";
 
 // Figma: 환경설정 (바텀탭 "마이")
 // 프로필 카드, 개인정보(연락처/이메일), 기본 설정(카메라 동의/알림/FAQ/이용약관/환경설정).
@@ -24,10 +24,22 @@ export default function Settings() {
   const [cameraConsent, setCameraConsent] = useState(true);
   const [notifications, setNotifications] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     getUserProfile().then(setProfile);
   }, []);
+
+  // 서버 호출이 실패해도 기기의 토큰은 지워지므로(logout 내부에서 처리) 항상 로그인 화면으로 보낸다.
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logout();
+    } finally {
+      router.replace("/login");
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -121,6 +133,14 @@ export default function Settings() {
               <ChevronRightIcon />
             </Pressable>
           </View>
+
+          <Pressable
+            style={({ pressed }) => [styles.logoutButton, pressed && styles.logoutButtonPressed]}
+            disabled={loggingOut}
+            onPress={handleLogout}
+          >
+            <Text style={styles.logoutText}>{loggingOut ? "로그아웃 중..." : "로그아웃"}</Text>
+          </Pressable>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -241,6 +261,22 @@ const styles = StyleSheet.create({
   },
   settingsCard: {
     paddingHorizontal: 20,
+  },
+  logoutButton: {
+    marginTop: 24,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FFD9E8",
+    backgroundColor: "#FFFCFD",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoutButtonPressed: { opacity: 0.7 },
+  logoutText: {
+    color: "#FA0C56",
+    fontSize: 16,
+    fontFamily: "Pretendard-SemiBold",
   },
   settingsRow: {
     flexDirection: "row",

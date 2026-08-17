@@ -592,6 +592,8 @@ const styles = StyleSheet.create({
     right: -34,
     bottom: 0,
     paddingTop: 28,
+    // 휠이 카드 바닥에 딱 붙어 잘려 보여서 아래쪽 여백을 준다.
+    paddingBottom: 36,
     alignItems: "center",
     backgroundColor: "#FFFCFD",
     elevation: 3,

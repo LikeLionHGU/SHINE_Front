@@ -26,7 +26,8 @@ export default function Login() {
     setSubmitting(true);
     setError("");
     try {
-      await login({ accountId, password });
+      // 자동 로그인을 켰을 때만 서버가 refreshToken을 발급한다(명세서 1.2절).
+      await login({ accountId, password, autoLogin });
       router.replace("/home");
     } catch (e) {
       setError(e instanceof Error ? e.message : "로그인에 실패했어요.");
