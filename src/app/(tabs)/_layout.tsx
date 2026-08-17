@@ -19,8 +19,10 @@ export default function TabsLayout() {
       <LinearGradient colors={["#FFFCFD", "#FFEBF3"]} style={StyleSheet.absoluteFill} />
       <Tabs
         tabBar={(props) => <CustomTabBar {...props} />}
-        screenOptions={{ headerShown: false }}
-        sceneContainerStyle={{ backgroundColor: "transparent" }}
+        screenOptions={{
+          headerShown: false,
+          sceneStyle: { backgroundColor: "transparent" },
+        }}
       >
         <Tabs.Screen name="home" />
         <Tabs.Screen name="analysis" />

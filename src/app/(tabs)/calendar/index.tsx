@@ -7,12 +7,10 @@ import {
 import { centeredContentStyle } from "@/lib/layout";
 import {
   hasSeenShareTip,
-  loadPregnancyInfo,
   markShareTipSeen,
   PREGNANCY_LAST_WEEK,
   pregnancyWeekOf,
   startOfWeek,
-  type PregnancyInfo,
 } from "@/lib/pregnancy";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -22,10 +20,12 @@ import {
   formatVisitTime,
   getCalendarMonthMarks,
   getGuardianEmail,
+  getPregnancyInfo,
   getVisits,
   type CalendarMonthMarks,
   type CalendarVisit,
   type DayMark,
+  type PregnancyInfo,
 } from "@/lib/api";
 import {
   Modal,
@@ -135,7 +135,7 @@ export default function Calendar() {
   }, []));
 
   useEffect(() => {
-    loadPregnancyInfo().then(setPregnancy);
+    getPregnancyInfo().then(setPregnancy);
     getGuardianEmail().then(setGuardianEmail);
   }, []);
 

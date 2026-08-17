@@ -1,35 +1,18 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { PregnancyInfo } from "@/lib/api";
 
-const PREGNANCY_KEY = "pregnancy-info";
+/**
+ * 임신 주차 계산과, 서버로 갈 필요 없는 기기 설정.
+ *
+ * 임신 정보 자체(주차·기록 시점)는 서버 데이터라 @/lib/api 의
+ * getPregnancyInfo / savePregnancyInfo 로 옮겼다.
+ */
+
 const SHARE_TIP_KEY = "calendar-share-tip-seen";
 
 export const PREGNANCY_LAST_WEEK = 42;
 
-/** 회원가입에서 입력한 임신 주차와, 그 값을 입력한 시점. */
-export type PregnancyInfo = {
-  week: number;
-  /** ISO 날짜 문자열 */
-  recordedAt: string;
-};
-
-export async function savePregnancyInfo(week: number) {
-  const info: PregnancyInfo = { week, recordedAt: new Date().toISOString() };
-  await AsyncStorage.setItem(PREGNANCY_KEY, JSON.stringify(info));
-}
-
-export async function loadPregnancyInfo(): Promise<PregnancyInfo | null> {
-  const raw = await AsyncStorage.getItem(PREGNANCY_KEY);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as PregnancyInfo;
-    if (typeof parsed?.week !== "number" || !parsed?.recordedAt) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-/** 안내 말풍선은 앱을 처음 쓸 때 한 번만 노출한다. */
+/** 안내 말풍선은 앱을 처음 쓸 때 한 번만 노출한다 (기기별 설정). */
 export async function hasSeenShareTip() {
   return (await AsyncStorage.getItem(SHARE_TIP_KEY)) === "1";
 }
@@ -52,6 +35,8 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  */
 export function pregnancyWeekOf(weekStart: Date, info: PregnancyInfo) {
   const anchorWeekStart = startOfWeek(new Date(info.recordedAt));
-  const days = Math.round((weekStart.getTime() - anchorWeekStart.getTime()) / MS_PER_DAY);
+  const days = Math.round(
+    (weekStart.getTime() - anchorWeekStart.getTime()) / MS_PER_DAY,
+  );
   return info.week + Math.round(days / 7);
 }

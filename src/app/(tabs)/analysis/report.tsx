@@ -23,6 +23,7 @@ import {
   Text,
   TextInput,
   View,
+  type ImageStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -309,7 +310,10 @@ const styles = StyleSheet.create({
   image: { width: "100%", height: "100%", borderRadius: 8, backgroundColor: "#FFF0F6" },
   // scanDocumentImage(lib/scan.ts)가 정리해준 사진을 "스캔한 문서"처럼
   // 흑백·고대비 톤으로 보여준다. 실제 픽셀은 원본 그대로 둔다.
-  scanFilter: { filter: [{ grayscale: 1 }, { contrast: 1.6 }, { brightness: 1.05 }] },
+  // filter는 웹에서만 동작하고 RN 타입에는 없어서 캐스팅해서 넘긴다.
+  scanFilter: {
+    filter: [{ grayscale: 1 }, { contrast: 1.6 }, { brightness: 1.05 }],
+  } as unknown as ImageStyle,
   zoomHint: { alignSelf: "center", color: "#A0A0A0", fontFamily: "Pretendard-Regular", fontSize: 12, marginTop: -4 },
 
   card: { paddingTop: 11, paddingHorizontal: 18, paddingBottom: 4, borderRadius: 14, backgroundColor: "#FFFCFD", gap: 8, ...shadow },
@@ -348,7 +352,7 @@ const styles = StyleSheet.create({
   // 붙고, backdrop은 absoluteFill이라 시트 뒤(둥근 모서리 바깥 포함) 화면
   // 전체를 덮는다.
   modalRoot: { flex: 1, justifyContent: "flex-end" },
-  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.25)" },
+  modalBackdrop: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.25)" },
   sheet: {
     ...centeredSheetStyle,
     backgroundColor: "#FFFFFF",

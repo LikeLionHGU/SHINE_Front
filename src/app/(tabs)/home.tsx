@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
   // 카드 폭(고정 px가 아니라 flex로 화면 폭에 맞춰 늘어남)을 그대로 덮도록
   // 절대 위치 + 상하좌우 0으로 채운다 — 예전엔 고정 362x182였어서 카드 폭이
   // Figma 기준(361px)과 다른 화면에서는 글로우가 카드보다 짧거나 길게 튀어나왔다.
-  uploadGlow: { ...StyleSheet.absoluteFillObject, opacity: 0.8 },
+  uploadGlow: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, opacity: 0.8 },
   uploadCopy: { position: "absolute", left: 20, bottom: 13 },
   eyebrow: { color: "#707070", fontFamily: "Pretendard-Medium", fontSize: 14, lineHeight: 22 },
   uploadTitle: { color: "#111", fontFamily: "Pretendard-SemiBold", fontSize: 18, lineHeight: 26 },

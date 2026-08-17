@@ -16,7 +16,7 @@ import {
   RequiredDot,
   XXLogoIcon,
 } from "@/components/icons";
-import { savePregnancyInfo } from "@/lib/pregnancy";
+import { signup } from "@/lib/api";
 
 const PREGNANCY_WEEKS = Array.from({ length: 42 }, (_, i) => i + 1);
 
@@ -197,8 +197,16 @@ export default function Signup() {
             style={[styles.submitButton, canSubmit && styles.submitButtonEnabled]}
             disabled={!canSubmit}
             onPress={async () => {
-              // 캘린더의 주차 표시는 여기서 저장한 값을 기준으로 계산된다.
-              await savePregnancyInfo(pregnancyWeek);
+              // 캘린더의 주차 표시는 여기서 보낸 주차를 기준으로 계산된다.
+              await signup({
+                name,
+                accountId: id,
+                password,
+                phone,
+                email: ownEmail,
+                guardianEmail,
+                pregnancyWeek,
+              });
               router.replace("/home");
             }}
           >

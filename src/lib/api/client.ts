@@ -9,9 +9,14 @@ import {
   MOCK_SUGGESTED_QUESTIONS,
   MOCK_VISITS,
 } from "./mock-data";
+import { setAuthToken } from "./http";
 import type {
+  AuthResult,
   CalendarMonthMarks,
   CalendarVisit,
+  LoginRequest,
+  PregnancyInfo,
+  SignupRequest,
   UserProfile,
   VisitDate,
   VisitDetail,
@@ -21,20 +26,84 @@ import type {
  * 화면이 쓰는 데이터 접근 계층.
  *
  * 지금은 목 데이터와 기기 저장소로 동작한다. 서버가 준비되면 각 함수 본문을
- * fetch 호출로 바꾸기만 하면 되고, 화면 코드는 건드릴 필요가 없다.
+ * apiRequest 호출로 바꾸기만 하면 되고, 화면 코드는 건드릴 필요가 없다.
  *
  *   export async function getUserProfile(): Promise<UserProfile> {
- *     const res = await fetch(`${API_BASE_URL}/me`);
- *     return res.json();
+ *     return apiRequest<UserProfile>("/me");
  *   }
  */
 
 const VISITS_KEY = "shine.calendar.visits.v1";
+const PREGNANCY_KEY = "shine.pregnancy.v1";
+const QUESTIONS_KEY = "shine.calendar.questions.v1";
+
+/* ---------------------------------------------------------------- 인증 */
+
+/** 로그인. 성공하면 토큰을 저장해 이후 요청에 자동으로 붙는다. */
+export async function login(request: LoginRequest): Promise<AuthResult> {
+  // TODO(api): POST /auth/login
+  //   const result = await apiRequest<AuthResult>("/auth/login", {
+  //     method: "POST", body: request, skipAuth: true,
+  //   });
+  const result: AuthResult = { token: "mock-token", profile: MOCK_PROFILE };
+  await setAuthToken(result.token);
+  return result;
+}
+
+/** 회원가입. 로그인과 마찬가지로 토큰을 저장한다. */
+export async function signup(request: SignupRequest): Promise<AuthResult> {
+  // TODO(api): POST /auth/signup
+  const result: AuthResult = {
+    token: "mock-token",
+    profile: {
+      ...MOCK_PROFILE,
+      name: request.name,
+      phone: request.phone,
+      email: request.email,
+      guardianEmail: request.guardianEmail,
+    },
+  };
+  await setAuthToken(result.token);
+  // 목 구현에서는 가입 정보를 기기에 남겨 캘린더 주차 계산에 쓴다.
+  await savePregnancyInfo(request.pregnancyWeek);
+  return result;
+}
+
+/** 로그아웃. 저장된 토큰을 지운다. */
+export async function logout(): Promise<void> {
+  // TODO(api): POST /auth/logout
+  await setAuthToken(null);
+}
+
+/* ------------------------------------------------------------ 사용자 정보 */
 
 /** 마이 페이지 프로필 */
 export async function getUserProfile(): Promise<UserProfile> {
   // TODO(api): GET /me
   return MOCK_PROFILE;
+}
+
+/* -------------------------------------------------------------- 임신 정보 */
+
+/** 회원가입에서 받은 임신 주차 저장 */
+export async function savePregnancyInfo(week: number): Promise<void> {
+  // TODO(api): PUT /me/pregnancy
+  const info: PregnancyInfo = { week, recordedAt: new Date().toISOString() };
+  await AsyncStorage.setItem(PREGNANCY_KEY, JSON.stringify(info));
+}
+
+/** 캘린더 주차 계산의 기준이 되는 임신 정보 */
+export async function getPregnancyInfo(): Promise<PregnancyInfo | null> {
+  // TODO(api): GET /me/pregnancy
+  const raw = await AsyncStorage.getItem(PREGNANCY_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as PregnancyInfo;
+    if (typeof parsed?.week !== "number" || !parsed?.recordedAt) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 /** 보호자에게 공유할 때 쓰는 메일 주소 */
@@ -123,8 +192,39 @@ export async function getVisitDetail(date: VisitDate): Promise<VisitDetail> {
     todayReport: null,
     previousReport: MOCK_LATEST_REPORT,
     suggestedQuestions: MOCK_SUGGESTED_QUESTIONS,
-    questions: [],
+    questions: await getVisitQuestions(date),
   };
+}
+
+/** 그 날 진료에서 직접 물어보려고 적어둔 질문 */
+export async function getVisitQuestions(date: VisitDate): Promise<string[]> {
+  // TODO(api): GET /visits/:date/questions
+  const raw = await AsyncStorage.getItem(QUESTIONS_KEY);
+  if (!raw) return [];
+  try {
+    const byDate = JSON.parse(raw) as Record<string, string[]>;
+    return byDate[date] ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** 질문 목록 저장 (빈 칸은 제외하고 보관한다) */
+export async function saveVisitQuestions(
+  date: VisitDate,
+  questions: string[],
+): Promise<void> {
+  // TODO(api): PUT /visits/:date/questions
+  const cleaned = questions.map((q) => q.trim()).filter(Boolean);
+  const raw = await AsyncStorage.getItem(QUESTIONS_KEY);
+  let byDate: Record<string, string[]> = {};
+  try {
+    byDate = raw ? (JSON.parse(raw) as Record<string, string[]>) : {};
+  } catch {
+    byDate = {};
+  }
+  byDate[date] = cleaned;
+  await AsyncStorage.setItem(QUESTIONS_KEY, JSON.stringify(byDate));
 }
 
 /** Date → "YY.MM.DD" */

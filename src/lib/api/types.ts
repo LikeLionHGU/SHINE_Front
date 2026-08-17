@@ -69,3 +69,29 @@ export type VisitDetail = {
   /** 사용자가 직접 적은 질문 */
   questions: string[];
 };
+
+/** 로그인 요청 */
+export type LoginRequest = {
+  accountId: string;
+  password: string;
+};
+
+/** 회원가입 요청 */
+export type SignupRequest = {
+  name: string;
+  accountId: string;
+  password: string;
+  phone: string;
+  email: string;
+  /** 입력하지 않았으면 빈 문자열 */
+  guardianEmail: string;
+  /** 가입 시점의 임신 주차 */
+  pregnancyWeek: number;
+};
+
+/** 로그인·회원가입 응답 */
+export type AuthResult = {
+  /** 이후 요청의 Authorization 헤더에 쓰이는 토큰 */
+  token: string;
+  profile: UserProfile;
+};

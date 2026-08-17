@@ -9,12 +9,31 @@ import {
   LockIcon,
   UserIcon,
 } from "@/components/icons";
+import { login } from "@/lib/api";
 
 // Figma: 로그인/회원가입
 // 아이디/비밀번호 입력, 자동 로그인 체크, 회원가입 진입 링크.
 export default function Login() {
   const router = useRouter();
   const [autoLogin, setAutoLogin] = useState(false);
+  const [accountId, setAccountId] = useState("");
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleLogin = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      await login({ accountId, password });
+      router.replace("/home");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "로그인에 실패했어요.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -34,6 +53,8 @@ export default function Login() {
               placeholderTextColor="#A0A0A0"
               autoCapitalize="none"
               autoCorrect={false}
+              value={accountId}
+              onChangeText={setAccountId}
             />
           </View>
 
@@ -46,6 +67,8 @@ export default function Login() {
               secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
+              value={password}
+              onChangeText={setPassword}
             />
           </View>
 
@@ -79,11 +102,15 @@ export default function Login() {
         </View>
 
         <View style={styles.bottomArea}>
+          {error !== "" && <Text style={styles.errorText}>{error}</Text>}
           <Pressable
             style={styles.loginButton}
-            onPress={() => router.replace("/home")}
+            disabled={submitting}
+            onPress={handleLogin}
           >
-            <Text style={styles.loginButtonText}>로그인</Text>
+            <Text style={styles.loginButtonText}>
+              {submitting ? "로그인 중..." : "로그인"}
+            </Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -131,6 +158,13 @@ const styles = StyleSheet.create({
   bottomArea: {
     paddingHorizontal: 16,
     paddingBottom: 8,
+  },
+  errorText: {
+    marginBottom: 8,
+    textAlign: "center",
+    color: "#FA0C56",
+    fontSize: 13,
+    fontFamily: "Pretendard-Medium",
   },
   loginButton: {
     height: 46,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -25,6 +25,7 @@ import {
   getCalendarMonthMarks,
   getVisitDetail,
   getVisitsByDate,
+  saveVisitQuestions,
   type CalendarVisit,
   type DayMark,
   type VisitDetail,
@@ -59,6 +60,16 @@ export default function CalendarDay() {
     setQuestions((prev) => prev.map((q, i) => (i === index ? value : q)));
   };
 
+  // 화면을 떠날 때 저장하려면 최신 입력값을 참조로 들고 있어야 한다.
+  const questionsRef = useRef(questions);
+  questionsRef.current = questions;
+
+  /** 입력이 끝나면(포커스 아웃) 그 시점의 질문을 저장한다. */
+  const persistQuestions = (next: string[]) => {
+    if (!visitKey) return;
+    saveVisitQuestions(visitKey, next);
+  };
+
   const hasAddedQuestion = questions.some((question) => question.trim().length > 0);
   const canAddMore =
     hasAddedQuestion && questions[questions.length - 1].trim().length > 0;
@@ -75,7 +86,10 @@ export default function CalendarDay() {
   useEffect(() => {
     let active = true;
     getVisitDetail(visitKey).then((result) => {
-      if (active) setDetail(result);
+      if (!active) return;
+      setDetail(result);
+      // 저장해둔 질문이 있으면 이어서 편집할 수 있게 채운다.
+      setQuestions(result.questions.length > 0 ? [...result.questions, ""] : [""]);
     });
     return () => {
       active = false;
@@ -105,6 +119,8 @@ export default function CalendarDay() {
       });
       return () => {
         active = false;
+        // 입력칸에 포커스가 남은 채로 나가도 질문이 사라지지 않도록 한번 더 저장한다.
+        if (visitKey) saveVisitQuestions(visitKey, questionsRef.current);
       };
     }, [visitKey]),
   );
@@ -272,6 +288,7 @@ export default function CalendarDay() {
                 placeholderTextColor="#A0A0A0"
                 value={value}
                 onChangeText={(text) => updateQuestion(i, text)}
+                onBlur={() => persistQuestions(questions)}
               />
             ))}
 
