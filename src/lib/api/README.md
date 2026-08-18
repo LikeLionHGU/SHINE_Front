@@ -16,13 +16,14 @@ src/lib/api/
 프로젝트 루트 `.env`:
 
 ```
-EXPO_PUBLIC_API_BASE_URL=http://172.30.1.12:8080
+EXPO_PUBLIC_API_BASE_URL=http://1.201.117.27:8080
 ```
 
 `EXPO_PUBLIC_` 접두사가 있어야 앱 번들에 값이 들어갑니다.
 값을 바꿨으면 캐시를 비우고 개발 서버를 재시작하세요 — `npx expo start -c`.
 
-사설 IP라 **같은 와이파이에 붙은 기기에서만** 접근됩니다.
+현재는 배포된 서버 주소라 어느 망에서나 접근됩니다.
+Swagger: http://1.201.117.27:8080/swagger-ui/index.html
 비워두면 모든 함수가 목 데이터로 동작합니다.
 
 ## 2. 엔드포인트

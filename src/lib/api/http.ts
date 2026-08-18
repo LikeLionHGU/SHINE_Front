@@ -4,7 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
  * 서버 통신 공통 처리.
  *
  * .env 에 백엔드 주소를 넣으면 apiRequest가 그 주소로 요청한다.
- *   EXPO_PUBLIC_API_BASE_URL=http://172.30.1.12:8080
+ *   EXPO_PUBLIC_API_BASE_URL=http://1.201.117.27:8080
  *
  * 주소가 비어 있으면 client.ts의 각 함수가 목 데이터로 되돌아간다(withFallback).
  */
@@ -128,7 +128,16 @@ function firstFieldError(data: unknown): string | null {
   return typeof reason === "string" && reason.trim() ? reason.trim() : null;
 }
 
-/** refreshToken으로 accessToken을 다시 받는다. 여러 요청이 동시에 401이 나도 한 번만 돈다. */
+/**
+ * refreshToken으로 accessToken을 다시 받는다. 여러 요청이 동시에 401이 나도 한 번만 돈다.
+ *
+ * 배포 서버의 accessToken 만료가 30분이라(로컬은 24시간이었다) 앱을 켜둔 채로 쓰면
+ * 중간에 반드시 한 번은 401이 난다. 그때마다 이 함수가 돌아 토큰을 갱신한다.
+ * 서버가 refreshToken도 새로 주면(rotation) 반드시 새 값으로 덮어써야 다음 갱신이 된다.
+ *
+ * 주의: 로그인할 때 autoLogin=false면 서버가 refreshToken을 안 준다 → 갱신할 수단이
+ * 없어 30분 뒤 전부 401이 된다. 로그인 화면의 "자동 로그인"을 켠 채로 테스트할 것.
+ */
 let reissuing: Promise<boolean> | null = null;
 
 async function reissueTokens(): Promise<boolean> {
@@ -138,12 +147,15 @@ async function reissueTokens(): Promise<boolean> {
 
   reissuing = (async () => {
     try {
-      const result = await apiRequest<{ accessToken: string; refreshToken?: string | null }>(
-        "/auth/reissue",
-        { method: "POST", body: { refreshToken }, skipAuth: true, _retried: true },
-      );
-      if (!result?.accessToken) return false;
-      await setAuthToken(result.accessToken, result.refreshToken ?? refreshToken);
+      // 서버가 accessToken/token 중 어느 이름으로 주든 받도록 둘 다 본다.
+      const result = await apiRequest<{
+        accessToken?: string;
+        token?: string;
+        refreshToken?: string | null;
+      }>("/auth/reissue", { method: "POST", body: { refreshToken }, skipAuth: true, _retried: true });
+      const nextAccessToken = result?.accessToken ?? result?.token;
+      if (!nextAccessToken) return false;
+      await setAuthToken(nextAccessToken, result.refreshToken ?? refreshToken);
       return true;
     } catch {
       // Rotation 재사용 감지 등으로 재발급이 막히면 토큰을 비워 로그인 화면으로 보낸다.
@@ -197,7 +209,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const failed = !response.ok || envelope?.success === false;
 
   if (failed) {
-    // accessToken 만료면 한 번만 재발급하고 같은 요청을 다시 보낸다.
+    // accessToken 만료(401 + TOKEN_EXPIRED)면 한 번만 재발급하고 같은 요청을 다시 보낸다.
+    // 코드 이름이 서버마다 조금씩 달라서, refreshToken 재사용 감지(더 이상 갱신 불가)만
+    // 빼고 401은 전부 갱신 대상으로 본다.
     const expired = response.status === 401 && envelope?.code !== "REFRESH_TOKEN_REUSED";
     if (expired && !skipAuth && !_retried && (await reissueTokens())) {
       return apiRequest<T>(path, { ...options, _retried: true });
