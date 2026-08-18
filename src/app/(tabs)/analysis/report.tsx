@@ -4,6 +4,7 @@ import {
   CloseIcon,
   SparkleIcon,
 } from "@/components/icons";
+import { FoodImage } from "@/components/food-image";
 import { StatusBadge } from "@/components/status-badge";
 import { centeredContentStyle, centeredSheetStyle } from "@/lib/layout";
 import { getQuestionsBySheet, getRecordDetail } from "@/lib/api";
@@ -306,6 +307,7 @@ export default function AnalysisReport() {
                       : DEMO_INGREDIENTS.map((name) => ({ name, reason: "" }))
                     ).map((food) => (
                       <View key={food.name} style={styles.ingredient}>
+                        <FoodImage name={food.name} />
                         <Text style={styles.ingredientName}>{food.name}</Text>
                       </View>
                     ))}
@@ -419,7 +421,7 @@ const styles = StyleSheet.create({
   input: { height: "100%", paddingHorizontal: 15, color: "#111", fontFamily: "Pretendard-Medium", fontSize: 14 },
 
   ingredients: { paddingBottom: 12, gap: 8 },
-  ingredient: { width: 67, height: 76, borderRadius: 4, alignItems: "center", justifyContent: "flex-end", paddingBottom: 8, backgroundColor: "#FFF0F6" },
+  ingredient: { width: 67, height: 76, borderRadius: 4, alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8, backgroundColor: "#FFF0F6" },
   ingredientName: { color: "#707070", fontFamily: "Pretendard-Medium", fontSize: 12 },
 
   // justifyContent: "flex-end"이라 시트(유일한 in-flow 자식)는 항상 하단에

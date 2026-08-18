@@ -3,6 +3,7 @@ import {
   SparkleIcon,
   XXLogoIcon,
 } from "@/components/icons";
+import { FoodImage } from "@/components/food-image";
 import { getHome, type Home } from "@/lib/api";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -132,6 +133,7 @@ export default function Home() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ingredients}>
               {nutritions.map((food) => (
                 <View key={`${food.name}-${food.nutrient}`} style={styles.ingredient}>
+                  <FoodImage name={food.name} />
                   <Text style={styles.ingredientName} numberOfLines={1}>{food.name}</Text>
                 </View>
               ))}
@@ -203,7 +205,7 @@ const styles = StyleSheet.create({
   card: { height: 126, paddingTop: 11, paddingLeft: 17, borderRadius: 14, overflow: "hidden", backgroundColor: "#FFFCFD", ...shadow },
   sectionTitle: { color: "#111", fontFamily: "Pretendard-Medium", fontSize: 16, lineHeight: 24 },
   ingredients: { paddingTop: 4, paddingRight: 17, gap: 8 },
-  ingredient: { width: 67, height: 76, borderRadius: 4, alignItems: "center", justifyContent: "flex-end", paddingBottom: 8, backgroundColor: "#FFF0F6" },
+  ingredient: { width: 67, height: 76, borderRadius: 4, alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8, backgroundColor: "#FFF0F6" },
   ingredientName: { color: "#707070", fontFamily: "Pretendard-Medium", fontSize: 12 },
   moreDots: { width: 24, height: 76, flexDirection: "row", alignItems: "center", gap: 3 },
   dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: "#A0A0A0" },
