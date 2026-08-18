@@ -1,4 +1,4 @@
-import { BackChevronIcon, CloseIcon, UpTriangleIcon } from "@/components/icons";
+import { BackChevronIcon, UpTriangleIcon } from "@/components/icons";
 import { StatusBadge } from "@/components/status-badge";
 import { TrendChart } from "@/components/trend-chart";
 import { centeredContentStyle, MAX_CONTENT_WIDTH } from "@/lib/layout";
@@ -59,9 +59,6 @@ export default function AnalysisDetail() {
               <BackChevronIcon size={24} />
             </Pressable>
             <Text style={styles.headerTitle} pointerEvents="none">분석</Text>
-            <Pressable hitSlop={8} onPress={() => router.push("/(tabs)/home")}>
-              <CloseIcon size={24} />
-            </Pressable>
           </View>
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>
@@ -88,9 +85,6 @@ export default function AnalysisDetail() {
           </Pressable>
           {/* 절대 위치라 헤더 전체를 덮는다 — pointerEvents를 꺼야 뒤로가기 버튼이 눌린다. */}
           <Text style={styles.headerTitle} pointerEvents="none">분석</Text>
-          <Pressable hitSlop={8} onPress={() => router.push("/(tabs)/home")}>
-            <CloseIcon size={24} />
-          </Pressable>
         </View>
 
         <ScrollView style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
