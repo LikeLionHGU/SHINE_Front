@@ -38,14 +38,43 @@ export type RecommendableFood = (typeof RECOMMENDABLE_FOODS)[number];
 
 const FOOD_SET = new Set<string>(RECOMMENDABLE_FOODS);
 
+// 같은 재료를 다르게 부르는 표현들. 서버도 "계란 → 달걀" 정도는 맞춰주지만,
+// 프론트에서 먼저 걸러내면 목록 밖으로 보고 버리는 일이 없다.
+const FOOD_ALIASES: Record<string, RecommendableFood> = {
+  계란: "달걀",
+  달걀흰자: "달걀",
+  쇠고기: "소고기",
+  한우: "소고기",
+  닭고기: "닭가슴살",
+  요거트: "그릭요거트",
+  요구르트: "그릭요거트",
+  플레인요거트: "그릭요거트",
+  렌즈콩: "렌틸콩",
+  오트밀: "귀리",
+  귀리밥: "귀리",
+  현미밥: "현미",
+  브로컬리: "브로콜리",
+  표고: "표고버섯",
+  파프리카빨강: "파프리카",
+  김구이: "김",
+  조미김: "김",
+  미역국: "미역",
+  참깨가루: "참깨",
+  검정콩: "검은콩",
+  서리태: "검은콩",
+};
+
 // AI가 "시금치(익힌 것)", "삶은 달걀"처럼 살을 붙여 답하는 경우가 있어서,
-// 공백·괄호를 걷어내고 목록 안의 이름이 포함되는지까지 확인한다.
+// 공백·괄호를 걷어내고 별칭·부분일치까지 확인한다.
 export function normalizeFoodName(raw: string): RecommendableFood | null {
   const name = raw.replace(/\(.*?\)/g, "").replace(/\s+/g, "").trim();
   if (!name) return null;
   if (FOOD_SET.has(name)) return name as RecommendableFood;
+  if (FOOD_ALIASES[name]) return FOOD_ALIASES[name];
   const matched = RECOMMENDABLE_FOODS.find((food) => name.includes(food));
-  return matched ?? null;
+  if (matched) return matched;
+  const aliasKey = Object.keys(FOOD_ALIASES).find((alias) => name.includes(alias));
+  return aliasKey ? FOOD_ALIASES[aliasKey] : null;
 }
 
 export function isRecommendableFood(name: string): boolean {
