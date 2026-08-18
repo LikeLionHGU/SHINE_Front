@@ -147,8 +147,10 @@ export default function AnalysisReport() {
       router.replace("/(tabs)/record");
       return;
     }
-    if (router.canGoBack()) router.back();
-    else router.push("/(tabs)/analysis");
+    // 검사지 업로드 직후 도달하는 화면이라, 뒤로가기는 "산전 검사지를
+    // 업로드 해주세요" 화면(scan/index.tsx)으로 돌려보낸다.
+    // (헤더 X는 메인 홈으로 — 아래 header 참고)
+    router.replace("/(modals)/scan");
   }
 
   return (
@@ -160,7 +162,7 @@ export default function AnalysisReport() {
             <BackChevronIcon size={24} />
           </Pressable>
           <Text style={styles.headerTitle} pointerEvents="none">분석</Text>
-          <Pressable hitSlop={8} onPress={() => router.push("/(tabs)/home")}>
+          <Pressable hitSlop={8} onPress={() => router.replace("/(tabs)/home")}>
             <CloseIcon size={24} />
           </Pressable>
         </View>
