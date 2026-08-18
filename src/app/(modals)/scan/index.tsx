@@ -1,7 +1,6 @@
 import {
   BackChevronIcon,
   CameraIcon,
-  CloseIcon,
   UploadCloudIcon,
   XXLogoIcon,
 } from "@/components/icons";
@@ -102,9 +101,6 @@ export default function ScanStart() {
         <View style={styles.header}>
           <Pressable hitSlop={8} onPress={handleClose}>
             <BackChevronIcon size={24} />
-          </Pressable>
-          <Pressable hitSlop={8} onPress={handleClose}>
-            <CloseIcon size={24} />
           </Pressable>
         </View>
 
