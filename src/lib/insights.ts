@@ -1,3 +1,4 @@
+import { normalizeFoodName, RECOMMENDABLE_FOODS } from "@/lib/foods";
 import type { ParsedTestItem } from "@/lib/report";
 
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
@@ -14,8 +15,11 @@ const SYSTEM_PROMPT =
   "구체적으로 작성해(예: '요단백 수치가 1.4로 나왔는데 관리가 필요한가요?'). 전부 안심이면 일반적인 " +
   "임신 관리 관련 질문으로 대체해도 돼. " +
   "3) foods: 주의/위험 항목을 보완하거나 관련 영양소를 채우는 데 도움이 될 음식 3~6개. 각 음식은 " +
-  "name(한두 단어, 예: '시금치')과 reason(왜 도움되는지 1문장)으로. 전부 안심이면 임신 중 전반적으로 " +
-  "도움이 되는 음식으로 대체해도 돼. " +
+  "name과 reason(왜 도움되는지 1문장)으로. 전부 안심이면 임신 중 전반적으로 도움이 되는 음식으로 " +
+  "대체해도 돼. " +
+  "**name은 반드시 아래 재료 목록 안에서만 고르고, 목록에 적힌 이름 그대로(괄호·수식어 없이) 써. " +
+  "목록에 없는 재료는 아무리 좋아 보여도 절대 추천하지 말고, 같은 재료를 두 번 넣지 마.** " +
+  `사용 가능한 재료 목록: ${RECOMMENDABLE_FOODS.join(", ")}. ` +
   '출력은 반드시 JSON 객체 하나로만: {"summary": string, "questions": string[], "foods": [{"name": string, "reason": string}]}.';
 
 export type ReportFood = { name: string; reason: string };
@@ -95,19 +99,26 @@ export async function generateReportInsights(items: ParsedTestItem[]): Promise<R
     ? rawQuestions.filter((q): q is string => typeof q === "string" && q.trim().length > 0).map((q) => q.trim())
     : [];
 
+  // 재료는 이미지가 준비된 30가지(lib/foods.ts)만 노출한다. 모델이 목록 밖 재료를
+  // 내놓거나 이름에 수식어를 붙이면 여기서 정규화하고, 못 맞추면 버린다.
   const rawFoods = (parsed as { foods?: unknown })?.foods;
+  const seenFoods = new Set<string>();
   const foods = Array.isArray(rawFoods)
     ? rawFoods
         .filter(
           (food): food is { name: string; reason?: unknown } =>
             !!food && typeof food === "object" && typeof (food as any).name === "string" && (food as any).name.trim(),
         )
-        .map(
-          (food): ReportFood => ({
-            name: String(food.name).trim(),
-            reason: food.reason != null ? String(food.reason).trim() : "",
-          }),
-        )
+        .map((food) => ({
+          name: normalizeFoodName(String(food.name)),
+          reason: food.reason != null ? String(food.reason).trim() : "",
+        }))
+        .filter((food) => {
+          if (!food.name || seenFoods.has(food.name)) return false;
+          seenFoods.add(food.name);
+          return true;
+        })
+        .map((food): ReportFood => ({ name: food.name as string, reason: food.reason }))
     : [];
 
   if (!summary) throw new Error("OpenAI 응답에서 종합 소견을 찾지 못했어요.");

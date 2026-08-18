@@ -29,7 +29,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const DEMO_INGREDIENTS = ["달걀", "연어", "시금치", "버섯"];
+const DEMO_INGREDIENTS = ["달걀", "연어", "시금치", "표고버섯"];
 const DEFAULT_QUESTIONS = ["Ex) 당 수치가 올라가고 있는데 괜찮나요?", "Ex) 비타민 D 수치가 떨어지고 있는데 괜찮나요?"];
 
 // Figma(node 671:4356 검사지 분석-번역 / 671:4386, 837:5338 …단어 클릭시 하단
