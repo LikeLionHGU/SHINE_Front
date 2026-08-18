@@ -1,4 +1,4 @@
-import { BackChevronIcon, ChevronRightIcon, XXLogoIcon } from "@/components/icons";
+import { ChevronRightIcon, XXLogoIcon } from "@/components/icons";
 import { centeredContentStyle } from "@/lib/layout";
 import { getRecords } from "@/lib/api";
 import type { RecordEntry } from "@/lib/report";
@@ -31,23 +31,17 @@ export default function Record() {
     }, []),
   );
 
-  function goBack() {
-    if (router.canGoBack()) router.back();
-    else router.push("/(tabs)/home");
-  }
-
   return (
     <View style={styles.container}>
       <LinearGradient colors={["#FFFCFD", "#FFEBF3"]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
         <View style={styles.header}>
-          <Pressable hitSlop={8} onPress={goBack}>
-            <BackChevronIcon size={24} />
-          </Pressable>
+          {/* 기록은 탭 최상위 화면이라 뒤로가기를 두지 않는다 — 양쪽 여백만 맞춘다. */}
+          <View style={{ width: 24, height: 24 }} />
           <Text style={styles.headerTitle} pointerEvents="none">
             기록
           </Text>
-          <View style={{ width: 24 }} />
+          <View style={{ width: 24, height: 24 }} />
         </View>
 
         <ScrollView style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
