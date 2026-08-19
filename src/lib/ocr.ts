@@ -46,7 +46,9 @@ export type ParsedTestReport = {
 // 이미지를 보내고, 표 인식과 정상범위 판정을 모델에게 맡긴 뒤 구조화된
 // JSON으로 돌려받는다. (주의: API 키가 클라이언트 번들에 포함되므로
 // 해커톤 데모용 구조다 — 프로덕션에서는 서버를 거쳐야 한다.)
-export async function parseTestReport(imageUri: string): Promise<ParsedTestReport> {
+export async function parseTestReport(
+  imageUri: string,
+): Promise<ParsedTestReport> {
   if (!OPENAI_API_KEY) {
     throw new Error(
       "OpenAI API 키가 설정되지 않았어요. .env 파일에 EXPO_PUBLIC_OPENAI_API_KEY를 추가하고 개발 서버를 재시작해주세요.",
@@ -69,7 +71,10 @@ export async function parseTestReport(imageUri: string): Promise<ParsedTestRepor
         {
           role: "user",
           content: [
-            { type: "text", text: "이 산전 검사지 사진을 읽고 지시한 JSON 형식으로 정리해줘." },
+            {
+              type: "text",
+              text: "이 산전 검사지 사진을 읽고 지시한 JSON 형식으로 정리해줘.",
+            },
             { type: "image_url", image_url: { url: dataUrl } },
           ],
         },
@@ -83,7 +88,9 @@ export async function parseTestReport(imageUri: string): Promise<ParsedTestRepor
 
   if (!response.ok) {
     const errText = await response.text().catch(() => "");
-    throw new Error(`OpenAI 요청 실패 (${response.status}): ${errText.slice(0, 300)}`);
+    throw new Error(
+      `OpenAI 요청 실패 (${response.status}): ${errText.slice(0, 300)}`,
+    );
   }
 
   const json = await response.json();
@@ -104,15 +111,29 @@ export async function parseTestReport(imageUri: string): Promise<ParsedTestRepor
 
   const items = rawItems
     .filter(
-      (item): item is { name: string; value?: unknown; status?: unknown; definition?: unknown; verdict?: unknown } =>
-        !!item && typeof item === "object" && typeof (item as any).name === "string" && (item as any).name.trim(),
+      (
+        item,
+      ): item is {
+        name: string;
+        value?: unknown;
+        status?: unknown;
+        definition?: unknown;
+        verdict?: unknown;
+      } =>
+        !!item &&
+        typeof item === "object" &&
+        typeof (item as any).name === "string" &&
+        (item as any).name.trim(),
     )
     .map(
       (item): ParsedTestItem => ({
         name: String(item.name).trim(),
         value: item.value != null ? String(item.value).trim() : "",
-        status: validStatuses.includes(item.status as IndicatorStatus) ? (item.status as IndicatorStatus) : "주의",
-        definition: item.definition != null ? String(item.definition).trim() : "",
+        status: validStatuses.includes(item.status as IndicatorStatus)
+          ? (item.status as IndicatorStatus)
+          : "주의",
+        definition:
+          item.definition != null ? String(item.definition).trim() : "",
         verdict: item.verdict != null ? String(item.verdict).trim() : "",
       }),
     );
@@ -122,7 +143,9 @@ export async function parseTestReport(imageUri: string): Promise<ParsedTestRepor
   // 사용자가 직접 날짜를 고르게 한다.
   const rawDate = (parsed as { reportDate?: unknown })?.reportDate;
   const reportDate =
-    typeof rawDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rawDate.trim()) ? rawDate.trim() : null;
+    typeof rawDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rawDate.trim())
+      ? rawDate.trim()
+      : null;
 
   return { items, reportDate };
 }
