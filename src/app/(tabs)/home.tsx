@@ -77,12 +77,8 @@ export default function Home() {
     return weekly.map((day) => {
       const dayVisits = visits.filter((visit) => visit.date === toVisitDate(day.date));
       if (dayVisits.length === 0) return day;
-      const first = dayVisits[0];
-      return {
-        ...day,
-        hasAppointment: true,
-        label: day.label ?? (first.title || first.place || null),
-      };
+      // 홈에서는 장소·제목을 적지 않고 점만 찍는다(캘린더 탭에서 확인).
+      return { ...day, hasAppointment: true };
     });
   }, [home?.weeklyCalendar, visits]);
 
@@ -178,7 +174,6 @@ export default function Home() {
                   <Text style={[styles.dayNumber, item.isToday && styles.daySelectedText]}>{item.day}</Text>
                   <Text style={[styles.dayLabel, item.isToday && styles.daySelectedText]}>{item.dayOfWeek}</Text>
                   {item.hasAppointment && <View style={styles.eventDot} />}
-                  {item.label && <Text style={styles.appointment} numberOfLines={1}>{item.label}</Text>}
                 </View>
               ))}
             </ScrollView>

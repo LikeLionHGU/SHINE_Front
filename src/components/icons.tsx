@@ -434,13 +434,14 @@ export function MyTabIcon({ size = 24, color = "#A0A0A0" }: { size?: number; col
 
 /**
  * Figma(837:4279 / 911:4634 "image 343"): AI가 추천한 질문 앞에 붙는 원형 아이콘.
- * 그려진 아이콘이 아니라 디자인에 실린 이미지 에셋(assets/images/AIicon.png)을
- * 그대로 쓴다. 디자인 기준 16x16 · opacity 0.8.
+ * 그려진 아이콘이 아니라 디자인에 실린 이미지 에셋(assets/images/AIQ.png)을
+ * 그대로 쓴다. 디자인 기준 16x16 · opacity 0.8이라, 에셋은 3배(48px)로 넣어
+ * 고해상도 화면에서도 번지지 않게 한다.
  */
 export function AiQuestionIcon({ size = 16 }: { size?: number }) {
   return (
     <ExpoImage
-      source={require("@/assets/images/AIicon.png")}
+      source={require("@/assets/images/AIQ.png")}
       style={{ width: size, height: size, opacity: 0.8 }}
       contentFit="contain"
     />
