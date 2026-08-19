@@ -3,6 +3,7 @@ import {
   BackChevronIcon,
   ChevronRightIcon,
   EditOutlineIcon,
+  TrashIcon,
   UpTriangleIcon,
 } from "@/components/icons";
 import { centeredContentStyle } from "@/lib/layout";
@@ -17,6 +18,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  deleteVisit,
   formatVisitTime,
   getCalendarMonthMarks,
   getGuardianEmail,
@@ -136,7 +138,10 @@ export default function Calendar() {
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [calloutVisible, setCalloutVisible] = useState(false);
-  const [questionsOpen, setQuestionsOpen] = useState(false);
+  // 어떤 일정의 질문 목록이 펼쳐져 있는지. 예전에는 "가장 가까운 진료" 한 건만
+  // 펼칠 수 있었는데, 지난 진료의 질문도 확인해야 해서 일정마다 열 수 있게 했다.
+  const [openVisitId, setOpenVisitId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<CalendarVisit | null>(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const router = useRouter();
   const [pregnancy, setPregnancy] = useState<PregnancyInfo | null>(null);
@@ -200,6 +205,20 @@ export default function Calendar() {
   const goToMonth = (delta: number) => {
     setMonthCursor(
       (prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1),
+    );
+  };
+
+  // 일정 삭제 — DELETE /api/v1/app/visits/{id}. 지우고 나면 목록과 달력 표시를
+  // 다시 읽어서 원/라벨까지 같이 정리한다.
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    const target = pendingDelete;
+    setPendingDelete(null);
+    setOpenVisitId((open) => (open === target.id ? null : open));
+    await deleteVisit(target.id);
+    setUpcomingVisits(await getVisits());
+    setMonthMarks(
+      await getCalendarMonthMarks(monthCursor.getFullYear(), monthCursor.getMonth()),
     );
   };
 
@@ -350,7 +369,7 @@ export default function Calendar() {
           <View style={styles.visitsCard}>
             <Text style={styles.visitsTitle}>예정된 방문</Text>
             {monthlyHospitalVisits.map((visit, i) => {
-              const isNext = i === 0;
+              const isOpen = openVisitId === visit.id;
               return (
                 <View key={visit.id}>
                   {i > 0 && (
@@ -368,9 +387,7 @@ export default function Calendar() {
                   )}
                   <Pressable
                     style={styles.visitRow}
-                    // 질문 목록은 가장 가까운 다음 진료에만 열린다.
-                    disabled={!isNext}
-                    onPress={() => setQuestionsOpen((open) => !open)}
+                    onPress={() => setOpenVisitId(isOpen ? null : visit.id)}
                   >
                     <View style={styles.visitDateCol}>
                       <Text style={styles.visitDate}>{visit.date}</Text>
@@ -396,29 +413,40 @@ export default function Calendar() {
                     >
                       <EditOutlineIcon size={16} />
                     </Pressable>
-                    {isNext && (
-                      <View
-                        style={[
-                          styles.visitMarkerCol,
-                          questionsOpen && styles.visitMarkerColOpen,
-                        ]}
-                      >
-                        <UpTriangleIcon size={14} />
-                      </View>
-                    )}
+                    <Pressable
+                      style={styles.visitDeleteCol}
+                      hitSlop={10}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        setPendingDelete(visit);
+                      }}
+                    >
+                      <TrashIcon size={16} />
+                    </Pressable>
+                    <View
+                      style={[styles.visitMarkerCol, isOpen && styles.visitMarkerColOpen]}
+                    >
+                      <UpTriangleIcon size={14} />
+                    </View>
                   </Pressable>
 
-                  {/* 다음 진료를 펼치면 그때 물어볼 질문 목록이 나온다. */}
-                  {isNext && questionsOpen && (
+                  {/* 일정을 펼치면 그때 물어볼 질문 목록이 나온다. */}
+                  {isOpen && (
                     <View style={styles.questionPanel}>
-                      {visit.questions.map((question, qi) => (
-                        <View key={qi} style={styles.questionRow}>
-                          <AiQuestionIcon />
-                          <Text style={styles.questionText} numberOfLines={1}>
-                            {question}
-                          </Text>
-                        </View>
-                      ))}
+                      {visit.questions.length > 0 ? (
+                        visit.questions.map((question, qi) => (
+                          <View key={qi} style={styles.questionRow}>
+                            <AiQuestionIcon />
+                            <Text style={styles.questionText} numberOfLines={1}>
+                              {question}
+                            </Text>
+                          </View>
+                        ))
+                      ) : (
+                        <Text style={styles.questionText}>
+                          아직 준비된 질문이 없어요. 날짜를 눌러 질문을 추가해보세요.
+                        </Text>
+                      )}
                     </View>
                   )}
                 </View>
@@ -428,6 +456,35 @@ export default function Calendar() {
           )}
         </ScrollView>
       </SafeAreaView>
+
+      <Modal
+        visible={pendingDelete !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPendingDelete(null)}
+      >
+        <View style={styles.dialogBackdrop}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>일정 삭제</Text>
+            <Text style={styles.dialogQuestion}>이 일정을 삭제하시겠습니까?</Text>
+            <Text style={styles.dialogEmail}>
+              {pendingDelete?.title || pendingDelete?.place || ""}
+            </Text>
+            <Text style={styles.dialogNote}>삭제하면 되돌릴 수 없어요.</Text>
+
+            <View style={styles.dialogDivider} />
+            <View style={styles.dialogActions}>
+              <Pressable style={styles.dialogAction} onPress={() => setPendingDelete(null)}>
+                <Text style={styles.dialogCancelText}>취소</Text>
+              </Pressable>
+              <View style={styles.dialogActionDivider} />
+              <Pressable style={styles.dialogAction} onPress={confirmDelete}>
+                <Text style={styles.dialogConfirmText}>삭제</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={shareDialogOpen}
@@ -742,7 +799,15 @@ const styles = StyleSheet.create({
   },
   visitEditCol: {
     position: "absolute",
-    left: "81.72%",
+    left: "77%",
+    width: 16,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+  },
+  visitDeleteCol: {
+    position: "absolute",
+    left: "84%",
     width: 16,
     top: 0,
     bottom: 0,
