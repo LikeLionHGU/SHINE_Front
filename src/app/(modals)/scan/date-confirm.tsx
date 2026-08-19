@@ -1,12 +1,24 @@
-import { BackChevronIcon, ChevronRightIcon, CloseIcon, XXLogoIcon } from "@/components/icons";
+import {
+  BackChevronIcon,
+  ChevronRightIcon,
+  CloseIcon,
+  XXLogoIcon,
+} from "@/components/icons";
 import { centeredContentStyle, centeredSheetStyle } from "@/lib/layout";
-import { setPendingScan, type ParsedTestItem } from "@/lib/report";
 import { parseTestReport } from "@/lib/ocr";
+import { setPendingScan, type ParsedTestItem } from "@/lib/report";
 import { scanDocumentImage } from "@/lib/scan";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Animated,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const BAR_WIDTHS = [100.8, 100.8, 83.2, 73.6];
@@ -53,8 +65,16 @@ export default function ScanDateConfirm() {
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 550, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0.4, duration: 550, useNativeDriver: true }),
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 550,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0.4,
+          duration: 550,
+          useNativeDriver: true,
+        }),
       ]),
     );
     loop.start();
@@ -85,7 +105,9 @@ export default function ScanDateConfirm() {
         const parsedDate = parseReportDate(result.reportDate);
         if (parsedDate) {
           setSelectedDate(parsedDate);
-          setCalendarMonth(new Date(parsedDate.getFullYear(), parsedDate.getMonth(), 1));
+          setCalendarMonth(
+            new Date(parsedDate.getFullYear(), parsedDate.getMonth(), 1),
+          );
         }
       } catch (error) {
         console.warn("[scan] 검사지 OCR 파싱 실패:", error);
@@ -120,13 +142,23 @@ export default function ScanDateConfirm() {
 
   function handleConfirm() {
     if (!finalUri || !selectedDate) return;
-    setPendingScan({ uri: finalUri, items, testDate: toStoredDate(selectedDate) });
-    router.push({ pathname: "/(modals)/scan/analyzing", params: { uri: finalUri } });
+    setPendingScan({
+      uri: finalUri,
+      items,
+      testDate: toStoredDate(selectedDate),
+    });
+    router.push({
+      pathname: "/(modals)/scan/analyzing",
+      params: { uri: finalUri },
+    });
   }
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={["#FFFCFD", "#FFEBF3"]} style={StyleSheet.absoluteFill} />
+      <LinearGradient
+        colors={["#FFFCFD", "#FFEBF3"]}
+        style={StyleSheet.absoluteFill}
+      />
       <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
         <View style={styles.header}>
           <Pressable hitSlop={8} onPress={handleBack}>
@@ -139,10 +171,15 @@ export default function ScanDateConfirm() {
 
         {loading ? (
           <View style={styles.center}>
-            <Text style={styles.loadingText}>검사지에서{"\n"}검사 날짜를 찾는 중이에요</Text>
+            <Text style={styles.loadingText}>
+              검사지에서{"\n"}검사 날짜를 찾는 중이에요
+            </Text>
             <View style={styles.bars}>
               {BAR_WIDTHS.map((width, index) => (
-                <Animated.View key={index} style={[styles.bar, { width, opacity: pulse }]} />
+                <Animated.View
+                  key={index}
+                  style={[styles.bar, { width, opacity: pulse }]}
+                />
               ))}
             </View>
           </View>
@@ -154,7 +191,10 @@ export default function ScanDateConfirm() {
 
               {/* Figma 911:4419 — "날짜" 라벨 + 값 칩 한 줄.
                   편집(연필) 아이콘 없이 줄 전체를 누르면 아래 데이트피커가 열린다. */}
-              <Pressable style={styles.dateField} onPress={() => setPickerOpen((open) => !open)}>
+              <Pressable
+                style={styles.dateField}
+                onPress={() => setPickerOpen((open) => !open)}
+              >
                 <Text style={styles.dateLabel}>날짜</Text>
                 <View style={styles.dateChip}>
                   <Text style={styles.dateChipText}>
@@ -194,13 +234,17 @@ export default function ScanDateConfirm() {
           요일 헤더 없이 날짜 그리드만 두고, 시트 바깥을 누르면 닫힌다. */}
       {!loading && pickerOpen && (
         <View style={styles.pickerLayer} pointerEvents="box-none">
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setPickerOpen(false)} />
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setPickerOpen(false)}
+          />
           <View style={[centeredSheetStyle, styles.pickerSheet]}>
             <SafeAreaView edges={["bottom"]}>
               <View style={styles.pickerHeader}>
                 <View style={styles.pickerMonthRow}>
                   <Text style={styles.pickerMonth}>
-                    {calendarMonth.getFullYear()}년 {calendarMonth.getMonth() + 1}월
+                    {calendarMonth.getFullYear()}년{" "}
+                    {calendarMonth.getMonth() + 1}월
                   </Text>
                   <ChevronRightIcon size={16} color="#111111" />
                 </View>
@@ -208,7 +252,14 @@ export default function ScanDateConfirm() {
                   <Pressable
                     hitSlop={10}
                     onPress={() =>
-                      setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))
+                      setCalendarMonth(
+                        (current) =>
+                          new Date(
+                            current.getFullYear(),
+                            current.getMonth() - 1,
+                            1,
+                          ),
+                      )
                     }
                   >
                     <View style={styles.pickerNavPrev}>
@@ -218,7 +269,14 @@ export default function ScanDateConfirm() {
                   <Pressable
                     hitSlop={10}
                     onPress={() =>
-                      setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))
+                      setCalendarMonth(
+                        (current) =>
+                          new Date(
+                            current.getFullYear(),
+                            current.getMonth() + 1,
+                            1,
+                          ),
+                      )
                     }
                   >
                     <ChevronRightIcon size={22} color="#A0A0A0" />
@@ -244,12 +302,23 @@ export default function ScanDateConfirm() {
                       style={styles.pickerDayCell}
                       onPress={() => {
                         if (day == null) return;
-                        setSelectedDate(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day));
+                        setSelectedDate(
+                          new Date(
+                            calendarMonth.getFullYear(),
+                            calendarMonth.getMonth(),
+                            day,
+                          ),
+                        );
                         setPickerOpen(false);
                       }}
                     >
                       {day != null && (
-                        <View style={[styles.pickerDay, selected && styles.pickerDaySelected]}>
+                        <View
+                          style={[
+                            styles.pickerDay,
+                            selected && styles.pickerDaySelected,
+                          ]}
+                        >
                           <Text
                             style={[
                               styles.pickerDayText,
@@ -283,12 +352,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 6,
   },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 16, paddingHorizontal: 48 },
-  loadingText: { color: "#A0A0A0", fontFamily: "Pretendard-Medium", fontSize: 14, lineHeight: 22, textAlign: "center" },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+    paddingHorizontal: 48,
+  },
+  loadingText: {
+    color: "#A0A0A0",
+    fontFamily: "Pretendard-Medium",
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: "center",
+  },
   bars: { width: 100.8, gap: 4.8, alignItems: "flex-start" },
   bar: { height: 3.2, borderRadius: 220, backgroundColor: "#FA0C56" },
   content: { paddingHorizontal: 16, paddingTop: 24, gap: 12 },
-  heading: { marginTop: -8, marginBottom: 4, color: "#4C4C4C", fontFamily: "Pretendard-SemiBold", fontSize: 24, lineHeight: 32 },
+  heading: {
+    marginTop: -8,
+    marginBottom: 4,
+    color: "#4C4C4C",
+    fontFamily: "Pretendard-SemiBold",
+    fontSize: 24,
+    lineHeight: 32,
+  },
 
   // Figma 911:4419 — 361x50 / radius 8 / secondary_pink / base shadow
   dateField: {
@@ -303,7 +391,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     boxShadow: "0 3px 3px rgba(0, 0, 0, 0.06)",
   },
-  dateLabel: { color: "#A0A0A0", fontFamily: "Pretendard-Medium", fontSize: 14 },
+  dateLabel: {
+    color: "#A0A0A0",
+    fontFamily: "Pretendard-Medium",
+    fontSize: 14,
+  },
   // Figma 911:4422 — 80x30 흰 칩. 값이 없으면 빈 칩만 보인다.
   dateChip: {
     width: 80,
@@ -313,14 +405,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  dateChipText: { color: "#111111", fontFamily: "Pretendard-Medium", fontSize: 14 },
+  dateChipText: {
+    color: "#111111",
+    fontFamily: "Pretendard-Medium",
+    fontSize: 14,
+  },
 
   bottomArea: { paddingHorizontal: 16, paddingBottom: 12, gap: 14 },
   // Figma 911:4480 — 309x36 / rgba(17,17,17,0.8) / radius 6
   toast: {
     alignSelf: "center",
     minHeight: 36,
-    maxWidth: 309,
+    maxWidth: 320,
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 6,
@@ -344,10 +440,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   confirmButtonDisabled: { backgroundColor: "#A0A0A0" },
-  confirmButtonText: { color: "#FFFDF9", fontFamily: "Pretendard-SemiBold", fontSize: 20, letterSpacing: 1.2 },
+  confirmButtonText: {
+    color: "#FFFDF9",
+    fontFamily: "Pretendard-SemiBold",
+    fontSize: 20,
+    letterSpacing: 1.2,
+  },
 
   // Figma 911:4481 "팝업3" — 하단에 붙는 날짜 선택 시트
-  pickerLayer: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "flex-end" },
+  pickerLayer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "flex-end",
+  },
   pickerSheet: {
     backgroundColor: "#FFFCFD",
     borderTopLeftRadius: 20,
@@ -367,15 +475,39 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   pickerMonthRow: { flexDirection: "row", alignItems: "center", gap: 3 },
-  pickerMonth: { color: "#111111", fontFamily: "Pretendard-SemiBold", fontSize: 15.4, lineHeight: 22 },
+  pickerMonth: {
+    color: "#111111",
+    fontFamily: "Pretendard-SemiBold",
+    fontSize: 15.4,
+    lineHeight: 22,
+  },
   pickerNav: { flexDirection: "row", alignItems: "center", gap: 22 },
   pickerNavPrev: { transform: [{ rotate: "180deg" }] },
   // 요일 헤더 없이 날짜만 7열로 깐다(디자인 911:4657).
   pickerGrid: { flexDirection: "row", flexWrap: "wrap" },
-  pickerDayCell: { width: "14.2857%", height: 46, alignItems: "center", justifyContent: "center" },
-  pickerDay: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  pickerDayCell: {
+    width: "14.2857%",
+    height: 46,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pickerDay: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   pickerDaySelected: { backgroundColor: "#FFF0F6" },
-  pickerDayText: { color: "#111111", fontFamily: "Pretendard-Regular", fontSize: 16.4, lineHeight: 20 },
+  pickerDayText: {
+    color: "#111111",
+    fontFamily: "Pretendard-Regular",
+    fontSize: 16.4,
+    lineHeight: 20,
+  },
   pickerDayTextToday: { color: "#FF0A68", fontFamily: "Pretendard-SemiBold" },
-  pickerDayTextSelected: { color: "#FF0A68", fontFamily: "Pretendard-SemiBold" },
+  pickerDayTextSelected: {
+    color: "#FF0A68",
+    fontFamily: "Pretendard-SemiBold",
+  },
 });
