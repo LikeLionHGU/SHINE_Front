@@ -8,19 +8,19 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "http://1.201.117.27:8080"
+        "EXPO_PUBLIC_API_BASE_URL": "https://1.201.117.27.nip.io"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "http://1.201.117.27:8080"
+        "EXPO_PUBLIC_API_BASE_URL": "https://1.201.117.27.nip.io"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "http://1.201.117.27:8080"
+        "EXPO_PUBLIC_API_BASE_URL": "https://1.201.117.27.nip.io"
       }
     }
   },

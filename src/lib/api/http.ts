@@ -4,7 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
  * 서버 통신 공통 처리.
  *
  * .env 에 백엔드 주소를 넣으면 apiRequest가 그 주소로 요청한다.
- *   EXPO_PUBLIC_API_BASE_URL=http://1.201.117.27:8080
+ *   EXPO_PUBLIC_API_BASE_URL=https://1.201.117.27.nip.io
  *
  * 주소가 비어 있으면 client.ts의 각 함수가 목 데이터로 되돌아간다(withFallback).
  */
@@ -131,8 +131,8 @@ function firstFieldError(data: unknown): string | null {
 /**
  * refreshToken으로 accessToken을 다시 받는다. 여러 요청이 동시에 401이 나도 한 번만 돈다.
  *
- * 배포 서버의 accessToken 만료가 30분이라(로컬은 24시간이었다) 앱을 켜둔 채로 쓰면
- * 중간에 반드시 한 번은 401이 난다. 그때마다 이 함수가 돌아 토큰을 갱신한다.
+ * 명세서 v3 기준 accessToken은 시연 기간 동안 24시간, refreshToken은 14일이다.
+ * 만료되면 401 + TOKEN_EXPIRED가 오고, 그때 이 함수가 돌아 토큰을 갱신한다.
  * 서버가 refreshToken도 새로 주면(rotation) 반드시 새 값으로 덮어써야 다음 갱신이 된다.
  *
  * 주의: 로그인할 때 autoLogin=false면 서버가 refreshToken을 안 준다 → 갱신할 수단이
@@ -212,7 +212,8 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     // accessToken 만료(401 + TOKEN_EXPIRED)면 한 번만 재발급하고 같은 요청을 다시 보낸다.
     // 코드 이름이 서버마다 조금씩 달라서, refreshToken 재사용 감지(더 이상 갱신 불가)만
     // 빼고 401은 전부 갱신 대상으로 본다.
-    const expired = response.status === 401 && envelope?.code !== "REFRESH_TOKEN_REUSED";
+    const unrecoverable = ["REFRESH_TOKEN_REUSED", "REFRESH_TOKEN_INVALID", "LOGIN_FAILED"];
+    const expired = response.status === 401 && !unrecoverable.includes(envelope?.code ?? "");
     if (expired && !skipAuth && !_retried && (await reissueTokens())) {
       return apiRequest<T>(path, { ...options, _retried: true });
     }
