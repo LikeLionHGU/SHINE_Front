@@ -34,6 +34,7 @@ import type {
   ReportSubmission,
   SignupRequest,
   UserProfile,
+  UserProfileUpdate,
   VisitDate,
   VisitDetail,
 } from "./types";
@@ -131,6 +132,28 @@ export async function logout(): Promise<void> {
 /** 마이 페이지 프로필 — GET /api/v1/app/me */
 export async function getUserProfile(): Promise<UserProfile> {
   return withFallback("getUserProfile", () => apiRequest<UserProfile>("/app/me"), () => MOCK_PROFILE);
+}
+
+/**
+ * 개인정보 수정 — PATCH /api/v1/users/me
+ *
+ * 보낸 칸만 바뀐다(부분 수정). 서버는 추가 이메일을 additionalEmail로 부르지만
+ * 화면(UserProfile)은 extraEmail을 쓰고 있어 여기서 이름을 맞춰준다.
+ * 값을 비워서 지우려는 경우가 있으므로 빈 문자열도 그대로 보낸다.
+ *
+ * 저장에 실패하면 화면이 알아야 하므로 목 폴백을 두지 않고 오류를 그대로 던진다.
+ */
+export async function updateUserProfile(patch: UserProfileUpdate): Promise<UserProfile> {
+  const body: Record<string, string> = {};
+  if (patch.name !== undefined) body.name = patch.name.trim();
+  if (patch.phone !== undefined) body.phoneNumber = patch.phone.trim();
+  if (patch.email !== undefined) body.email = patch.email.trim();
+  if (patch.guardianEmail !== undefined) body.guardianEmail = patch.guardianEmail.trim();
+  if (patch.extraEmail !== undefined) body.additionalEmail = patch.extraEmail.trim();
+
+  await apiRequest("/users/me", { method: "PATCH", body });
+  // PATCH 응답 모양이 /app/me와 달라서, 화면이 쓰는 형태로 다시 읽어 온다.
+  return getUserProfile();
 }
 
 /* -------------------------------------------------------------- 임신 정보 */

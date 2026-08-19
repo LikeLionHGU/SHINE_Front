@@ -167,7 +167,11 @@ export default function AnalysisReport() {
           <Pressable hitSlop={8} onPress={goBack}>
             <BackChevronIcon size={24} />
           </Pressable>
-          <Text style={styles.headerTitle} pointerEvents="none">분석</Text>
+          {/* 기록 탭에서 지난 검사지를 열었을 때는 제목을 두지 않는다.
+              분석 탭 스택에서 온 경우에만 "분석"을 보여준다. */}
+          {from !== "record" && (
+            <Text style={styles.headerTitle} pointerEvents="none">분석</Text>
+          )}
           <Pressable hitSlop={8} onPress={() => router.replace("/(tabs)/home")}>
             <CloseIcon size={24} />
           </Pressable>
