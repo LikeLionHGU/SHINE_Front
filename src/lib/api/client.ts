@@ -6,6 +6,7 @@ import {
   type IndicatorStatus,
   type ParsedTestItem,
   type RecordEntry,
+  type ReportFood,
   type TrendIndicator,
 } from "@/lib/report";
 import {
@@ -412,6 +413,12 @@ export async function getRecordDetail(id: string): Promise<RecordDetail | null> 
 }
 
 type TestResultResponse = {
+  /** POST /reports 응답과 같은 모양일 때 쓰는 필드들 */
+  name?: string | null;
+  status?: string | null;
+  definition?: string | null;
+  verdict?: string | null;
+  value?: string | null;
   itemName?: string | null;
   itemNameEn?: string | null;
   ocrLabel?: string | null;
@@ -429,27 +436,51 @@ type TestSheetDetailResponse = {
   testSheetId: number;
   testDate?: string | null;
   pregnancyWeek?: number | null;
+  week?: string | null;
   hospitalName?: string | null;
-  summary?: { summaryForMom?: string | null } | null;
+  /** 표준 REST 모양: { summaryForMom }. /reports 모양이면 그냥 문자열로 온다. */
+  summary?: { summaryForMom?: string | null } | string | null;
   results?: TestResultResponse[] | null;
+  /** /reports 응답과 같은 모양으로 돌려주는 서버도 있어서 둘 다 받는다. */
+  items?: TestResultResponse[] | null;
+  questions?: (string | { content?: string | null })[] | null;
+  foods?: ReportFood[] | null;
 };
 
 const STATUS_LABELS: IndicatorStatus[] = ["안심", "주의", "위험"];
 
+/**
+ * 검사지 상세 응답을 화면 모양으로 옮긴다.
+ *
+ * 같은 검사지를 두 가지 모양으로 돌려주는 서버가 있어서(표준 REST의 `results[]`
+ * 와 POST /reports 응답과 같은 `items[]`) 둘 다 받는다. 한쪽 모양만 보다가
+ * 상태(status)를 못 읽어서 전부 "미분류"로 보이던 문제가 있었다.
+ */
 function toRecordDetail(sheet: TestSheetDetailResponse): RecordDetail {
+  const rawItems = sheet.items?.length ? sheet.items : (sheet.results ?? []);
+  const summary =
+    typeof sheet.summary === "string" ? sheet.summary : (sheet.summary?.summaryForMom ?? "");
+  const questions = (sheet.questions ?? [])
+    .map((q) => (typeof q === "string" ? q : (q?.content ?? "")))
+    .map((q) => q.trim())
+    .filter(Boolean);
+
   return {
     testSheetId: sheet.testSheetId,
     testDate: sheet.testDate ?? "",
-    week: sheet.pregnancyWeek != null ? `${sheet.pregnancyWeek}주차` : "",
+    week: sheet.week?.trim() || (sheet.pregnancyWeek != null ? `${sheet.pregnancyWeek}주차` : ""),
     hospitalName: sheet.hospitalName ?? null,
-    summary: sheet.summary?.summaryForMom ?? "",
-    items: (sheet.results ?? []).map(toParsedItem),
+    summary,
+    items: rawItems.map(toParsedItem),
+    questions,
+    foods: (sheet.foods ?? []).filter((food) => !!food?.name),
   };
 }
 
 function toParsedItem(result: TestResultResponse): ParsedTestItem {
-  const label = result.statusLabel?.trim() ?? "";
-  const name = result.itemName?.trim() || result.ocrLabel?.trim() || "";
+  // 상태 필드 이름이 응답 모양에 따라 statusLabel / status로 갈린다.
+  const label = (result.statusLabel ?? result.status ?? "").trim();
+  const name = result.name?.trim() || result.itemName?.trim() || result.ocrLabel?.trim() || "";
   const printed = result.ocrLabel?.trim() || result.itemNameEn?.trim() || "";
   return {
     // 매칭이 안 된 항목은 카탈로그 대표명이 없어 OCR 원문을 그대로 보여준다.
@@ -457,17 +488,19 @@ function toParsedItem(result: TestResultResponse): ParsedTestItem {
     // 대표명과 같은 글자면 두 번 보여줄 이유가 없다.
     originalName: printed && printed !== name ? printed : undefined,
     value: formatResultValue(result),
-    // statusLabel이 없으면 서버가 판정하지 못한 항목(UNKNOWN)이다.
+    // 상태 문자열이 없으면 서버가 판정하지 못한 항목(UNKNOWN)이다.
     status: STATUS_LABELS.includes(label as IndicatorStatus) ? (label as IndicatorStatus) : "미분류",
-    definition: result.description?.trim() ?? "",
-    // 이 응답에는 판정 문장(verdict)이 없다. 진단처럼 읽힐 문장을 만들지 않고
-    // 측정치와 참고치를 그대로 다시 적어주기만 한다.
-    verdict: composeVerdict(result),
+    definition: (result.definition ?? result.description ?? "").trim(),
+    // verdict를 주는 응답이면 그대로 쓰고, 없으면 측정치와 참고치를 다시 적어준다
+    // (진단처럼 읽힐 문장을 새로 만들지 않는다).
+    verdict: result.verdict?.trim() || composeVerdict(result),
   };
 }
 
 /** "12.2 g/dL (11~15)" 형태로 합친다. */
 function formatResultValue(result: TestResultResponse): string {
+  // value를 통째로 주는 응답이면(POST /reports 모양) 그대로 쓴다.
+  if (result.value?.trim()) return result.value.trim();
   const base =
     result.rawValue?.trim() ||
     (result.numberValue != null ? String(result.numberValue) : "") ||

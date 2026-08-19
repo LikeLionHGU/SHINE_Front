@@ -101,8 +101,13 @@ export default function AnalysisReport() {
                 ? {
                     items: detail.items,
                     summary: detail.summary,
-                    // 그 검사지에 달린 추천 질문. 없으면 질문 카드가 안내 문구로 바뀐다.
-                    questions: questions.map((q) => q.content),
+                    // 그 검사지에 달린 추천 질문. /questions가 비면 검사지 응답에
+                    // 같이 담겨 오는 questions를 쓴다. 둘 다 없으면 안내 문구.
+                    questions: questions.length > 0
+                      ? questions.map((q) => q.content)
+                      : (detail.questions ?? []),
+                    // 저장할 때 함께 보낸 추천 재료. 서버가 돌려주면 그대로 보여준다.
+                    foods: detail.foods ?? [],
                     fromServer: true,
                   }
                 : null,

@@ -146,6 +146,10 @@ export type RecordDetail = {
   hospitalName: string | null;
   items: ParsedTestItem[];
   summary: string;
+  /** 그때 저장해둔 추천 질문 (서버가 검사지와 함께 돌려주는 경우) */
+  questions?: string[];
+  /** 그때 저장해둔 추천 재료 (서버가 검사지와 함께 돌려주는 경우) */
+  foods?: ReportFood[];
 };
 
 /* ---------------------------------------------------------------- 홈 */
