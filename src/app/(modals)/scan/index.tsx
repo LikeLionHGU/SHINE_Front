@@ -63,7 +63,10 @@ export default function ScanStart() {
   }
 
   function handleClose() {
-    router.back();
+    // 분석 결과 화면에서 replace로 이 화면에 올 수도 있어서(스택에 이전 화면이
+    // 없는 경우) canGoBack을 확인하고, 없으면 홈으로 보낸다.
+    if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)/home");
   }
 
   function handleComplete() {

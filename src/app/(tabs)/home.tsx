@@ -4,10 +4,10 @@ import {
   XXLogoIcon,
 } from "@/components/icons";
 import { FoodImage } from "@/components/food-image";
-import { getHome, type Home } from "@/lib/api";
+import { getHome, getVisits, type CalendarVisit, type Home } from "@/lib/api";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -35,6 +35,11 @@ function UploadGlow() {
   );
 }
 
+/** 홈 주간 캘린더의 "2026-08-19" → 일정 목록이 쓰는 "26.08.19" */
+function toVisitDate(isoDate: string): string {
+  return `${isoDate.slice(2, 4)}.${isoDate.slice(5, 7)}.${isoDate.slice(8, 10)}`;
+}
+
 // 홈은 GET /api/v1/home 한 번으로 인사말·최신 검사지 요약·추천 질문·추천 재료·
 // 주간 캘린더를 전부 받는다. 검사지를 아직 안 올렸으면 latestSheet가 null이고
 // questions·nutritions가 빈 배열로 오는데, 그때는 각 카드가 안내 문구로 바뀐다.
@@ -42,14 +47,16 @@ export default function Home() {
   const router = useRouter();
   const [question, setQuestion] = useState("");
   const [home, setHome] = useState<Home | null>(null);
+  const [visits, setVisits] = useState<CalendarVisit[]>([]);
   const [loading, setLoading] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      getHome().then((result) => {
+      Promise.all([getHome(), getVisits()]).then(([result, visitList]) => {
         if (!active) return;
         setHome(result);
+        setVisits(visitList);
         setLoading(false);
       });
       return () => {
@@ -61,7 +68,23 @@ export default function Home() {
   const latestSheet = home?.latestSheet ?? null;
   const questions = home?.questions ?? [];
   const nutritions = home?.nutritions ?? [];
-  const days = home?.weeklyCalendar ?? [];
+
+  // 서버 주간 캘린더에 방금 추가한 일정이 아직 안 반영돼 있어도 홈에서 바로
+  // 보이도록, 캘린더 탭과 같은 일정 목록(GET /app/visits)을 겹쳐서 표시한다.
+  const days = useMemo(() => {
+    const weekly = home?.weeklyCalendar ?? [];
+    if (weekly.length === 0 || visits.length === 0) return weekly;
+    return weekly.map((day) => {
+      const dayVisits = visits.filter((visit) => visit.date === toVisitDate(day.date));
+      if (dayVisits.length === 0) return day;
+      const first = dayVisits[0];
+      return {
+        ...day,
+        hasAppointment: true,
+        label: day.label ?? (first.title || first.place || null),
+      };
+    });
+  }, [home?.weeklyCalendar, visits]);
 
   return (
     <View style={styles.container}>

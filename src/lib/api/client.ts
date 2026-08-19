@@ -384,13 +384,26 @@ async function readStoredQuestions(date: VisitDate): Promise<string[]> {
 
 /* ------------------------------------------------------------ 기록 · 분석 */
 
-/** 기록 탭 타임라인 — GET /api/v1/app/records */
+/**
+ * 기록 탭 타임라인 — GET /api/v1/app/records
+ *
+ * 서버가 최신순으로 주지만, 지난 날짜의 검사지를 나중에 올리면 업로드 순서로
+ * 섞여 보이는 경우가 있어 화면에서 쓰기 전에 검사일 기준으로 다시 정렬한다.
+ */
 export async function getRecords(): Promise<RecordEntry[]> {
   return withFallback(
     "getRecords",
-    async () => (await apiRequest<RecordEntry[]>("/app/records")) ?? [],
+    async () => sortRecordsByDateDesc((await apiRequest<RecordEntry[]>("/app/records")) ?? []),
     () => DEMO_RECORDS,
   );
+}
+
+/** "26.08.20" 형식은 문자열 비교만으로 날짜 순이 맞는다. 날짜가 같으면 최근 id 우선. */
+function sortRecordsByDateDesc(records: RecordEntry[]): RecordEntry[] {
+  return [...records].sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+    return Number(b.id) - Number(a.id) || 0;
+  });
 }
 
 /**
