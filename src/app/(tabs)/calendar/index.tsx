@@ -17,10 +17,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  formatVisitDate,
   formatVisitTime,
   getCalendarMonthMarks,
   getGuardianEmail,
   getPregnancyInfo,
+  getVisitDetail,
   getVisits,
   type CalendarMonthMarks,
   type CalendarVisit,
@@ -144,29 +146,24 @@ export default function Calendar() {
   const [monthMarks, setMonthMarks] = useState<CalendarMonthMarks>(EMPTY_MARKS);
   const [guardianEmail, setGuardianEmail] = useState("");
 
+  // 일정과 검사 기록(마크)을 함께 다시 읽는다.
+  //
+  // 예전에는 마크만 useEffect([monthCursor])로 받아서, 검사지를 올리고 캘린더로
+  // 돌아와도 달을 넘기거나 앱을 새로고침하기 전까지 동그라미가 안 찍혔다.
+  // 화면에 들어올 때마다 받도록 옮겨서 업로드 직후에도 바로 반영되게 한다.
   useFocusEffect(useCallback(() => {
     let active = true;
     getVisits().then((visits) => { if (active) setUpcomingVisits(visits); });
+    getCalendarMonthMarks(monthCursor.getFullYear(), monthCursor.getMonth()).then(
+      (marks) => { if (active) setMonthMarks(marks); },
+    );
     return () => { active = false; };
-  }, []));
+  }, [monthCursor]));
 
   useEffect(() => {
     getPregnancyInfo().then(setPregnancy);
     getGuardianEmail().then(setGuardianEmail);
   }, []);
-
-  // 보고 있는 달이 바뀔 때마다 그 달의 검사 기록을 받아온다.
-  useEffect(() => {
-    let active = true;
-    getCalendarMonthMarks(monthCursor.getFullYear(), monthCursor.getMonth()).then(
-      (marks) => {
-        if (active) setMonthMarks(marks);
-      },
-    );
-    return () => {
-      active = false;
-    };
-  }, [monthCursor]);
 
   // 안내 말풍선은 앱을 처음 쓸 때 한 번만 보여주고 바로 본 것으로 기록한다.
   useEffect(() => {
@@ -196,6 +193,46 @@ export default function Calendar() {
       (visit) => visit.isHospital && visit.date.startsWith(prefix),
     );
   }, [monthCursor, upcomingVisits]);
+
+  // 질문 목록은 "다음 진료" 한 건에만 열린다.
+  //
+  // 예전에는 목록의 첫 줄(i === 0)을 다음 진료로 봤는데, 그 달의 가장 이른
+  // 일정이라 이미 지난 날짜가 잡히곤 했다(8월 19일에 8월 10일이 "다음 진료").
+  // 오늘 이후로 가장 가까운 일정을 골라야 맞다. upcomingVisits는 날짜·시간
+  // 순으로 정렬돼 오므로 조건에 맞는 첫 항목이 곧 다음 진료다.
+  const nextVisit = useMemo(() => {
+    const today = formatVisitDate(new Date());
+    return (
+      monthlyHospitalVisits.find((visit) => visit.date >= today) ?? null
+    );
+  }, [monthlyHospitalVisits]);
+
+  // 다음 진료 때 물어볼 질문.
+  //
+  // GET /app/visits는 questions를 항상 빈 배열로 주기 때문에 일정 목록만으로는
+  // 질문을 채울 수 없다. AI 추천 질문과 직접 적어둔 질문은 날짜별 상세
+  // (getVisitDetail)에 들어 있어서 다음 진료 날짜로 따로 받아온다.
+  const [nextQuestions, setNextQuestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    const date = nextVisit?.date;
+    if (!date) {
+      setNextQuestions([]);
+      return;
+    }
+    let active = true;
+    getVisitDetail(date).then((detail) => {
+      if (!active) return;
+      const merged = [...detail.suggestedQuestions, ...detail.questions]
+        .map((question) => question.trim())
+        .filter(Boolean);
+      setNextQuestions([...new Set(merged)]);
+    });
+    return () => {
+      active = false;
+    };
+  }, [nextVisit?.date]);
+
 
   const goToMonth = (delta: number) => {
     setMonthCursor(
@@ -350,7 +387,7 @@ export default function Calendar() {
           <View style={styles.visitsCard}>
             <Text style={styles.visitsTitle}>예정된 방문</Text>
             {monthlyHospitalVisits.map((visit, i) => {
-              const isNext = i === 0;
+              const isNext = visit.id === nextVisit?.id;
               return (
                 <View key={visit.id}>
                   {i > 0 && (
@@ -411,14 +448,20 @@ export default function Calendar() {
                   {/* 다음 진료를 펼치면 그때 물어볼 질문 목록이 나온다. */}
                   {isNext && questionsOpen && (
                     <View style={styles.questionPanel}>
-                      {visit.questions.map((question, qi) => (
-                        <View key={qi} style={styles.questionRow}>
-                          <AiQuestionIcon />
-                          <Text style={styles.questionText} numberOfLines={1}>
-                            {question}
-                          </Text>
-                        </View>
-                      ))}
+                      {nextQuestions.length === 0 ? (
+                        <Text style={styles.questionEmptyText}>
+                          아직 준비된 질문이 없어요.
+                        </Text>
+                      ) : (
+                        nextQuestions.map((question, qi) => (
+                          <View key={qi} style={styles.questionRow}>
+                            <AiQuestionIcon />
+                            <Text style={styles.questionText} numberOfLines={1}>
+                              {question}
+                            </Text>
+                          </View>
+                        ))
+                      )}
                     </View>
                   )}
                 </View>
@@ -465,6 +508,7 @@ export default function Calendar() {
           </View>
         </View>
       </Modal>
+
     </View>
   );
 }
@@ -808,6 +852,11 @@ const styles = StyleSheet.create({
     color: "#A0A0A0",
     fontSize: 14,
     fontFamily: "Pretendard-Medium",
+  },
+  questionEmptyText: {
+    color: "#A0A0A0",
+    fontSize: 14,
+    fontFamily: "Pretendard-Regular",
   },
   // 공유하기 확인 다이얼로그 (디자인: 326x218 다크 카드)
   dialogBackdrop: {

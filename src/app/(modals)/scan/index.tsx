@@ -63,7 +63,11 @@ export default function ScanStart() {
   }
 
   function handleClose() {
-    router.back();
+    // 홈에서 "올리기"로 들어오면 뒤로 갈 화면이 있지만, 주소로 바로 열거나
+    // 분석 화면에서 dismissTo로 넘어온 경우엔 히스토리가 없어 back()이 아무 일도
+    // 하지 않는다. 그때는 홈으로 보낸다.
+    if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)/home");
   }
 
   function handleComplete() {
