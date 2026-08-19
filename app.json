@@ -25,7 +25,10 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "usesCleartextTraffic": true
+      "usesCleartextTraffic": true,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -56,9 +59,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "1c4694f8-fe4e-4bf4-a3e5-37bcdd366756"
+        "projectId": "cd654ae3-e8f6-452b-8f46-725f86184137"
       }
     },
-    "owner": "yo0ncs-team"
+    "owner": "hahashes-team"
   }
 }
