@@ -402,7 +402,12 @@ async function readStoredQuestions(date: VisitDate): Promise<string[]> {
 export async function getRecords(): Promise<RecordEntry[]> {
   return withFallback(
     "getRecords",
-    async () => sortRecordsByDateDesc((await apiRequest<RecordEntry[]>("/app/records")) ?? []),
+    async () => {
+      const records = (await apiRequest<RecordEntry[]>("/app/records")) ?? [];
+      return sortRecordsByDateDesc(
+        records.map((record) => ({ ...record, week: sanitizeWeek(record.week) })),
+      );
+    },
     () => DEMO_RECORDS,
   );
 }
@@ -413,6 +418,17 @@ function sortRecordsByDateDesc(records: RecordEntry[]): RecordEntry[] {
     if (a.date !== b.date) return a.date < b.date ? 1 : -1;
     return Number(b.id) - Number(a.id) || 0;
   });
+}
+
+/**
+ * 서버가 계산해준 주차 문자열("28주차")을 그대로 쓰되, 임신 시작 이전 날짜의
+ * 검사지에는 0 이하가 내려온다("-335주차", "0주차"). 화면에 그대로 찍으면
+ * 사람이 읽을 수 없는 값이라 주차를 비워둔다.
+ */
+function sanitizeWeek(week: string | null | undefined): string {
+  if (!week) return "";
+  const value = Number(week.replace(/[^0-9-]/g, ""));
+  return Number.isFinite(value) && value > 0 ? week : "";
 }
 
 /**
@@ -490,7 +506,11 @@ function toRecordDetail(sheet: TestSheetDetailResponse): RecordDetail {
   return {
     testSheetId: sheet.testSheetId,
     testDate: sheet.testDate ?? "",
-    week: sheet.week?.trim() || (sheet.pregnancyWeek != null ? `${sheet.pregnancyWeek}주차` : ""),
+    // 서버가 "12주 3일"처럼 문자열로 주면 그대로 쓰고, 숫자만 주면 "N주차"로
+    // 만든다. 둘 다 임신 시작 이전 날짜면 0 이하가 오므로 표시하지 않는다.
+    week: sanitizeWeek(
+      sheet.week?.trim() || (sheet.pregnancyWeek != null ? `${sheet.pregnancyWeek}주차` : ""),
+    ),
     hospitalName: sheet.hospitalName ?? null,
     summary,
     items: rawItems.map(toParsedItem),
