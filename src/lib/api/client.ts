@@ -60,6 +60,8 @@ type TokenResponse = {
   refreshToken?: string | null;
   tokenType?: string;
   expiresIn?: number;
+  /** 로그인 응답에 함께 오는 사용자 정보 (명세서 v3 1-3) */
+  user?: { userId?: number; name?: string; pregnancyWeek?: number } | null;
 };
 
 /** 로그인. 성공하면 토큰을 저장해 이후 요청에 자동으로 붙는다. */
@@ -76,6 +78,11 @@ export async function login(request: LoginRequest): Promise<AuthResult> {
   });
 
   await setAuthToken(tokens.accessToken, tokens.refreshToken ?? null);
+  // 캘린더 주차 계산이 /users/me 응답을 기다리지 않아도 되도록, 로그인 응답에
+  // 담겨 오는 주수를 그대로 기기에 남겨둔다.
+  if (typeof tokens.user?.pregnancyWeek === "number") {
+    await cachePregnancyInfo(tokens.user.pregnancyWeek);
+  }
   return { token: tokens.accessToken, profile: await getUserProfile() };
 }
 
@@ -309,7 +316,9 @@ export async function getVisitDetail(date: VisitDate): Promise<VisitDetail> {
  */
 function withAbsoluteUrl(report: Report | null): Report | null {
   if (!report) return null;
-  const matched = report.url?.match(/test-sheets\/(\d+)\//);
+  // 명세서 예시는 "/api/v1/test-sheets/15"처럼 끝에 슬래시가 없다.
+  // 이미지 경로("/api/v1/test-sheets/15/images/1")도 같은 정규식으로 잡힌다.
+  const matched = report.url?.match(/test-sheets\/(\d+)/);
   const testSheetId = matched ? Number(matched[1]) : report.testSheetId;
   const url =
     report.url && !/^https?:\/\//.test(report.url) ? `${API_BASE_URL}${report.url}` : report.url;
