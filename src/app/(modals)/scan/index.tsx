@@ -4,11 +4,11 @@ import {
   UploadCloudIcon,
   XXLogoIcon,
 } from "@/components/icons";
-import { centeredContentStyle, centeredSheetStyle, MAX_CONTENT_WIDTH } from "@/lib/layout";
+import { centeredContentStyle, centeredSheetStyle } from "@/lib/layout";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Alert,
   Image,
@@ -16,7 +16,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -29,30 +28,8 @@ type PickMethod = "camera" | "library";
 // analyzing 화면으로 넘어가 스캔 애니메이션 후 결과 화면으로 이동한다.
 export default function ScanStart() {
   const router = useRouter();
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  // 미리보기 박스가 넘지 않을 최대 크기. 화면 폭에서 계산해서(고정 300px가
-  // 아니라) 작은 폰에서는 잘리지 않고, 큰 화면에서는 콘텐츠 폭(MAX_CONTENT_WIDTH)
-  // 이상으로 커지지 않는다. 실제 표시 크기는 선택한 사진의 원본 비율을 유지한
-  // 채 이 박스 안에 맞춰(축소만, 확대는 하지 않음) 계산한다.
-  const maxPreviewWidth = Math.min(windowWidth - 32, MAX_CONTENT_WIDTH - 32);
-  const maxPreviewHeight = windowHeight * 0.45;
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [method, setMethod] = useState<PickMethod | null>(null);
-  const [previewSize, setPreviewSize] = useState({ width: 241, height: 395 });
-
-  // 선택한 사진을 고정 박스에 잘라 넣지 않고, 원본 비율 그대로 보여준다.
-  useEffect(() => {
-    if (!imageUri) return;
-    Image.getSize(
-      imageUri,
-      (width, height) => {
-        const scale = Math.min(maxPreviewWidth / width, maxPreviewHeight / height, 1);
-        setPreviewSize({ width: Math.round(width * scale), height: Math.round(height * scale) });
-      },
-      () => {},
-    );
-  }, [imageUri, maxPreviewWidth, maxPreviewHeight]);
-
   async function pickFromCamera() {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
@@ -130,8 +107,8 @@ export default function ScanStart() {
           </View>
 
           {imageUri && (
-            <View style={[styles.previewWrap, previewSize]}>
-              <Image source={{ uri: imageUri }} style={[styles.preview, previewSize]} resizeMode="contain" />
+            <View style={styles.previewWrap}>
+              <Image source={{ uri: imageUri }} style={styles.preview} resizeMode="contain" />
               <View style={[styles.corner, styles.cornerTL]} />
               <View style={[styles.corner, styles.cornerTR]} />
               <View style={[styles.corner, styles.cornerBL]} />
@@ -154,6 +131,8 @@ export default function ScanStart() {
 }
 
 const CORNER_SIZE = 18;
+/** ㄱ자 모서리 안쪽 미리보기 틀의 고정 높이. 폭은 콘텐츠 폭을 그대로 쓴다. */
+const PREVIEW_HEIGHT = 320;
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -191,12 +170,19 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.78 },
   cardLabel: { color: "#111", fontFamily: "Pretendard-Medium", fontSize: 16 },
-  // width/height는 렌더링 시 선택한 사진의 실제 비율로 덮어쓴다(기본값은 초기 fallback).
+  // ㄱ자 모서리로 감싸는 미리보기 틀은 항상 같은 크기다. 사진 비율에 따라
+  // 틀이 늘었다 줄었다 하면 아래 "완료" 버튼과 여백이 매번 달라 보인다.
+  // 안쪽 사진만 contain으로 맞춰서, 세로 사진이든 가로 사진이든 잘리지 않고
+  // 이 틀 안에 자유롭게 들어간다.
   previewWrap: {
     marginTop: 12,
     alignSelf: "center",
+    width: "100%",
+    height: PREVIEW_HEIGHT,
   },
   preview: {
+    width: "100%",
+    height: "100%",
     borderRadius: 8,
     backgroundColor: "#FFF0F6",
   },

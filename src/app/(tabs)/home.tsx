@@ -1,6 +1,6 @@
 import {
   ChevronRightIcon,
-  SparkleIcon,
+  AiQuestionIcon,
   XXLogoIcon,
 } from "@/components/icons";
 import { FoodImage } from "@/components/food-image";
@@ -91,7 +91,7 @@ export default function Home() {
             ) : questions.length > 0 ? (
               questions.slice(0, 2).map((item) => (
                 <View key={item.questionId} style={styles.exampleRow}>
-                  <SparkleIcon />
+                  <AiQuestionIcon />
                   <Text style={styles.example} numberOfLines={1}>{item.content}</Text>
                 </View>
               ))

@@ -1,4 +1,4 @@
-import { BackChevronIcon, CloseIcon, EditOutlineIcon, XXLogoIcon } from "@/components/icons";
+import { BackChevronIcon, ChevronRightIcon, CloseIcon, XXLogoIcon } from "@/components/icons";
 import { centeredContentStyle, centeredSheetStyle } from "@/lib/layout";
 import { setPendingScan, type ParsedTestItem } from "@/lib/report";
 import { parseTestReport } from "@/lib/ocr";
@@ -10,7 +10,6 @@ import { Alert, Animated, Pressable, StyleSheet, Text, View } from "react-native
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const BAR_WIDTHS = [100.8, 100.8, 83.2, 73.6];
-const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
 function pad(value: number) {
   return String(value).padStart(2, "0");
@@ -19,11 +18,6 @@ function pad(value: number) {
 /** 저장용 "YY.MM.DD" 문자열 (calendar-visits 등 앱 전반의 날짜 표기와 통일). */
 function toStoredDate(value: Date) {
   return `${pad(value.getFullYear() % 100)}.${pad(value.getMonth() + 1)}.${pad(value.getDate())}`;
-}
-
-/** 화면에 보여줄 "3월 23일 (토)" 형태. */
-function toDisplayDate(value: Date) {
-  return `${value.getMonth() + 1}월 ${value.getDate()}일 (${WEEKDAY_LABELS[value.getDay()]})`;
 }
 
 /** OCR이 돌려준 "YYYY-MM-DD"를 Date로. 형식이 안 맞으면 null. */
@@ -52,7 +46,6 @@ export default function ScanDateConfirm() {
   const [finalUri, setFinalUri] = useState<string | null>(null);
   const [items, setItems] = useState<ParsedTestItem[] | undefined>(undefined);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [dateFound, setDateFound] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const today = useMemo(() => new Date(), []);
@@ -93,15 +86,11 @@ export default function ScanDateConfirm() {
         if (parsedDate) {
           setSelectedDate(parsedDate);
           setCalendarMonth(new Date(parsedDate.getFullYear(), parsedDate.getMonth(), 1));
-          setDateFound(true);
-        } else {
-          setDateFound(false);
         }
       } catch (error) {
         console.warn("[scan] 검사지 OCR 파싱 실패:", error);
         if (cancelled) return;
         setItems(undefined);
-        setDateFound(false);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -113,11 +102,6 @@ export default function ScanDateConfirm() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uri]);
-
-  // 날짜를 못 찾았으면, 로딩이 끝나자마자 바로 달력을 열어서 직접 고르게 한다.
-  useEffect(() => {
-    if (!loading && !dateFound) setPickerOpen(true);
-  }, [loading, dateFound]);
 
   const calendarCells = useMemo(() => {
     const year = calendarMonth.getFullYear();
@@ -163,107 +147,128 @@ export default function ScanDateConfirm() {
             </View>
           </View>
         ) : (
-          <View style={[centeredContentStyle, styles.content]}>
-            <XXLogoIcon width={65} />
-            <Text style={styles.heading}>검사 날짜를{"\n"}확인해주세요</Text>
+          <>
+            <View style={[centeredContentStyle, styles.content]}>
+              <XXLogoIcon width={65} />
+              <Text style={styles.heading}>검사 날짜를{"\n"}확인해주세요</Text>
 
-            {!dateFound && (
-              <Text style={styles.notice}>사진에서 검사 날짜를 찾지 못했어요.{"\n"}아래에서 직접 선택해주세요.</Text>
-            )}
+              {/* Figma 911:4419 — "날짜" 라벨 + 값 칩 한 줄.
+                  편집(연필) 아이콘 없이 줄 전체를 누르면 아래 데이트피커가 열린다. */}
+              <Pressable style={styles.dateField} onPress={() => setPickerOpen((open) => !open)}>
+                <Text style={styles.dateLabel}>날짜</Text>
+                <View style={styles.dateChip}>
+                  <Text style={styles.dateChipText}>
+                    {selectedDate ? toStoredDate(selectedDate) : ""}
+                  </Text>
+                </View>
+              </Pressable>
+            </View>
 
-            <Pressable style={styles.dateField} onPress={() => setPickerOpen((open) => !open)}>
-              <Text style={styles.dateLabel}>검사 날짜</Text>
-              <View style={styles.dateValueRow}>
-                <Text style={[styles.dateValue, !selectedDate && styles.dateValuePlaceholder]}>
-                  {selectedDate ? toDisplayDate(selectedDate) : "날짜 선택"}
-                </Text>
-                <EditOutlineIcon size={16} />
-              </View>
-            </Pressable>
+            {/* 완료(다음) 버튼은 항상 화면 하단에 붙는다. */}
+            <View style={[centeredSheetStyle, styles.bottomArea]}>
+              {/* Figma 911:4480 — 날짜를 아직 못 정했을 때만 뜨는 안내 토스트 */}
+              {!selectedDate && (
+                <View style={styles.toast}>
+                  <Text style={styles.toastText}>
+                    검사지에서 날짜를 파악하지 못했어요 날짜를 직접선택해주세요
+                  </Text>
+                </View>
+              )}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.confirmButton,
+                  !selectedDate && styles.confirmButtonDisabled,
+                  pressed && selectedDate && styles.pressed,
+                ]}
+                disabled={!selectedDate}
+                onPress={handleConfirm}
+              >
+                <Text style={styles.confirmButtonText}>다음</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
+      </SafeAreaView>
 
-            {pickerOpen && (
-              <View style={styles.calendarCard}>
-                <View style={styles.calendarHeader}>
-                  <Text style={styles.calendarTitle}>
+      {/* Figma 911:4481 "팝업3" — 화면 하단에 붙는 날짜 선택 시트.
+          요일 헤더 없이 날짜 그리드만 두고, 시트 바깥을 누르면 닫힌다. */}
+      {!loading && pickerOpen && (
+        <View style={styles.pickerLayer} pointerEvents="box-none">
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setPickerOpen(false)} />
+          <View style={[centeredSheetStyle, styles.pickerSheet]}>
+            <SafeAreaView edges={["bottom"]}>
+              <View style={styles.pickerHeader}>
+                <View style={styles.pickerMonthRow}>
+                  <Text style={styles.pickerMonth}>
                     {calendarMonth.getFullYear()}년 {calendarMonth.getMonth() + 1}월
                   </Text>
-                  <View style={styles.calendarActions}>
-                    <Pressable
-                      hitSlop={8}
-                      onPress={() =>
-                        setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))
-                      }
-                    >
-                      <Text style={styles.calendarArrow}>‹</Text>
-                    </Pressable>
-                    <Pressable
-                      hitSlop={8}
-                      onPress={() =>
-                        setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))
-                      }
-                    >
-                      <Text style={styles.calendarArrow}>›</Text>
-                    </Pressable>
-                  </View>
+                  <ChevronRightIcon size={16} color="#111111" />
                 </View>
-                <View style={styles.calendarGrid}>
-                  {calendarCells.map((day, index) => {
-                    const selected =
-                      selectedDate != null &&
-                      day === selectedDate.getDate() &&
-                      calendarMonth.getMonth() === selectedDate.getMonth() &&
-                      calendarMonth.getFullYear() === selectedDate.getFullYear();
-                    const isToday =
-                      day === today.getDate() &&
-                      calendarMonth.getMonth() === today.getMonth() &&
-                      calendarMonth.getFullYear() === today.getFullYear();
-                    return (
-                      <Pressable
-                        key={`${index}-${day ?? "empty"}`}
-                        disabled={day == null}
-                        style={[styles.calendarDay, selected && styles.calendarDaySelected]}
-                        onPress={() => {
-                          if (day == null) return;
-                          setSelectedDate(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day));
-                          setDateFound(true);
-                          setPickerOpen(false);
-                        }}
-                      >
-                        {day != null && (
+                <View style={styles.pickerNav}>
+                  <Pressable
+                    hitSlop={10}
+                    onPress={() =>
+                      setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))
+                    }
+                  >
+                    <View style={styles.pickerNavPrev}>
+                      <ChevronRightIcon size={22} color="#A0A0A0" />
+                    </View>
+                  </Pressable>
+                  <Pressable
+                    hitSlop={10}
+                    onPress={() =>
+                      setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))
+                    }
+                  >
+                    <ChevronRightIcon size={22} color="#A0A0A0" />
+                  </Pressable>
+                </View>
+              </View>
+
+              <View style={styles.pickerGrid}>
+                {calendarCells.map((day, index) => {
+                  const selected =
+                    selectedDate != null &&
+                    day === selectedDate.getDate() &&
+                    calendarMonth.getMonth() === selectedDate.getMonth() &&
+                    calendarMonth.getFullYear() === selectedDate.getFullYear();
+                  const isToday =
+                    day === today.getDate() &&
+                    calendarMonth.getMonth() === today.getMonth() &&
+                    calendarMonth.getFullYear() === today.getFullYear();
+                  return (
+                    <Pressable
+                      key={`${index}-${day ?? "empty"}`}
+                      disabled={day == null}
+                      style={styles.pickerDayCell}
+                      onPress={() => {
+                        if (day == null) return;
+                        setSelectedDate(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day));
+                        setPickerOpen(false);
+                      }}
+                    >
+                      {day != null && (
+                        <View style={[styles.pickerDay, selected && styles.pickerDaySelected]}>
                           <Text
                             style={[
-                              styles.calendarDayText,
-                              isToday && styles.calendarDayTextToday,
-                              selected && styles.calendarDayTextSelected,
+                              styles.pickerDayText,
+                              isToday && styles.pickerDayTextToday,
+                              selected && styles.pickerDayTextSelected,
                             ]}
                           >
                             {day}
                           </Text>
-                        )}
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                })}
               </View>
-            )}
+            </SafeAreaView>
           </View>
-        )}
-
-        {!loading && (
-          <Pressable
-            style={({ pressed }) => [
-              centeredSheetStyle,
-              styles.confirmButton,
-              !selectedDate && styles.confirmButtonDisabled,
-              pressed && selectedDate && styles.pressed,
-            ]}
-            disabled={!selectedDate}
-            onPress={handleConfirm}
-          >
-            <Text style={styles.confirmButtonText}>다음</Text>
-          </Pressable>
-        )}
-      </SafeAreaView>
+        </View>
+      )}
     </View>
   );
 }
@@ -284,53 +289,93 @@ const styles = StyleSheet.create({
   bar: { height: 3.2, borderRadius: 220, backgroundColor: "#FA0C56" },
   content: { paddingHorizontal: 16, paddingTop: 24, gap: 12 },
   heading: { marginTop: -8, marginBottom: 4, color: "#4C4C4C", fontFamily: "Pretendard-SemiBold", fontSize: 24, lineHeight: 32 },
-  notice: { color: "#FA0C56", fontFamily: "Pretendard-Medium", fontSize: 13, lineHeight: 20 },
+
+  // Figma 911:4419 — 361x50 / radius 8 / secondary_pink / base shadow
   dateField: {
     marginTop: 8,
-    height: 52,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    height: 50,
+    paddingLeft: 15,
+    paddingRight: 9,
+    borderRadius: 8,
     backgroundColor: "#FFF0F6",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    boxShadow: "0 3px 3px rgba(0, 0, 0, 0.06)",
   },
   dateLabel: { color: "#A0A0A0", fontFamily: "Pretendard-Medium", fontSize: 14 },
-  dateValueRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  dateValue: { color: "#111111", fontFamily: "Pretendard-SemiBold", fontSize: 16 },
-  dateValuePlaceholder: { color: "#A0A0A0", fontFamily: "Pretendard-Medium" },
-  calendarCard: {
-    marginTop: 8,
-    padding: 16,
-    borderRadius: 16,
+  // Figma 911:4422 — 80x30 흰 칩. 값이 없으면 빈 칩만 보인다.
+  dateChip: {
+    width: 80,
+    height: 30,
+    borderRadius: 4,
     backgroundColor: "#FFFCFD",
-    boxShadow: "0 0 8px rgba(0, 0, 0, 0.08)",
-  },
-  calendarHeader: {
-    height: 24,
-    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
   },
-  calendarTitle: { color: "#111111", fontSize: 15.4, lineHeight: 22, fontFamily: "Pretendard-SemiBold" },
-  calendarActions: { flexDirection: "row", alignItems: "center", gap: 24 },
-  calendarArrow: { color: "#A0A0A0", fontSize: 28, lineHeight: 28, fontFamily: "Pretendard-Medium" },
-  calendarGrid: { marginTop: 8, flexDirection: "row", flexWrap: "wrap" },
-  calendarDay: { width: "14.2857%", height: 42, alignItems: "center", justifyContent: "center", borderRadius: 21 },
-  calendarDaySelected: { backgroundColor: "#FFF0F6" },
-  calendarDayText: { color: "#111111", fontSize: 16, lineHeight: 22, fontFamily: "Pretendard-Regular" },
-  calendarDayTextToday: { color: "#FA0C56", fontFamily: "Pretendard-SemiBold" },
-  calendarDayTextSelected: { color: "#FF0A68", fontSize: 18.5, lineHeight: 24 },
+  dateChipText: { color: "#111111", fontFamily: "Pretendard-Medium", fontSize: 14 },
+
+  bottomArea: { paddingHorizontal: 16, paddingBottom: 12, gap: 14 },
+  // Figma 911:4480 — 309x36 / rgba(17,17,17,0.8) / radius 6
+  toast: {
+    alignSelf: "center",
+    minHeight: 36,
+    maxWidth: 309,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 6,
+    backgroundColor: "rgba(17,17,17,0.8)",
+    justifyContent: "center",
+  },
+  toastText: {
+    textAlign: "center",
+    color: "#FFFDF9",
+    fontFamily: "Pretendard-Medium",
+    fontSize: 12,
+    lineHeight: 22,
+  },
   pressed: { opacity: 0.78 },
+  // Figma 911:4396 / 911:4474 — 361x46 / radius 12 / 활성 #FA0C56, 비활성 #A0A0A0
   confirmButton: {
-    marginHorizontal: 16,
-    marginBottom: 12,
     height: 46,
     borderRadius: 12,
     backgroundColor: "#FA0C56",
     alignItems: "center",
     justifyContent: "center",
   },
-  confirmButtonDisabled: { backgroundColor: "#F0A9C2" },
+  confirmButtonDisabled: { backgroundColor: "#A0A0A0" },
   confirmButtonText: { color: "#FFFDF9", fontFamily: "Pretendard-SemiBold", fontSize: 20, letterSpacing: 1.2 },
+
+  // Figma 911:4481 "팝업3" — 하단에 붙는 날짜 선택 시트
+  pickerLayer: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "flex-end" },
+  pickerSheet: {
+    backgroundColor: "#FFFCFD",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: "#CFCFCF",
+    paddingHorizontal: 24,
+    paddingTop: 22,
+    paddingBottom: 8,
+    boxShadow: "0 -4px 4px rgba(0, 0, 0, 0.15)",
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  pickerMonthRow: { flexDirection: "row", alignItems: "center", gap: 3 },
+  pickerMonth: { color: "#111111", fontFamily: "Pretendard-SemiBold", fontSize: 15.4, lineHeight: 22 },
+  pickerNav: { flexDirection: "row", alignItems: "center", gap: 22 },
+  pickerNavPrev: { transform: [{ rotate: "180deg" }] },
+  // 요일 헤더 없이 날짜만 7열로 깐다(디자인 911:4657).
+  pickerGrid: { flexDirection: "row", flexWrap: "wrap" },
+  pickerDayCell: { width: "14.2857%", height: 46, alignItems: "center", justifyContent: "center" },
+  pickerDay: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  pickerDaySelected: { backgroundColor: "#FFF0F6" },
+  pickerDayText: { color: "#111111", fontFamily: "Pretendard-Regular", fontSize: 16.4, lineHeight: 20 },
+  pickerDayTextToday: { color: "#FF0A68", fontFamily: "Pretendard-SemiBold" },
+  pickerDayTextSelected: { color: "#FF0A68", fontFamily: "Pretendard-SemiBold" },
 });

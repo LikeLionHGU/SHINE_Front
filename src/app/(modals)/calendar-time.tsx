@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ToggleSwitch } from "@/components/icons";
-import { saveVisit } from "@/lib/api";
+import { getVisits, saveVisit } from "@/lib/api";
 import { centeredSheetStyle } from "@/lib/layout";
 
 /** 휠에는 AM/PM으로 표기하고, 화면 상단 요약에는 오전/오후로 보여준다. */
@@ -37,6 +37,13 @@ const SHEET_HEIGHT_RATIO = 0.73;
 
 /** 시간/산부인과 한 줄 높이. 시간 피커를 그 줄 바로 아래에 붙일 때 쓴다. */
 const OPTION_ROW_HEIGHT = 41;
+
+/** 제목/장소 입력 한 줄 높이. 장소 추천 목록을 그 아래에 붙일 때 쓴다. */
+const FIELD_HEIGHT = 41;
+/** 제목 + 구분선 + 장소 = 입력 덩어리 전체 높이. */
+const FIELD_GROUP_HEIGHT = FIELD_HEIGHT * 2 + 1;
+/** 한 번에 보여줄 장소 추천 개수. 너무 많으면 아래 입력들을 다 덮는다. */
+const PLACE_SUGGESTION_LIMIT = 5;
 
 function pad(value: number) {
   return String(value).padStart(2, "0");
@@ -135,12 +142,47 @@ export default function CalendarTimePicker() {
 
   const [title, setTitle] = useState(params.title ?? "");
   const [place, setPlace] = useState(params.place ?? "");
+  // 지금까지 등록한 일정의 장소들. 같은 산부인과를 반복해서 가는 경우가
+  // 대부분이라, 매번 새로 타이핑하지 않고 골라 넣을 수 있게 한다.
+  const [pastPlaces, setPastPlaces] = useState<string[]>([]);
+  const [placeSuggestOpen, setPlaceSuggestOpen] = useState(false);
   const [isHospital, setIsHospital] = useState(params.isHospital !== "false");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   // 시간 피커는 "시간" 행 바로 아래에 붙어 시트 바닥까지 채운다.
   const [optionCardY, setOptionCardY] = useState<number | null>(null);
   const today = useMemo(() => new Date(), []);
+
+  // 최근에 간 곳이 위로 오도록 날짜 내림차순으로 정렬한 뒤 중복을 없앤다.
+  // ("YY.MM.DD" 형식이라 문자열 비교만으로 날짜순이 된다.)
+  useEffect(() => {
+    let active = true;
+    getVisits().then((visits) => {
+      if (!active) return;
+      const seen = new Set<string>();
+      const places: string[] = [];
+      for (const visit of [...visits].sort((a, b) => b.date.localeCompare(a.date))) {
+        const value = visit.place?.trim();
+        if (!value || seen.has(value)) continue;
+        seen.add(value);
+        places.push(value);
+      }
+      setPastPlaces(places);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // 입력한 글자가 있으면 그걸로 걸러내고, 비어 있으면 최근 장소를 그대로 보여준다.
+  // 이미 정확히 같은 값이 들어가 있으면 고를 게 없으므로 목록을 닫는다.
+  const placeSuggestions = useMemo(() => {
+    const query = place.trim().toLowerCase();
+    return pastPlaces
+      .filter((item) => item.toLowerCase() !== query)
+      .filter((item) => !query || item.toLowerCase().includes(query))
+      .slice(0, PLACE_SUGGESTION_LIMIT);
+  }, [pastPlaces, place]);
 
   const [meridiemIndex, setMeridiemIndex] = useState(params.meridiem === "AM" ? 0 : 1);
   const [hourIndex, setHourIndex] = useState(Math.max(0, HOURS.indexOf(Number(params.hour ?? 3))));
@@ -269,6 +311,7 @@ export default function CalendarTimePicker() {
         <Pressable
           style={styles.dateField}
           onPress={() => {
+            setPlaceSuggestOpen(false);
             setPickerOpen(false);
             setDatePickerOpen((open) => !open);
           }}
@@ -277,22 +320,59 @@ export default function CalendarTimePicker() {
           <View style={styles.dateChip}><Text style={styles.timeChipText}>{date}</Text></View>
         </Pressable>
 
-        <View style={styles.fieldGroup}>
-          <TextInput
-            style={[styles.field, styles.fieldTop]}
-            placeholder="제목"
-            placeholderTextColor="#A0A0A0"
-            value={title}
-            onChangeText={setTitle}
-          />
-          <View style={styles.fieldSeparator} />
-          <TextInput
-            style={[styles.field, styles.fieldBottom]}
-            placeholder="장소 또는 위치"
-            placeholderTextColor="#A0A0A0"
-            value={place}
-            onChangeText={setPlace}
-          />
+        {/* 추천 목록이 아래 입력들 위로 떠야 해서 감싸는 View에 zIndex를 준다. */}
+        <View style={styles.fieldGroupWrap}>
+          <View style={styles.fieldGroup}>
+            <TextInput
+              style={[styles.field, styles.fieldTop]}
+              placeholder="제목"
+              placeholderTextColor="#A0A0A0"
+              value={title}
+              onChangeText={setTitle}
+              onFocus={() => setPlaceSuggestOpen(false)}
+            />
+            <View style={styles.fieldSeparator} />
+            <TextInput
+              style={[styles.field, styles.fieldBottom]}
+              placeholder="장소 또는 위치"
+              placeholderTextColor="#A0A0A0"
+              value={place}
+              onChangeText={(text) => {
+                setPlace(text);
+                setPlaceSuggestOpen(true);
+              }}
+              onFocus={() => {
+                setPickerOpen(false);
+                setDatePickerOpen(false);
+                setPlaceSuggestOpen(true);
+              }}
+            />
+          </View>
+
+          {/* onBlur로 닫으면 항목을 누르는 순간 목록이 먼저 사라져 터치를
+              놓친다 — 고르거나 다른 곳을 눌렀을 때만 닫는다. */}
+          {placeSuggestOpen && placeSuggestions.length > 0 && (
+            <View style={styles.placeSuggestions}>
+              <Text style={styles.placeSuggestionsHint}>최근 등록한 장소</Text>
+              {placeSuggestions.map((item, index) => (
+                <Pressable
+                  key={item}
+                  style={[
+                    styles.placeSuggestionRow,
+                    index < placeSuggestions.length - 1 && styles.placeSuggestionDivider,
+                  ]}
+                  onPress={() => {
+                    setPlace(item);
+                    setPlaceSuggestOpen(false);
+                  }}
+                >
+                  <Text style={styles.placeSuggestionText} numberOfLines={1}>
+                    {item}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
         </View>
 
         <View
@@ -304,6 +384,7 @@ export default function CalendarTimePicker() {
             <Pressable
               style={styles.timeChip}
               onPress={() => {
+                setPlaceSuggestOpen(false);
                 setDatePickerOpen(false);
                 setPickerOpen((open) => !open);
               }}
@@ -517,11 +598,52 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  // 장소 추천 목록이 아래 옵션 카드 위로 떠야 해서, 감싸는 쪽이 층을 올린다.
+  // (안드로이드는 zIndex만으로는 형제보다 위로 안 올라와서 elevation도 같이 준다.)
+  fieldGroupWrap: {
+    marginTop: 14,
+    zIndex: 30,
+    elevation: 30,
+  },
   // 제목/장소는 위아래로 붙은 한 덩어리 (사이에만 구분선)
   fieldGroup: {
-    marginTop: 14,
     borderRadius: 8,
     overflow: "hidden",
+  },
+  // 장소 입력 바로 아래에 겹쳐 뜨는 최근 장소 목록.
+  placeSuggestions: {
+    position: "absolute",
+    top: FIELD_GROUP_HEIGHT + 6,
+    left: 0,
+    right: 0,
+    backgroundColor: "#FFFCFD",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#CFCFCF",
+    overflow: "hidden",
+    boxShadow: "0 4px 10px rgba(0, 0, 0, 0.10)",
+  },
+  placeSuggestionsHint: {
+    paddingTop: 9,
+    paddingBottom: 5,
+    paddingHorizontal: 15,
+    color: "#A0A0A0",
+    fontSize: 11,
+    fontFamily: "Pretendard-Medium",
+  },
+  placeSuggestionRow: {
+    height: 38,
+    justifyContent: "center",
+    paddingHorizontal: 15,
+  },
+  placeSuggestionDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#F5E9EE",
+  },
+  placeSuggestionText: {
+    color: "#111111",
+    fontSize: 14,
+    fontFamily: "Pretendard-Medium",
   },
   field: {
     height: 41,

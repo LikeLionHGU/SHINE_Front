@@ -10,9 +10,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import { Image } from "expo-image";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
+  AiQuestionIcon,
   BackChevronIcon,
   ChevronRightIcon,
   EditOutlineIcon,
@@ -302,11 +302,7 @@ export default function CalendarDay() {
 
             {suggestedQuestions.map((text, i) => (
               <View key={i} style={styles.questionRow}>
-                <Image
-                  source={require("@/assets/images/AIicon.png")}
-                  style={styles.questionIcon}
-                  contentFit="contain"
-                />
+                <AiQuestionIcon />
                 <Text style={styles.questionText} numberOfLines={1}>
                   {text}
                 </Text>
@@ -632,10 +628,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 9,
     marginBottom: 12,
-  },
-  questionIcon: {
-    width: 16,
-    height: 16,
   },
   questionText: {
     flex: 1,

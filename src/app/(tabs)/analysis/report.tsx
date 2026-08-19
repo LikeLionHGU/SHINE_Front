@@ -2,7 +2,7 @@ import {
   BackChevronIcon,
   ChevronRightIcon,
   CloseIcon,
-  SparkleIcon,
+  AiQuestionIcon,
 } from "@/components/icons";
 import { FoodImage } from "@/components/food-image";
 import { StatusBadge } from "@/components/status-badge";
@@ -266,7 +266,7 @@ export default function AnalysisReport() {
               {report.questions && report.questions.length > 0 ? (
                 report.questions.map((q, i) => (
                   <View key={i} style={styles.exampleRow}>
-                    <SparkleIcon />
+                    <AiQuestionIcon />
                     <Text style={styles.example}>{q}</Text>
                   </View>
                 ))
@@ -275,7 +275,7 @@ export default function AnalysisReport() {
               ) : (
                 DEFAULT_QUESTIONS.map((q, i) => (
                   <View key={i} style={styles.exampleRow}>
-                    <SparkleIcon />
+                    <AiQuestionIcon />
                     <Text style={styles.example}>{q}</Text>
                   </View>
                 ))
@@ -335,9 +335,6 @@ export default function AnalysisReport() {
           <Pressable style={styles.modalBackdrop} onPress={closeDetail} />
           {detail && (
             <View style={styles.sheet}>
-              <Pressable hitSlop={8} style={styles.sheetClose} onPress={closeDetail}>
-                <CloseIcon size={16} />
-              </Pressable>
               <View style={styles.sheetTitleRow}>
                 <Text style={styles.sheetTitle}>{detail.title}</Text>
                 {detail.originalName && (
@@ -348,6 +345,19 @@ export default function AnalysisReport() {
               <Text style={styles.sheetDefinition}>{detail.definition}</Text>
               <View style={styles.sheetDivider} />
               <Text style={styles.sheetVerdict}>{detail.verdict}</Text>
+              {/* 닫기 버튼은 제목 줄과 같은 자리(오른쪽 위)에 절대 배치된다.
+                  형제 중 마지막에 그려야 제목 줄·상태 배지에 터치를 뺏기지
+                  않는다 — RN에서는 position:absolute가 z축을 올려주지 않고
+                  나중에 그려진 형제가 위에 오기 때문이다. */}
+              <Pressable
+                hitSlop={12}
+                style={styles.sheetClose}
+                onPress={closeDetail}
+                accessibilityRole="button"
+                accessibilityLabel="닫기"
+              >
+                <CloseIcon size={16} />
+              </Pressable>
             </View>
           )}
         </View>
@@ -450,8 +460,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
   },
-  sheetClose: { position: "absolute", right: 20, top: 16 },
-  sheetTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  // 터치 영역을 넉넉히 잡으려고 padding을 주고, 그만큼 위치를 당겨
+  // 아이콘 자체는 기존과 같은 자리(right 20 / top 16)에 보이게 한다.
+  sheetClose: { position: "absolute", right: 12, top: 8, padding: 8, zIndex: 2, elevation: 2 },
+  // 닫기 버튼과 겹치지 않도록 제목 줄 오른쪽을 비워둔다.
+  sheetTitleRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 28 },
   sheetTitle: { color: "#111", fontFamily: "Pretendard-Medium", fontSize: 16 },
   sheetTitleOriginal: { flex: 1, color: "#A0A0A0", fontFamily: "Pretendard-Regular", fontSize: 12 },
   sheetDefinition: { color: "#111", fontFamily: "Pretendard-Regular", fontSize: 12, lineHeight: 18 },

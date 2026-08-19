@@ -1,4 +1,5 @@
 import {
+  AiQuestionIcon,
   BackChevronIcon,
   ChevronRightIcon,
   EditOutlineIcon,
@@ -12,7 +13,6 @@ import {
   pregnancyWeekOf,
   startOfWeek,
 } from "@/lib/pregnancy";
-import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -49,6 +49,7 @@ type DayCell = {
   day: number;
   dot?: DayMark;
   appointment?: string;
+  isToday?: boolean;
 } | null;
 
 type WeekRow = { cells: DayCell[]; pregnancyWeek: number | null };
@@ -86,6 +87,12 @@ function buildMonthWeeks(
       labels.length > 1 ? `${labels[0]} +${labels.length - 1}` : labels[0];
   }
 
+  // 오늘 표시는 "지금 보고 있는 달이 이번 달일 때"만 붙인다.
+  // 달을 넘겨가며 볼 때 다른 달의 같은 일자에 표시가 남으면 안 된다.
+  const now = new Date();
+  const todayDate =
+    now.getFullYear() === year && now.getMonth() === month ? now.getDate() : null;
+
   const cells: DayCell[] = [];
   for (let i = 0; i < firstWeekday; i++) cells.push(null);
   for (let day = 1; day <= daysInMonth; day++) {
@@ -104,6 +111,7 @@ function buildMonthWeeks(
           : undefined,
       // 산부인과가 아닌 일정은 동그라미 대신 제목 텍스트로 보여준다.
       appointment: otherDayLabels[day] ?? monthMarks.labels[day],
+      isToday: day === todayDate,
     });
   }
   while (cells.length % 7 !== 0) cells.push(null);
@@ -279,7 +287,7 @@ export default function Calendar() {
                   {week.cells.map((cell, i) => (
                     <Pressable
                       key={i}
-                      style={styles.dayCell}
+                      style={[styles.dayCell, cell?.isToday && styles.dayCellToday]}
                       disabled={!cell}
                       // 진료 기록이 있는 날은 상세 화면으로, 빈 날은 일정 추가 시트로.
                       onPress={() => {
@@ -305,7 +313,9 @@ export default function Calendar() {
                     >
                       {cell && (
                         <>
-                          <Text style={styles.dayText}>{cell.day}</Text>
+                          <Text style={[styles.dayText, cell.isToday && styles.dayTextToday]}>
+                            {cell.day}
+                          </Text>
                           {cell.dot === "uploaded" && (
                             <View style={styles.dayDotFilled} />
                           )}
@@ -403,11 +413,7 @@ export default function Calendar() {
                     <View style={styles.questionPanel}>
                       {visit.questions.map((question, qi) => (
                         <View key={qi} style={styles.questionRow}>
-                          <Image
-                            source={require("@/assets/images/AIicon.png")}
-                            style={styles.questionIcon}
-                            contentFit="contain"
-                          />
+                          <AiQuestionIcon />
                           <Text style={styles.questionText} numberOfLines={1}>
                             {question}
                           </Text>
@@ -640,6 +646,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Pretendard-Regular",
   },
+  // 오늘 날짜: 키컬러 테두리 + 옅은 핑크 배경으로 한눈에 구분되게 한다.
+  // 검사지(채운 점)·진료(빈 원) 표시와 겹쳐도 서로 가리지 않는다.
+  dayCellToday: {
+    borderWidth: 1.4,
+    borderColor: "#FA0C56",
+    backgroundColor: "#FFF0F6",
+  },
+  dayTextToday: {
+    color: "#FA0C56",
+    fontFamily: "Pretendard-SemiBold",
+  },
   dayDotFilled: {
     marginTop: 8,
     width: 5,
@@ -785,10 +802,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 9,
-  },
-  questionIcon: {
-    width: 16,
-    height: 16,
   },
   questionText: {
     flex: 1,

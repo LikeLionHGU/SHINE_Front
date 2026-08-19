@@ -20,6 +20,24 @@ import { signup } from "@/lib/api";
 
 const PREGNANCY_WEEKS = Array.from({ length: 42 }, (_, i) => i + 1);
 
+/** 하이픈이 들어간 형태의 최대 길이(010-1234-5678). */
+const PHONE_MAX_LENGTH = 13;
+
+/**
+ * 입력값에서 숫자만 남긴 뒤 010-1234-5678 형태로 하이픈을 넣어준다.
+ * 붙여넣기("01012345678")든 한 자씩 치는 중이든 같은 규칙을 쓰고,
+ * 사용자가 하이픈을 직접 지워도 숫자만 다시 읽어 재구성한다.
+ *
+ * 휴대폰 번호 전용 필드라 3-4-4로 고정한다 — 타이핑 도중 3-3-4로
+ * 끊었다가 11번째 자리에서 다시 3-4-4로 재배치되면 커서가 튀어 보인다.
+ */
+function formatPhone(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+}
+
 // Figma: 회원가입 / 회원가입_입력 시 텍스트
 // 이름, 아이디, 비밀번호, 임신 정보, 휴대폰 번호, 본인/보호자 이메일 입력 폼.
 // 두 프레임은 입력 전/후 상태 차이일 뿐이라 화면 하나에서
@@ -153,8 +171,9 @@ export default function Signup() {
             placeholder="010-1234-5678"
             placeholderTextColor="#A0A0A0"
             keyboardType="phone-pad"
+            maxLength={PHONE_MAX_LENGTH}
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={(text) => setPhone(formatPhone(text))}
           />
 
           <FieldLabel text="이메일" />
