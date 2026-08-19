@@ -23,6 +23,7 @@ import {
   getCalendarMonthMarks,
   getGuardianEmail,
   getPregnancyInfo,
+  getVisitDetail,
   getVisits,
   type CalendarMonthMarks,
   type CalendarVisit,
@@ -149,29 +150,24 @@ export default function Calendar() {
   const [monthMarks, setMonthMarks] = useState<CalendarMonthMarks>(EMPTY_MARKS);
   const [guardianEmail, setGuardianEmail] = useState("");
 
+  // 일정과 검사 기록(마크)을 함께 다시 읽는다.
+  //
+  // 예전에는 마크만 useEffect([monthCursor])로 받아서, 검사지를 올리고 캘린더로
+  // 돌아와도 달을 넘기거나 앱을 새로고침하기 전까지 동그라미가 안 찍혔다.
+  // 화면에 들어올 때마다 받도록 옮겨서 업로드 직후에도 바로 반영되게 한다.
   useFocusEffect(useCallback(() => {
     let active = true;
     getVisits().then((visits) => { if (active) setUpcomingVisits(visits); });
+    getCalendarMonthMarks(monthCursor.getFullYear(), monthCursor.getMonth()).then(
+      (marks) => { if (active) setMonthMarks(marks); },
+    );
     return () => { active = false; };
-  }, []));
+  }, [monthCursor]));
 
   useEffect(() => {
     getPregnancyInfo().then(setPregnancy);
     getGuardianEmail().then(setGuardianEmail);
   }, []);
-
-  // 보고 있는 달이 바뀔 때마다 그 달의 검사 기록을 받아온다.
-  useEffect(() => {
-    let active = true;
-    getCalendarMonthMarks(monthCursor.getFullYear(), monthCursor.getMonth()).then(
-      (marks) => {
-        if (active) setMonthMarks(marks);
-      },
-    );
-    return () => {
-      active = false;
-    };
-  }, [monthCursor]);
 
   // 안내 말풍선은 앱을 처음 쓸 때 한 번만 보여주고 바로 본 것으로 기록한다.
   useEffect(() => {
@@ -201,6 +197,38 @@ export default function Calendar() {
       (visit) => visit.isHospital && visit.date.startsWith(prefix),
     );
   }, [monthCursor, upcomingVisits]);
+
+  // 펼쳐 놓은 일정의 질문 목록.
+  //
+  // GET /app/visits는 questions를 항상 빈 배열로 주기 때문에 일정 목록만으로는
+  // 질문을 채울 수 없다. AI 추천 질문과 직접 적어둔 질문은 날짜별 상세
+  // (getVisitDetail)에 들어 있어서, 펼친 일정의 날짜로 따로 받아온다.
+  const openVisit = useMemo(
+    () => monthlyHospitalVisits.find((visit) => visit.id === openVisitId) ?? null,
+    [monthlyHospitalVisits, openVisitId],
+  );
+
+  const [openQuestions, setOpenQuestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    const date = openVisit?.date;
+    if (!date) {
+      setOpenQuestions([]);
+      return;
+    }
+    let active = true;
+    getVisitDetail(date).then((detail) => {
+      if (!active) return;
+      const merged = [...detail.suggestedQuestions, ...detail.questions]
+        .map((question) => question.trim())
+        .filter(Boolean);
+      setOpenQuestions([...new Set(merged)]);
+    });
+    return () => {
+      active = false;
+    };
+  }, [openVisit?.date]);
+
 
   const goToMonth = (delta: number) => {
     setMonthCursor(
@@ -433,8 +461,12 @@ export default function Calendar() {
                   {/* 일정을 펼치면 그때 물어볼 질문 목록이 나온다. */}
                   {isOpen && (
                     <View style={styles.questionPanel}>
-                      {visit.questions.length > 0 ? (
-                        visit.questions.map((question, qi) => (
+                      {openQuestions.length === 0 ? (
+                        <Text style={styles.questionEmptyText}>
+                          아직 준비된 질문이 없어요. 날짜를 눌러 질문을 추가해보세요.
+                        </Text>
+                      ) : (
+                        openQuestions.map((question, qi) => (
                           <View key={qi} style={styles.questionRow}>
                             <AiQuestionIcon />
                             <Text style={styles.questionText} numberOfLines={1}>
@@ -442,10 +474,6 @@ export default function Calendar() {
                             </Text>
                           </View>
                         ))
-                      ) : (
-                        <Text style={styles.questionText}>
-                          아직 준비된 질문이 없어요. 날짜를 눌러 질문을 추가해보세요.
-                        </Text>
                       )}
                     </View>
                   )}
@@ -522,6 +550,7 @@ export default function Calendar() {
           </View>
         </View>
       </Modal>
+
     </View>
   );
 }
@@ -873,6 +902,11 @@ const styles = StyleSheet.create({
     color: "#A0A0A0",
     fontSize: 14,
     fontFamily: "Pretendard-Medium",
+  },
+  questionEmptyText: {
+    color: "#A0A0A0",
+    fontSize: 14,
+    fontFamily: "Pretendard-Regular",
   },
   // 공유하기 확인 다이얼로그 (디자인: 326x218 다크 카드)
   dialogBackdrop: {

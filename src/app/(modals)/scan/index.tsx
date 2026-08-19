@@ -63,8 +63,9 @@ export default function ScanStart() {
   }
 
   function handleClose() {
-    // 분석 결과 화면에서 replace로 이 화면에 올 수도 있어서(스택에 이전 화면이
-    // 없는 경우) canGoBack을 확인하고, 없으면 홈으로 보낸다.
+    // 홈에서 "올리기"로 들어오면 뒤로 갈 화면이 있지만, 주소로 바로 열거나
+    // 분석 화면에서 replace·dismissTo로 넘어온 경우엔 히스토리가 없어 back()이
+    // 아무 일도 하지 않는다. 그때는 홈으로 보낸다.
     if (router.canGoBack()) router.back();
     else router.replace("/(tabs)/home");
   }
