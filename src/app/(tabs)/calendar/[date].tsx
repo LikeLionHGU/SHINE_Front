@@ -172,10 +172,18 @@ export default function CalendarDay() {
   const todayReport = detail?.todayReport ?? null;
   const suggestedQuestions = detail?.suggestedQuestions ?? [];
 
-  // 산부인과 진료일에만 검사지·질문 카드를 노출한다.
-  // 다른 병원 일정만 있는 날은 일정 목록만 보여주면 충분하다.
+  // 산부인과 진료일에는 검사지·질문 카드를 노출한다. 다른 병원 일정만 있는 날은
+  // 일정 목록만 보여주면 충분하다.
+  //
+  // 다만 서버가 그 날짜에 대해 검사지나 추천 질문을 이미 내려줬다면(예: 지난
+  // 진료일에 검사지를 나중에 올린 경우) 산부인과 일정이 등록돼 있지 않아도
+  // 보여준다 — 안 그러면 올린 검사지와 AI 질문이 화면에서 사라진다.
   const isPrenatalDay =
-    dayMark !== undefined || dayVisits.some((visit) => visit.isHospital);
+    dayMark !== undefined ||
+    dayVisits.some((visit) => visit.isHospital) ||
+    !!todayReport ||
+    !!previousReport ||
+    suggestedQuestions.length > 0;
 
   return (
     <View style={styles.container}>
