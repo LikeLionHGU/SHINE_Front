@@ -59,6 +59,28 @@ export default function Signup() {
     name.trim() && id.trim() && password.trim() && phone.trim() && ownEmail.trim()
   );
 
+  /**
+   * 서버가 요구하는 형식을 눌러보기 전에 먼저 확인한다.
+   *
+   * 서버는 어느 칸이 틀렸는지 알려주지 않고 "입력값이 올바르지 않습니다." 한 줄만
+   * 돌려주기 때문에, 그대로 두면 사용자가 무엇을 고쳐야 할지 알 수 없다.
+   * 규칙은 백엔드 명세(SignupRequest)와 맞춰둔 것이라, 서버 규칙이 바뀌면
+   * 여기도 같이 고쳐야 한다.
+   */
+  const validate = () => {
+    if (!/^[a-z0-9]{4,20}$/.test(id.trim()))
+      return "아이디는 영문 소문자와 숫자로 4~20자여야 해요.";
+    if (!/^(?=.*[A-Za-z])(?=.*\d).{8,30}$/.test(password))
+      return "비밀번호는 영문과 숫자를 모두 포함해 8자 이상이어야 해요.";
+    if (!/^[+0-9][0-9 -]{7,19}$/.test(phone.trim()))
+      return "휴대폰 번호를 다시 확인해주세요. (예: 010-1234-5678)";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownEmail.trim()))
+      return "이메일 형식을 다시 확인해주세요.";
+    if (guardianEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guardianEmail.trim()))
+      return "보호자 이메일 형식을 다시 확인해주세요.";
+    return "";
+  };
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -220,6 +242,11 @@ export default function Signup() {
             disabled={!canSubmit || submitting}
             onPress={async () => {
               if (submitting) return;
+              const invalid = validate();
+              if (invalid) {
+                setError(invalid);
+                return;
+              }
               setSubmitting(true);
               setError("");
               try {

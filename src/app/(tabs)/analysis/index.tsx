@@ -47,7 +47,16 @@ export default function Analysis() {
         if (!active) return;
         setIndicators(result);
         // 최신 검사일이 배열의 끝이라 기본 선택값은 마지막 항목이다.
-        setDateIndex(Math.max(0, (result[0]?.history.length ?? 1) - 1));
+        //
+        // 날짜 목록(dateLabels)은 history가 가장 긴 지표를 기준으로 만드는데,
+        // 여기서 첫 번째 지표의 길이를 쓰면 지표마다 측정 횟수가 다를 때
+        // (어떤 항목은 매번, 어떤 항목은 한 번만 검사) 최신이 아닌 중간 날짜가
+        // 선택된 채로 열린다. 같은 기준(가장 긴 history)으로 맞춘다.
+        const longest = result.reduce(
+          (max, item) => Math.max(max, item.history.length),
+          0,
+        );
+        setDateIndex(Math.max(0, longest - 1));
         setChecking(false);
       });
       return () => {
