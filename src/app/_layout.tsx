@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Platform } from "react-native";
 import { DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import {
   useFonts,
@@ -28,7 +29,11 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) {
+  // 웹에서는 폰트 로딩을 기다리지 않는다. 여기서 null을 반환하면 "첫 렌더에는
+  // 아무것도 없다가 나중에 화면이 생기는" 모양이 되는데, 정적 렌더링을 쓸 때는
+  // 이게 서버 HTML과 어긋나 hydration이 깨진다(React #418). 폰트는 준비되는 대로
+  // 자연스럽게 교체되므로 웹에서는 기다릴 이유가 없다.
+  if (Platform.OS !== "web" && !fontsLoaded && !fontError) {
     return null;
   }
 
