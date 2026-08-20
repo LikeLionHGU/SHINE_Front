@@ -33,6 +33,14 @@ export function MiniTrendLine({
 
 const CHART_HEIGHT = 128;
 
+/**
+ * 점을 그릴 영역을 SVG 안쪽으로 들여놓는 여백.
+ *
+ * 점을 x=0과 x=width, y=0과 y=CHART_HEIGHT에 그리면 반지름(5)과 테두리(2.4)만큼
+ * 원이 SVG 밖으로 나가 첫 점과 마지막 점, 그리고 최고·최저값 점이 잘려 보인다.
+ */
+const PAD = 7;
+
 // Figma(node 837:5500 분석_개별 상세 페이지): 지표 추이 큰 차트.
 // 3개 구간 기준선(높음/안정/낮음) + 데이터 포인트 4개 + 마지막 값 강조 툴팁.
 export function TrendChart({
@@ -45,15 +53,24 @@ export function TrendChart({
   const { history, range, zoneLabels, unit } = indicator;
   const [min, max] = range;
   const span = max - min || 1;
-  const stepX = history.length > 1 ? width / (history.length - 1) : 0;
+  // 실제로 선과 점을 그리는 영역. 바깥 PAD만큼은 원이 삐져나올 자리로 비워둔다.
+  const plotWidth = Math.max(1, width - PAD * 2);
+  const plotHeight = CHART_HEIGHT - PAD * 2;
+  const stepX = history.length > 1 ? plotWidth / (history.length - 1) : 0;
 
   const points = history.map((point: TrendPoint, i: number) => {
     const ratio = Math.min(1, Math.max(0, (point.value - min) / span));
-    return { ...point, x: i * stepX, y: CHART_HEIGHT - ratio * CHART_HEIGHT };
+    return {
+      ...point,
+      // 점이 하나뿐이면 가운데에 둔다.
+      x: history.length > 1 ? PAD + i * stepX : PAD + plotWidth / 2,
+      y: PAD + (1 - ratio) * plotHeight,
+    };
   });
 
   const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
-  const areaPath = `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${CHART_HEIGHT} L ${points[0].x.toFixed(1)} ${CHART_HEIGHT} Z`;
+  const chartBottom = PAD + plotHeight;
+  const areaPath = `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${chartBottom} L ${points[0].x.toFixed(1)} ${chartBottom} Z`;
   const lastPoint = points[points.length - 1];
 
   return (
@@ -83,9 +100,9 @@ export function TrendChart({
               </LinearGradient>
             </Defs>
 
-            <Path d={`M 0 0 L ${width} 0`} stroke="#EFEFEF" strokeWidth={1} />
-            <Path d={`M 0 ${CHART_HEIGHT / 2} L ${width} ${CHART_HEIGHT / 2}`} stroke="#EFEFEF" strokeWidth={1} />
-            <Path d={`M 0 ${CHART_HEIGHT} L ${width} ${CHART_HEIGHT}`} stroke="#EFEFEF" strokeWidth={1} />
+            <Path d={`M 0 ${PAD} L ${width} ${PAD}`} stroke="#EFEFEF" strokeWidth={1} />
+            <Path d={`M 0 ${PAD + plotHeight / 2} L ${width} ${PAD + plotHeight / 2}`} stroke="#EFEFEF" strokeWidth={1} />
+            <Path d={`M 0 ${chartBottom} L ${width} ${chartBottom}`} stroke="#EFEFEF" strokeWidth={1} />
 
             <Path d={areaPath} fill="url(#trendFill)" />
             <Path d={linePath} stroke="#FA0C56" strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -122,9 +139,11 @@ export function TrendChart({
 const styles = StyleSheet.create({
   wrap: { gap: 0 },
   row: { flexDirection: "row", gap: 10 },
+  // 기준선이 PAD만큼 안쪽으로 들어갔으므로 라벨도 같이 맞춘다.
   zoneLabels: {
     width: 24,
     height: CHART_HEIGHT,
+    paddingVertical: PAD - 8,
     justifyContent: "space-between",
   },
   zoneLabel: { color: "#A0A0A0", fontFamily: "Pretendard-Regular", fontSize: 12, lineHeight: 16 },

@@ -270,9 +270,12 @@ export default function Calendar() {
   }, [records, allHospitalVisits]);
 
   const [openQuestions, setOpenQuestions] = useState<string[]>([]);
+  // 한 줄로 줄인 질문 중 사용자가 눌러서 펼쳐 놓은 것들.
+  const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
   const [questionsLoading, setQuestionsLoading] = useState(false);
 
   useEffect(() => {
+    setExpandedQuestions(new Set());
     if (!openVisitId) {
       setOpenQuestions([]);
       return;
@@ -524,14 +527,33 @@ export default function Calendar() {
                           아직 준비된 질문이 없어요. 날짜를 눌러 질문을 추가해보세요.
                         </Text>
                       ) : (
-                        openQuestions.map((question, qi) => (
-                          <View key={qi} style={styles.questionRow}>
-                            <AiQuestionIcon />
-                            <Text style={styles.questionText} numberOfLines={1}>
-                              {question}
-                            </Text>
-                          </View>
-                        ))
+                        openQuestions.map((question, qi) => {
+                          // 질문이 길면 한 줄로 줄여 "..."로 끝나는데, 그러면
+                          // 뒷부분을 볼 방법이 없었다. 누르면 전체가 펼쳐진다.
+                          const expanded = expandedQuestions.has(question);
+                          return (
+                            <Pressable
+                              key={qi}
+                              style={styles.questionRow}
+                              onPress={() =>
+                                setExpandedQuestions((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(question)) next.delete(question);
+                                  else next.add(question);
+                                  return next;
+                                })
+                              }
+                            >
+                              <AiQuestionIcon />
+                              <Text
+                                style={styles.questionText}
+                                numberOfLines={expanded ? undefined : 1}
+                              >
+                                {question}
+                              </Text>
+                            </Pressable>
+                          );
+                        })
                       )}
                     </View>
                   )}
@@ -921,6 +943,7 @@ const styles = StyleSheet.create({
     gap: 9,
   },
   questionText: {
+    flexShrink: 1,
     flex: 1,
     color: "#A0A0A0",
     fontSize: 14,

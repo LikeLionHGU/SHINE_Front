@@ -1,4 +1,4 @@
-import { BackChevronIcon, UpTriangleIcon } from "@/components/icons";
+import { BackChevronIcon, ChevronDownIcon, UpTriangleIcon } from "@/components/icons";
 import { StatusBadge } from "@/components/status-badge";
 import { TrendChart } from "@/components/trend-chart";
 import { centeredContentStyle, MAX_CONTENT_WIDTH } from "@/lib/layout";
@@ -20,6 +20,8 @@ export default function AnalysisDetail() {
   const { width: windowWidth } = useWindowDimensions();
   const [indicator, setIndicator] = useState<TrendIndicator | null>(null);
   const [loading, setLoading] = useState(true);
+  // 항목 설명은 기본으로 펼쳐 두고, 제목 줄을 눌러 접을 수 있게 한다.
+  const [definitionOpen, setDefinitionOpen] = useState(true);
 
   useEffect(() => {
     if (!indicatorId) {
@@ -88,15 +90,25 @@ export default function AnalysisDetail() {
         </View>
 
         <ScrollView style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.titleRow}>
+          {/* 제목 줄을 누르면 항목 설명이 접혔다 펴진다.
+              설명이 길어 차트를 아래로 밀어내는 경우가 있어 접을 수 있게 했다. */}
+          <Pressable
+            style={styles.titleRow}
+            onPress={() => setDefinitionOpen((open) => !open)}
+          >
             <View style={{ transform: [{ rotate: trendingUp ? "0deg" : "180deg" }] }}>
               <UpTriangleIcon size={14} />
             </View>
             <Text style={styles.title}>{indicator.title}</Text>
             <StatusBadge status={indicator.status} />
-          </View>
+            <View style={definitionOpen ? styles.definitionChevronOpen : undefined}>
+              <ChevronDownIcon size={16} />
+            </View>
+          </Pressable>
 
-          <Text style={styles.definition}>{indicator.definition}</Text>
+          {definitionOpen && (
+            <Text style={styles.definition}>{indicator.definition}</Text>
+          )}
 
           <View style={styles.chartCard}>
             <TrendChart indicator={indicator} width={chartWidth} />
@@ -125,6 +137,7 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   title: { flex: 1, color: "#414141", fontFamily: "Pretendard-SemiBold", fontSize: 20, letterSpacing: -1 },
   definition: { color: "#111", fontFamily: "Pretendard-Regular", fontSize: 12, lineHeight: 18 },
+  definitionChevronOpen: { transform: [{ rotate: "180deg" }] },
 
   chartCard: { backgroundColor: "#FFFCFD", borderRadius: 14, paddingVertical: 18, paddingHorizontal: 16 },
 

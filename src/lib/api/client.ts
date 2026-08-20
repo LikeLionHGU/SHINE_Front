@@ -637,6 +637,29 @@ export async function getQuestionsBySheet(testSheetId: string | number): Promise
   );
 }
 
+/**
+ * 직접 적은 질문 추가 — POST /api/v1/questions
+ *
+ * testSheetId를 같이 보내면 그 검사지에 달린 질문이 되어, 캘린더에서 그 검사지
+ * 다음 진료를 펼쳤을 때 함께 보인다.
+ *
+ * 저장 실패를 사용자가 알아야 하므로 목 폴백을 두지 않는다.
+ */
+export async function createQuestion(
+  content: string,
+  testSheetId?: string | number | null,
+): Promise<void> {
+  const text = content.trim();
+  if (!text) return;
+  await apiRequest("/questions", {
+    method: "POST",
+    body: {
+      content: text,
+      ...(testSheetId != null ? { testSheetId: Number(testSheetId) } : {}),
+    },
+  });
+}
+
 /* ------------------------------------------------------------ 검사지 업로드 */
 
 /**

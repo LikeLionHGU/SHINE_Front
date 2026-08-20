@@ -1,4 +1,5 @@
 import { ComponentType } from "react";
+import { usePathname } from "expo-router";
 import { Pressable, Text, View, StyleSheet } from "react-native";
 import type { BottomTabBarProps } from "expo-router/build/react-navigation/bottom-tabs";
 import {
@@ -33,8 +34,27 @@ const NESTED_STACK_TABS = new Set(["analysis", "calendar"]);
 // Figma: 바텀 탭바 (둥근 상단 모서리 + 그림자 카드형 커스텀 탭바)
 // 사용처: src/app/(tabs)/_layout.tsx 에서 <Tabs tabBar={(props) => <CustomTabBar {...props} />}>
 // 로 연결돼 있어서, (tabs)/ 아래 스크린들은 이 탭바를 자동으로 공유한다.
+/**
+ * 탭 안에 있지만 탭바를 숨겨야 하는 하위 화면들.
+ *
+ * 검사지 상세(analysis/report)는 홈에서 업로드한 뒤에도, 기록 탭에서 지난
+ * 검사지를 눌렀을 때도 열리는 세부 페이지다. 파일 위치상 분석 탭 스택에
+ * 들어 있어서 탭바가 "분석"에 불이 켜진 채로 남아 있었는데, 실제 분석 탭은
+ * 항목별 그래프 목록이라 어디에 있는지 오해를 준다.
+ * 지표 상세(analysis/[indicatorId])도 같은 이유로 숨긴다.
+ */
+const HIDDEN_PATHS = [/^\/analysis\/report/, /^\/analysis\/[^/]+$/];
+
 // 탭 추가/이름 변경 시 위 TAB_ICONS / TAB_LABELS 맵만 route 파일명 기준으로 고치면 됨.
 export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
+  // 탭 안쪽 스택의 현재 화면은 navigation state로 파고들기보다 경로로 보는
+  // 편이 확실하다(스택 state가 아직 안 채워져 있는 경우가 있다).
+  // "/analysis"(지표 목록)는 탭 자체라 제외하고, 그 아래 화면만 숨긴다.
+  const pathname = usePathname();
+  if (pathname !== "/analysis" && HIDDEN_PATHS.some((re) => re.test(pathname))) {
+    return null;
+  }
+
   return (
     // 그림자(shadowWrap)와 둥근 모서리+배경(container)을 분리했다. 같은
     // View에 shadow*와 borderRadius를 같이 주면(특히 웹에서) 그림자가 둥근

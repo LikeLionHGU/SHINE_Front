@@ -4,7 +4,7 @@ import {
   XXLogoIcon,
 } from "@/components/icons";
 import { FoodImage } from "@/components/food-image";
-import { getHome, getVisits, type CalendarVisit, type Home } from "@/lib/api";
+import { createQuestion, getHome, getVisits, type CalendarVisit, type Home } from "@/lib/api";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
@@ -67,6 +67,29 @@ export default function Home() {
 
   const latestSheet = home?.latestSheet ?? null;
   const questions = home?.questions ?? [];
+  const [sendingQuestion, setSendingQuestion] = useState(false);
+
+  /**
+   * 직접 적은 질문을 서버에 올린다.
+   *
+   * 최신 검사지가 있으면 그 검사지에 달아서, 캘린더에서 그 검사지 다음 진료를
+   * 펼쳤을 때 추천 질문과 함께 보이게 한다. 검사지가 아직 없으면 검사지 없이
+   * 저장한다. 올린 뒤에는 홈을 다시 읽어 목록에 바로 반영한다.
+   */
+  async function submitQuestion() {
+    const text = question.trim();
+    if (!text || sendingQuestion) return;
+    setSendingQuestion(true);
+    try {
+      await createQuestion(text, latestSheet?.testSheetId ?? null);
+      setQuestion("");
+      setHome(await getHome());
+    } catch (error) {
+      console.warn("[home] 질문 저장 실패:", error);
+    } finally {
+      setSendingQuestion(false);
+    }
+  }
   const nutritions = home?.nutritions ?? [];
 
   // 서버 주간 캘린더에 방금 추가한 일정이 아직 안 반영돼 있어도 홈에서 바로
@@ -127,8 +150,14 @@ export default function Home() {
                 placeholderTextColor="#A0A0A0"
                 style={styles.input}
                 returnKeyType="send"
+                onSubmitEditing={submitQuestion}
+                editable={!sendingQuestion}
               />
-              {question.length > 0 && <Text style={styles.send}>↑</Text>}
+              {question.trim().length > 0 && (
+                <Pressable onPress={submitQuestion} hitSlop={10} disabled={sendingQuestion}>
+                  <Text style={styles.send}>↑</Text>
+                </Pressable>
+              )}
             </View>
           </View>
 
@@ -173,7 +202,11 @@ export default function Home() {
                 <View key={item.date} style={[styles.dayCard, item.isToday && styles.dayCardSelected]}>
                   <Text style={[styles.dayNumber, item.isToday && styles.daySelectedText]}>{item.day}</Text>
                   <Text style={[styles.dayLabel, item.isToday && styles.daySelectedText]}>{item.dayOfWeek}</Text>
-                  {item.hasAppointment && <View style={styles.eventDot} />}
+                  {item.hasAppointment && (
+                    <View
+                      style={[styles.eventDot, !item.isToday && styles.eventDotOnLight]}
+                    />
+                  )}
                 </View>
               ))}
             </ScrollView>
@@ -236,6 +269,9 @@ const styles = StyleSheet.create({
   dayNumber: { color: "#707070", fontFamily: "Pretendard-Regular", fontSize: 12, lineHeight: 18 },
   dayLabel: { color: "#707070", fontFamily: "Pretendard-Regular", fontSize: 12, lineHeight: 17 },
   daySelectedText: { color: "#FFFCFD" },
+  // 오늘 칸은 배경이 핑크라 흰 점이 보이지만, 나머지 칸은 배경이 흰색이라
+  // 같은 흰 점을 쓰면 일정이 있어도 아무것도 안 보인다.
   eventDot: { position: "absolute", bottom: 9, width: 5, height: 5, borderRadius: 3, backgroundColor: "#FFFCFD" },
+  eventDotOnLight: { backgroundColor: "#FA0C56" },
   appointment: { position: "absolute", bottom: 5, color: "#111", fontFamily: "Pretendard-Regular", fontSize: 8 },
 });
