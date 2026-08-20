@@ -12,15 +12,24 @@ import {
   getRecordDetail,
   submitReport,
 } from "@/lib/api";
-import { reanalyzeItems, buildEngineQuestions, buildEngineSummary } from "@/lib/labs/bridge";
 import { generateReportInsights } from "@/lib/insights";
+import {
+  buildEngineQuestions,
+  buildEngineSummary,
+  reanalyzeItems,
+} from "@/lib/labs/bridge";
 import { centeredContentStyle, centeredSheetStyle } from "@/lib/layout";
 import { currentPregnancyWeek } from "@/lib/pregnancy";
 import {
   DEMO_SUMMARY,
-  loadLastReport, saveLastReport, loadReportEdits, saveReportEdits, reportSignature, type IndicatorStatus,
+  loadLastReport,
+  loadReportEdits,
+  reportSignature,
+  saveLastReport,
+  saveReportEdits,
+  type IndicatorStatus,
   type ParsedTestItem,
-  type ReportFood
+  type ReportFood,
 } from "@/lib/report";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
@@ -335,14 +344,18 @@ export default function AnalysisReport() {
           if (!fromServer) return item;
           if (!item.engineStatus) {
             // 엔진이 모르는 항목 → 서버 판정을 쓰되 원문명은 유지한다.
-            return { ...fromServer, originalName: item.originalName ?? item.name };
+            return {
+              ...fromServer,
+              originalName: item.originalName ?? item.name,
+            };
           }
           const displayName = fromServer.name || item.name;
           return {
             ...item,
             name: displayName,
             originalName:
-              item.originalName ?? (displayName !== item.name ? item.name : undefined),
+              item.originalName ??
+              (displayName !== item.name ? item.name : undefined),
           };
         });
       }
@@ -413,7 +426,9 @@ export default function AnalysisReport() {
       let questions = report.questions;
       let foods = report.foods;
       try {
-        const insights = await generateReportInsights(re.items, { gestationalWeek });
+        const insights = await generateReportInsights(re.items, {
+          gestationalWeek,
+        });
         summary = insights.summary;
         questions = insights.questions;
         foods = insights.foods;
@@ -498,7 +513,9 @@ export default function AnalysisReport() {
     } catch (error) {
       // 실패를 조용히 넘기면 사용자는 저장된 줄 안다. 반드시 알린다.
       console.warn("[report] 질문 저장 실패:", error);
-      setQuestionNotice("질문을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.");
+      setQuestionNotice(
+        "질문을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.",
+      );
     } finally {
       setSendingQuestion(false);
       setTimeout(() => setQuestionNotice(null), 2600);
@@ -576,7 +593,7 @@ export default function AnalysisReport() {
                 행을 눌러서만 연다. */}
             {report.uri && (
               <>
-                <Text style={styles.sectionTitle}>검사 결과칸</Text>
+                <Text style={styles.sectionTitle}></Text>
                 <View style={[styles.imageWrap, { aspectRatio: imageAspect }]}>
                   <Image
                     source={{ uri: report.uri }}
@@ -612,7 +629,10 @@ export default function AnalysisReport() {
                           작성한 종합 소견. 생성 전이거나 실패했으면 데모 문구로 대체한다. */}
                       <Text style={styles.summaryText}>
                         {report.summary?.trim() ||
-                          buildEngineSummary(report.items ?? [], report.gestationalWeek)}
+                          buildEngineSummary(
+                            report.items ?? [],
+                            report.gestationalWeek,
+                          )}
                       </Text>
                       {/* 항목 하나만 봐서는 안 보이는 소견. 예: 헤모글로빈은 정상인데
                           페리틴이 낮은 "빈혈 전 단계", 단백뇨가 음성이어도 성립하는
@@ -624,10 +644,16 @@ export default function AnalysisReport() {
                         // 오독으로 오해하게 된다.
                         //  · 결과 없음 : 검사지에 값이 없거나 못 읽음 → 직접 입력이 필요
                         //  · 숫자 의심 : 값은 읽었는데 자릿수 등이 수상함 → 확인이 필요
-                        const all = (report.items ?? []).filter((it) => it.needsConfirm);
+                        const all = (report.items ?? []).filter(
+                          (it) => it.needsConfirm,
+                        );
                         if (all.length === 0) return null;
-                        const missing = all.filter((it) => it.badgeLabel === "결과 없음");
-                        const suspect = all.filter((it) => it.badgeLabel !== "결과 없음");
+                        const missing = all.filter(
+                          (it) => it.badgeLabel === "결과 없음",
+                        );
+                        const suspect = all.filter(
+                          (it) => it.badgeLabel !== "결과 없음",
+                        );
                         const openFirst = (target: typeof all) => {
                           const i = (report.items ?? []).indexOf(target[0]);
                           if (i >= 0) setActiveItemIndex(i);
@@ -635,12 +661,17 @@ export default function AnalysisReport() {
                         return (
                           <>
                             {suspect.length > 0 && (
-                              <Pressable style={styles.confirmCard} onPress={() => openFirst(suspect)}>
+                              <Pressable
+                                style={styles.confirmCard}
+                                onPress={() => openFirst(suspect)}
+                              >
                                 <Text style={styles.confirmTitle}>
                                   숫자를 확인해 주세요 · {suspect.length}개
                                 </Text>
                                 <Text style={styles.confirmBody}>
-                                  사진에서 잘못 읽었을 수 있는 항목이에요. 잘못 읽은 값으로 판정하지 않으려고 일부러 멈춰뒀어요.
+                                  사진에서 잘못 읽었을 수 있는 항목이에요. 잘못
+                                  읽은 값으로 판정하지 않으려고 일부러
+                                  멈춰뒀어요.
                                 </Text>
                                 <Text style={styles.confirmNames}>
                                   {suspect.map((it) => it.name).join(" · ")}
@@ -648,12 +679,16 @@ export default function AnalysisReport() {
                               </Pressable>
                             )}
                             {missing.length > 0 && (
-                              <Pressable style={styles.missingCard} onPress={() => openFirst(missing)}>
+                              <Pressable
+                                style={styles.missingCard}
+                                onPress={() => openFirst(missing)}
+                              >
                                 <Text style={styles.missingTitle}>
                                   값을 읽지 못한 항목 · {missing.length}개
                                 </Text>
                                 <Text style={styles.missingBody}>
-                                  검사지에서 결과값을 찾지 못했어요. 항목을 눌러 직접 입력하면 바로 판정해 드릴게요.
+                                  검사지에서 결과값을 찾지 못했어요. 항목을 눌러
+                                  직접 입력하면 바로 판정해 드릴게요.
                                 </Text>
                                 <Text style={styles.missingNames}>
                                   {missing.map((it) => it.name).join(" · ")}
@@ -803,7 +838,10 @@ export default function AnalysisReport() {
                   );
                 }
                 const saved = report.questions?.filter((q) => q.trim()) ?? [];
-                const list = saved.length > 0 ? saved : buildEngineQuestions(report.items ?? []);
+                const list =
+                  saved.length > 0
+                    ? saved
+                    : buildEngineQuestions(report.items ?? []);
                 if (list.length > 0) {
                   return list.map((q, i) => (
                     <View key={i} style={styles.exampleRow}>
@@ -823,7 +861,9 @@ export default function AnalysisReport() {
               {/* 개발 중에만 보이는 진단 문구. AI가 실패하면 엔진 문장으로 대체되는데,
                   그 사실이 화면에 안 보이면 "AI가 만든 질문"으로 오해하게 된다. */}
               {__DEV__ && !!insightsError && (
-                <Text style={styles.debugNote}>AI 질문 생성 실패 · {insightsError}</Text>
+                <Text style={styles.debugNote}>
+                  AI 질문 생성 실패 · {insightsError}
+                </Text>
               )}
               <View style={styles.inputWrap}>
                 <TextInput
@@ -845,11 +885,20 @@ export default function AnalysisReport() {
                     accessibilityLabel="질문 추가"
                     style={({ pressed }) => [pressed && styles.pressed]}
                   >
-                    <Text style={[styles.sendArrow, sendingQuestion && styles.sendDisabled]}>↑</Text>
+                    <Text
+                      style={[
+                        styles.sendArrow,
+                        sendingQuestion && styles.sendDisabled,
+                      ]}
+                    >
+                      ↑
+                    </Text>
                   </Pressable>
                 )}
               </View>
-              {!!questionNotice && <Text style={styles.sentNotice}>{questionNotice}</Text>}
+              {!!questionNotice && (
+                <Text style={styles.sentNotice}>{questionNotice}</Text>
+              )}
             </View>
 
             <View style={styles.card}>
@@ -908,7 +957,8 @@ export default function AnalysisReport() {
                     <Pressable
                       style={({ pressed }) => [
                         styles.saveButton,
-                        (savingToServer || !report.items?.length) && styles.saveDisabled,
+                        (savingToServer || !report.items?.length) &&
+                          styles.saveDisabled,
                         pressed && styles.pressed,
                       ]}
                       onPress={saveToServer}
@@ -924,7 +974,9 @@ export default function AnalysisReport() {
                     </Pressable>
                   </>
                 )}
-                {!!saveNotice && <Text style={styles.saveNotice}>{saveNotice}</Text>}
+                {!!saveNotice && (
+                  <Text style={styles.saveNotice}>{saveNotice}</Text>
+                )}
               </View>
             )}
           </ScrollView>
@@ -967,7 +1019,9 @@ export default function AnalysisReport() {
                     표에서는 심각도만 보이고, 자세한 말은 열어봤을 때 나오게 한다. */}
                 {!!detail.badgeLabel && detail.badgeLabel !== detail.status && (
                   <View style={styles.basisChip}>
-                    <Text style={styles.basisText}>판정 · {detail.badgeLabel}</Text>
+                    <Text style={styles.basisText}>
+                      판정 · {detail.badgeLabel}
+                    </Text>
                   </View>
                 )}
                 {/* 무엇과 비교해서 나온 판정인지 — 사용자가 가장 먼저 궁금해하는 것. */}
@@ -1269,10 +1323,30 @@ const styles = StyleSheet.create({
   },
 
   // ---- OCR 오독 확인·수정 ----
-  missingCard: { backgroundColor: "#F5F5F2", borderRadius: 11, padding: 12, marginBottom: 10, gap: 4 },
-  missingTitle: { color: "#4A4A44", fontFamily: "Pretendard-SemiBold", fontSize: 13 },
-  missingBody: { color: "#5C5C57", fontFamily: "Pretendard-Regular", fontSize: 12.5, lineHeight: 19 },
-  missingNames: { color: "#8A8A82", fontFamily: "Pretendard-Medium", fontSize: 11.5, marginTop: 2 },
+  missingCard: {
+    backgroundColor: "#F5F5F2",
+    borderRadius: 11,
+    padding: 12,
+    marginBottom: 10,
+    gap: 4,
+  },
+  missingTitle: {
+    color: "#4A4A44",
+    fontFamily: "Pretendard-SemiBold",
+    fontSize: 13,
+  },
+  missingBody: {
+    color: "#5C5C57",
+    fontFamily: "Pretendard-Regular",
+    fontSize: 12.5,
+    lineHeight: 19,
+  },
+  missingNames: {
+    color: "#8A8A82",
+    fontFamily: "Pretendard-Medium",
+    fontSize: 11.5,
+    marginTop: 2,
+  },
   confirmCard: {
     backgroundColor: "#E6EEF7",
     borderRadius: 11,
@@ -1367,13 +1441,33 @@ const styles = StyleSheet.create({
   },
   editDisabled: { opacity: 0.45 },
 
-  sendArrow: { color: "#FA0C56", fontFamily: "Pretendard-SemiBold", fontSize: 18, paddingHorizontal: 6 },
+  sendArrow: {
+    color: "#FA0C56",
+    fontFamily: "Pretendard-SemiBold",
+    fontSize: 18,
+    paddingHorizontal: 6,
+  },
   sendDisabled: { opacity: 0.4 },
-  sentNotice: { marginTop: 6, color: "#3A6B5C", fontFamily: "Pretendard-Medium", fontSize: 12 },
+  sentNotice: {
+    marginTop: 6,
+    color: "#3A6B5C",
+    fontFamily: "Pretendard-Medium",
+    fontSize: 12,
+  },
 
-  debugNote: { color: "#B03A2E", fontFamily: "Pretendard-Regular", fontSize: 11, lineHeight: 16 },
+  debugNote: {
+    color: "#B03A2E",
+    fontFamily: "Pretendard-Regular",
+    fontSize: 11,
+    lineHeight: 16,
+  },
   saveBox: { marginTop: 4, gap: 8, alignItems: "stretch" },
-  saveHint: { textAlign: "center", color: "#8A8A82", fontFamily: "Pretendard-Regular", fontSize: 12.5 },
+  saveHint: {
+    textAlign: "center",
+    color: "#8A8A82",
+    fontFamily: "Pretendard-Regular",
+    fontSize: 12.5,
+  },
   saveButton: {
     height: 52,
     borderRadius: 12,
@@ -1381,10 +1475,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  saveButtonText: { color: "#FFFDF9", fontFamily: "Pretendard-SemiBold", fontSize: 16 },
+  saveButtonText: {
+    color: "#FFFDF9",
+    fontFamily: "Pretendard-SemiBold",
+    fontSize: 16,
+  },
   saveDisabled: { opacity: 0.45 },
-  savedText: { textAlign: "center", color: "#2E7D52", fontFamily: "Pretendard-Medium", fontSize: 13 },
-  saveNotice: { textAlign: "center", color: "#3A6B5C", fontFamily: "Pretendard-Medium", fontSize: 12 },
+  savedText: {
+    textAlign: "center",
+    color: "#2E7D52",
+    fontFamily: "Pretendard-Medium",
+    fontSize: 13,
+  },
+  saveNotice: {
+    textAlign: "center",
+    color: "#3A6B5C",
+    fontFamily: "Pretendard-Medium",
+    fontSize: 12,
+  },
 
   sheetScroll: { maxHeight: 320 },
   basisChip: {
