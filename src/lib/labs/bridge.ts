@@ -2,7 +2,7 @@
 // 판정 엔진(evaluate)과 앱의 기존 화면 타입(ParsedTestItem)을 잇는 어댑터.
 // 화면 코드는 이 파일만 알면 되고, 엔진 내부 타입을 직접 쓰지 않는다.
 
-import { evaluate } from "./evaluate";
+import { evaluate, referenceData } from "./evaluate";
 import type { ExtractedRow, Judgment, Status, UserContext } from "./types";
 import { normalizeKey, parseValueString } from "./normalize";
 import type { IndicatorStatus, ParsedTestItem } from "@/lib/report";
@@ -108,6 +108,19 @@ export function doctorQuestionOf(j: Judgment): string | undefined {
   }
 }
 
+/**
+ * 항목 id → 쉬운 설명.
+ *
+ * 상세 시트 맨 위에 뜨는 "이게 무슨 검사인지" 한두 문장이다. 판정 결과와 달리
+ * 값에 따라 달라지지 않는 고정 문구라 기준표(reference_ranges.json)에 함께 둔다.
+ * 매 항목마다 배열을 훑지 않도록 한 번만 만들어 둔다.
+ */
+const DESCRIPTIONS = new Map<string, string>(
+  referenceData.items
+    .filter((item) => !!item.description)
+    .map((item) => [item.id, item.description as string]),
+);
+
 function judgmentToItem(j: Judgment, rawName: string, rawValue: string): ParsedTestItem {
   const engineUnit =
     j.unit && !["qualitative", "categorical", "dipstick"].includes(j.unit) ? ` ${j.unit}` : "";
@@ -132,7 +145,8 @@ function judgmentToItem(j: Judgment, rawName: string, rawValue: string): ParsedT
     name: j.itemName,
     value: shownValue,
     status: toIndicatorStatus(j.status),
-    definition: "",
+    // 기준표에 없는 항목(검사지 참고범위로만 판정한 것)은 설명이 없다.
+    definition: DESCRIPTIONS.get(j.itemId) ?? "",
     verdict: j.message,
     originalName: rawName !== j.itemName ? rawName : undefined,
 

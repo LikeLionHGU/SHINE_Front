@@ -2,7 +2,8 @@ import { saveLastReport, clearReportEdits, takePendingScan, type ParsedTestItem,
 import { parseTestReport } from "@/lib/ocr";
 import { generateReportInsights } from "@/lib/insights";
 import { scanDocumentImage } from "@/lib/scan";
-import { currentPregnancyWeek } from "@/lib/pregnancy";
+import { currentPregnancyWeek, pregnancyWeekAt } from "@/lib/pregnancy";
+import { reanalyzeItems } from "@/lib/labs/bridge";
 import { colors, font, tracking } from "@/lib/theme";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -49,12 +50,6 @@ export default function ScanAnalyzing() {
     (async () => {
       const minVisible = new Promise<void>((resolve) => setTimeout(resolve, MIN_VISIBLE_MS));
 
-      // 임신 주차는 두 군데에 쓰인다.
-      //  (1) 판정 엔진 — 삼분기별 기준(헤모글로빈 11 / 10.5 / 11 등)을 고르는 데
-      //  (2) AI 종합 분석 프롬프트 — "임신 28주차에 받은 이번 검사는…" 처럼 주차에 맞춰 설명하게
-      // 한 번만 구해서 둘 다 넘긴다.
-      const gestationalWeek = await currentPregnancyWeek();
-
       let finalUri = uri ?? null;
       let items: ParsedTestItem[] | undefined;
       let resolvedTestDate = testDate;
@@ -83,7 +78,12 @@ export default function ScanAnalyzing() {
           }
 
           try {
-            const result = await parseTestReport(finalUri, { gestationalWeek });
+            // 검사일은 OCR이 읽어내야 알 수 있어서, 이 첫 판정은 오늘 기준의
+            // 임시값으로 돌린다. 아래에서 검사일이 확정되면 다시 판정한다.
+            const provisionalWeek = await currentPregnancyWeek();
+            const result = await parseTestReport(finalUri, {
+              gestationalWeek: provisionalWeek,
+            });
             items = result.items;
             crossFindings = result.crossFindings;
             unsupported = result.unsupported;
@@ -97,6 +97,26 @@ export default function ScanAnalyzing() {
             items = undefined;
           }
         }
+      }
+
+      // 임신 주차는 '오늘'이 아니라 **검사받은 날** 기준이어야 한다.
+      // 두 달 전 검사지를 지금 올리면, 지금 30주차라도 그 검사는 22주차 기준으로
+      // 봐야 판정(삼분기별 기준)도 AI 설명도 맞는다.
+      //
+      // 이 주차는 두 군데에 쓰인다.
+      //  (1) 판정 엔진 — 삼분기별 기준(헤모글로빈 11 / 10.5 / 11 등)을 고르는 데
+      //  (2) AI 종합 분석 프롬프트 — "임신 22주차에 받은 이번 검사는…" 처럼 주차에 맞춰 설명하게
+      const gestationalWeek = await pregnancyWeekAt(resolvedTestDate);
+
+      // 위 두 경로(date-confirm이 넘겨준 결과 / 여기서 직접 읽은 결과) 모두
+      // 검사일을 알기 전의 임시 주차로 판정돼 있다. 검사일이 확정된 지금 다시 판정한다.
+      // OCR을 다시 부르지 않고 이미 읽어둔 값만 재판정하므로 비용이 들지 않는다.
+      if (items && items.length > 0) {
+        const re = reanalyzeItems(items, { gestationalWeek });
+        items = re.items;
+        crossFindings = re.crossFindings;
+        unsupported = re.unsupported;
+        sources = re.sources;
       }
 
       let summary: string | undefined;

@@ -118,8 +118,14 @@ export default function ScanDateConfirm() {
       try {
         // 임신 주수를 함께 넘겨야 판정 엔진이 삼분기별 기준을 적용할 수 있다.
         // (헤모글로빈 1분기 11.0 / 2분기 10.5 / 3분기 11.0 등)
-        const gestationalWeek = await currentPregnancyWeek();
-        const result = await parseTestReport(resolvedUri, { gestationalWeek });
+        //
+        // 다만 검사일은 이 OCR이 읽어내야 알 수 있어서, 여기서는 오늘 기준의
+        // 임시값을 쓴다. 사용자가 날짜를 확정하면 다음 화면(analyzing.tsx)이
+        // 그 날짜의 주차로 다시 판정한다.
+        const provisionalWeek = await currentPregnancyWeek();
+        const result = await parseTestReport(resolvedUri, {
+          gestationalWeek: provisionalWeek,
+        });
         if (cancelled) return;
         setItems(result.items);
         const parsedDate = parseReportDate(result.reportDate);

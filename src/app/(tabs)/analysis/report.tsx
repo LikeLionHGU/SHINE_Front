@@ -26,7 +26,7 @@ import {
   centeredSheetStyle,
   MAX_CONTENT_WIDTH,
 } from "@/lib/layout";
-import { currentPregnancyWeek } from "@/lib/pregnancy";
+import { pregnancyWeekAt } from "@/lib/pregnancy";
 import {
   DEMO_SUMMARY,
   loadLastReport,
@@ -257,7 +257,8 @@ export default function AnalysisReport() {
           const alreadyJudged = value.items.some((item) => !!item.engineStatus);
           if (alreadyJudged) return value;
           try {
-            const gestationalWeek = await currentPregnancyWeek();
+            // 주차는 오늘이 아니라 이 검사지를 받은 날 기준이다.
+            const gestationalWeek = await pregnancyWeekAt(value.testDate);
             const re = reanalyzeItems(value.items, { gestationalWeek });
             return {
               ...value,
@@ -312,7 +313,7 @@ export default function AnalysisReport() {
           if (active) setGeneratingInsights(true);
           try {
             const gestationalWeek =
-              value.gestationalWeek ?? (await currentPregnancyWeek());
+              value.gestationalWeek ?? (await pregnancyWeekAt(value.testDate));
             const insights = await generateReportInsights(value.items, {
               gestationalWeek,
             });
@@ -513,7 +514,7 @@ export default function AnalysisReport() {
 
     setSaving(true);
     try {
-      const gestationalWeek = await currentPregnancyWeek();
+      const gestationalWeek = await pregnancyWeekAt(report.testDate);
       const re = reanalyzeItems(next, { gestationalWeek });
 
       // 수치가 바뀌었으면 종합 소견·추천 질문·추천 재료도 다시 만들어야 한다.

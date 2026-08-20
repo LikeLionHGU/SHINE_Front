@@ -116,6 +116,11 @@ export interface Caveat {
 export interface LabItem {
   id: string;
   name: string;
+  /**
+   * 이 검사가 무엇을 보는 항목인지 쉬운 말로 한두 문장.
+   * 상세 시트 맨 위에 뜨는 "쉬운 설명"이다. 판정에는 쓰지 않는다.
+   */
+  description?: string;
   aliases: string[];
   unit: string;
   unitAliases?: Record<string, number>;
