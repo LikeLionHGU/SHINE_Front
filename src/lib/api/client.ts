@@ -19,7 +19,8 @@ import {
   MOCK_SUGGESTED_QUESTIONS,
   MOCK_VISITS,
 } from "./mock-data";
-import { API_BASE_URL, apiRequest, setAuthToken, withFallback } from "./http";
+import { API_BASE_URL, apiRequest, apiUpload, setAuthToken, withFallback } from "./http";
+import { compressForUpload } from "@/lib/scan";
 import type {
   AuthResult,
   Home,
@@ -672,6 +673,45 @@ export async function createQuestion(
  */
 export async function submitReport(submission: ReportSubmission): Promise<ReportResult> {
   return apiRequest<ReportResult>("/reports", { method: "POST", body: submission });
+}
+
+/**
+ * 저장한 검사지에 원본 사진을 붙인다 — POST /api/v1/test-sheets/{id}/images
+ *
+ * 왜 submitReport와 따로인가:
+ * `POST /reports`는 JSON만 받는다(멀티파트가 아니다). 사진을 같이 보내려면 요청
+ * 전체를 multipart로 바꿔야 하는데, 그러면 이미 동작하는 판정 결과 전송까지
+ * 흔들린다. 그래서 /reports로 먼저 저장해 testSheetId를 받고, 그 시트에 사진만
+ * 덧붙인다. 이렇게 하면 기록이 두 개로 갈라지지도 않는다
+ * (기존 `POST /test-sheets`는 검사지를 새로 만들어 버린다).
+ *
+ * 사진이 못 올라가도 판정 결과는 이미 저장된 뒤다. 그래서 오류를 던지지 않고
+ * false를 돌려준다 — 사진 하나 때문에 "저장 실패"라고 말하면 안 된다.
+ */
+export async function uploadTestSheetImage(
+  testSheetId: number | string,
+  uri: string,
+): Promise<boolean> {
+  if (!uri?.trim() || testSheetId == null || testSheetId === "") return false;
+
+  try {
+    const uploadUri = await compressForUpload(uri);
+    const form = new FormData();
+    // 필드명 'files'는 백엔드의 검사지 업로드 스펙(POST /test-sheets)과 맞춘 것이다.
+    // RN의 FormData는 웹의 File이 아니라 { uri, name, type } 객체를 파일로 받는다.
+    form.append("files", {
+      uri: uploadUri,
+      name: `test-sheet-${testSheetId}.jpg`,
+      type: "image/jpeg",
+    } as unknown as Blob);
+
+    await apiUpload(`/test-sheets/${encodeURIComponent(String(testSheetId))}/images`, form);
+    return true;
+  } catch (error) {
+    // 404면 아직 백엔드에 이 엔드포인트가 없는 것이다(전달사항 문서 참고).
+    console.warn("[api] 검사지 사진 업로드 실패:", error);
+    return false;
+  }
 }
 
 /* ---------------------------------------------------------------- 유틸 */

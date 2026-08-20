@@ -47,6 +47,10 @@ Swagger: https://1.201.117.27.nip.io/swagger-ui/index.html
 | `getTrends()` | `GET /app/trends` |
 | `getTrend(id)` | `GET /app/trends/{id}` |
 | `submitReport(...)` | `POST /reports` |
+| `uploadTestSheetImage(id, uri)` | `POST /test-sheets/{id}/images` (multipart) |
+| `updateUserProfile(patch)` | `PATCH /users/me` |
+| `createQuestion(text, sheetId?)` | `POST /questions` |
+| `getQuestionsBySheet(sheetId)` | `GET /questions?testSheetId=` |
 
 `getCalendarMonthMarks`의 `month`는 `Date.getMonth()` 값(0~11)을 그대로 받고,
 서버로 보낼 때 1~12로 바꿔줍니다.
@@ -100,9 +104,28 @@ OCR과 AI 요약은 프론트가 담당합니다 (`lib/ocr.ts`, `lib/insights.ts
 ```
 scan/date-confirm.tsx   parseTestReport(사진) → 검사항목 + 검사일
 scan/analyzing.tsx      generateReportInsights(항목) → 요약·질문·음식
-                        submitReport(전부)  → POST /api/v1/reports
+                        ↳ 로컬(saveLastReport)에만 저장. 아직 서버로 안 보낸다.
+analysis/report.tsx     "저장하기" 를 눌렀을 때
+                        1) submitReport(전부)        → POST /reports        → testSheetId
+                        2) uploadTestSheetImage(...)  → POST /test-sheets/{id}/images
                         ↳ 서버 교정본을 saveLastReport로 저장
 ```
+
+**사진 업로드가 두 번째 요청인 이유.** `POST /reports`는 JSON만 받습니다. 사진을
+같이 보내려면 요청 전체를 multipart로 바꿔야 하는데 그러면 이미 동작하는 판정
+결과 전송까지 흔들립니다. 그래서 결과를 먼저 저장해 `testSheetId`를 받고, 그
+시트에 사진만 덧붙입니다. 기존 `POST /test-sheets`(multipart)를 쓰지 않는 것은
+그쪽이 **검사지를 새로 만들어** 기록이 두 개로 갈라지기 때문입니다.
+
+사진 업로드는 실패해도 저장을 실패로 만들지 않습니다(`uploadTestSheetImage`는
+오류를 던지지 않고 `false`를 돌려줍니다). 판정 결과는 이미 저장된 뒤라서,
+사진만 없는 기록으로 남습니다.
+
+업로드 전에 `lib/scan.ts`의 `compressForUpload()`로 긴 변 2000px·JPEG 80%까지
+줄입니다. 원본은 한 장에 5~10MB라 모바일 데이터에서 자주 실패합니다.
+
+> ⚠️ `POST /test-sheets/{id}/images`는 **아직 백엔드에 없습니다.** 생기기 전까지는
+> 404가 나고 콘솔 경고만 남습니다(저장 자체는 정상). 스펙은 아래 8절 참고.
 
 서버는 받은 결과를 **임신 기준으로 다시 판정**해서 돌려줍니다. 검사지에 인쇄된
 참고치는 비임신 기준인 경우가 많아(혈색소 11.5 → 검사지 기준 "주의", 임신 기준
@@ -120,3 +143,21 @@ scan/analyzing.tsx      generateReportInsights(항목) → 요약·질문·음�
 | `shine.pregnancy.v1` | 임신 주차 / 기준 시점 (서버 값 캐시) |
 | `shine.calendar.visits.v1` | 캘린더 일정 (폴백용) |
 | `shine.calendar.questions.v1` | 진료 때 물어볼 질문 (폴백용) |
+
+## 8. 백엔드에 요청한 것 — `POST /api/v1/test-sheets/{testSheetId}/images`
+
+```
+POST /api/v1/test-sheets/{testSheetId}/images
+Content-Type: multipart/form-data
+Authorization: Bearer <accessToken>
+
+files: <binary>      # 필드명은 기존 POST /test-sheets 와 동일하게 맞췄다
+```
+
+- 이미 있는 검사지(`POST /reports`가 만든 것)에 이미지를 **덧붙이는** 동작이다.
+  새 검사지를 만들면 안 된다.
+- 응답 본문은 쓰지 않는다. 공통 껍데기(`{ success, code, message, data }`)면 충분하다.
+- 저장된 사진은 기존 `GET /test-sheets/{id}/images/{page}` 로 다시 내려주면 된다.
+- 대안으로 `POST /reports`를 multipart로 확장하거나, 요청 본문에 `testSheetId`를
+  받아 기존 시트를 갱신하는 방식도 가능하다. 정해지면 이 문서와
+  `uploadTestSheetImage()`를 그 스펙에 맞춘다.

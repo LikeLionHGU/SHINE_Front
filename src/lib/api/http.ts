@@ -170,6 +170,47 @@ async function reissueTokens(): Promise<boolean> {
 }
 
 /**
+/**
+ * fetch 응답 한 건을 해석한다.
+ *
+ * JSON 요청(apiRequest)과 파일 업로드(apiUpload)가 응답 처리를 똑같이 해야 해서
+ * 여기로 뺐다. 토큰 만료 재시도는 호출부마다 방식이 달라(재귀 인자가 다르다)
+ * `expired` 플래그만 돌려주고 재시도 여부는 호출부가 정한다.
+ */
+type ApiOutcome =
+  | { ok: true; payload: unknown }
+  | { ok: false; error: ApiError; expired: boolean };
+
+async function interpretResponse(response: Response): Promise<ApiOutcome> {
+  // 본문이 없는 응답(204 등)도 있으므로 먼저 텍스트로 읽는다.
+  const text = await response.text();
+  const parsed = text ? safeParseJson(text) : null;
+  const envelope = isEnvelope(parsed) ? parsed : null;
+  const payload = envelope ? (envelope.data ?? null) : parsed;
+
+  // HTTP는 200인데 껍데기 안에서 실패인 경우도 실패로 취급한다.
+  const failed = !response.ok || envelope?.success === false;
+  if (!failed) return { ok: true, payload };
+
+  // accessToken 만료(401 + TOKEN_EXPIRED)면 한 번만 재발급하고 같은 요청을 다시 보낸다.
+  // 코드 이름이 서버마다 조금씩 달라서, refreshToken 재사용 감지(더 이상 갱신 불가)만
+  // 빼고 401은 전부 갱신 대상으로 본다.
+  const unrecoverable = ["REFRESH_TOKEN_REUSED", "REFRESH_TOKEN_INVALID", "LOGIN_FAILED"];
+  const expired = response.status === 401 && !unrecoverable.includes(envelope?.code ?? "");
+
+  const message =
+    firstFieldError(payload) ??
+    (typeof envelope?.message === "string" && envelope.message.trim() ? envelope.message : null) ??
+    `요청에 실패했어요 (${response.status})`;
+
+  return {
+    ok: false,
+    error: new ApiError(response.status, message, envelope?.code ?? null, parsed),
+    expired,
+  };
+}
+
+/**
  * JSON API 호출 한 번.
  * path는 `/api/v1` 뒤의 경로만 준다 (예: `/app/visits`).
  * 성공하면 껍데기를 벗긴 `data`를, 실패하면 ApiError를 던진다.
@@ -199,34 +240,56 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     signal,
   });
 
-  // 본문이 없는 응답(204 등)도 있으므로 먼저 텍스트로 읽는다.
-  const text = await response.text();
-  const parsed = text ? safeParseJson(text) : null;
-  const envelope = isEnvelope(parsed) ? parsed : null;
-  const payload = envelope ? (envelope.data ?? null) : parsed;
+  const outcome = await interpretResponse(response);
+  if (outcome.ok) return outcome.payload as T;
+  if (outcome.expired && !skipAuth && !_retried && (await reissueTokens())) {
+    return apiRequest<T>(path, { ...options, _retried: true });
+  }
+  throw outcome.error;
+}
 
-  // HTTP는 200인데 껍데기 안에서 실패인 경우도 실패로 취급한다.
-  const failed = !response.ok || envelope?.success === false;
-
-  if (failed) {
-    // accessToken 만료(401 + TOKEN_EXPIRED)면 한 번만 재발급하고 같은 요청을 다시 보낸다.
-    // 코드 이름이 서버마다 조금씩 달라서, refreshToken 재사용 감지(더 이상 갱신 불가)만
-    // 빼고 401은 전부 갱신 대상으로 본다.
-    const unrecoverable = ["REFRESH_TOKEN_REUSED", "REFRESH_TOKEN_INVALID", "LOGIN_FAILED"];
-    const expired = response.status === 401 && !unrecoverable.includes(envelope?.code ?? "");
-    if (expired && !skipAuth && !_retried && (await reissueTokens())) {
-      return apiRequest<T>(path, { ...options, _retried: true });
-    }
-
-    const message =
-      firstFieldError(payload) ??
-      (typeof envelope?.message === "string" && envelope.message.trim() ? envelope.message : null) ??
-      `요청에 실패했어요 (${response.status})`;
-
-    throw new ApiError(response.status, message, envelope?.code ?? null, parsed);
+/**
+ * 파일 업로드 한 번 — multipart/form-data.
+ *
+ * apiRequest와 나눈 이유는 헤더 하나 때문이다. multipart는 본문 경계를 나타내는
+ * boundary 문자열이 Content-Type에 들어가야 하는데, 그 값은 FormData를 실제로
+ * 직렬화할 때 정해진다. 그래서 **Content-Type을 직접 넣으면 안 된다** —
+ * boundary가 빠진 헤더가 나가서 서버가 본문을 파싱하지 못한다.
+ * fetch가 FormData를 보고 알아서 붙이도록 비워둔다.
+ *
+ * RN의 FormData는 `{ uri, name, type }` 모양의 객체를 파일로 받는다(웹의 File이
+ * 아니다). 타입 정의가 웹 기준이라 호출부에서 캐스팅이 필요하다.
+ */
+export async function apiUpload<T>(
+  path: string,
+  form: FormData,
+  options: { method?: "POST" | "PUT" | "PATCH"; signal?: AbortSignal; _retried?: boolean } = {},
+): Promise<T> {
+  if (!isApiConfigured()) {
+    throw new ApiError(
+      0,
+      "EXPO_PUBLIC_API_BASE_URL이 설정되지 않았습니다. .env에 백엔드 주소를 추가하고 개발 서버를 재시작해주세요.",
+    );
   }
 
-  return payload as T;
+  const { method = "POST", signal, _retried } = options;
+  const headers: Record<string, string> = { Accept: "application/json" };
+  const token = await loadAuthToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}${path}`, {
+    method,
+    headers,
+    body: form,
+    signal,
+  });
+
+  const outcome = await interpretResponse(response);
+  if (outcome.ok) return outcome.payload as T;
+  if (outcome.expired && !_retried && (await reissueTokens())) {
+    return apiUpload<T>(path, form, { ...options, _retried: true });
+  }
+  throw outcome.error;
 }
 
 /**

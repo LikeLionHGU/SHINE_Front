@@ -11,6 +11,7 @@ import {
   getQuestionsBySheet,
   getRecordDetail,
   submitReport,
+  uploadTestSheetImage,
 } from "@/lib/api";
 import { generateReportInsights } from "@/lib/insights";
 import {
@@ -369,6 +370,14 @@ export default function AnalysisReport() {
       };
       setReport(next);
 
+      // 검사지 사진도 같은 기록에 붙인다.
+      // 판정 결과 저장(/reports)이 끝난 뒤라, 사진이 실패해도 기록은 이미 남아 있다.
+      // 사진이 없는 건(기록 탭에서 연 지난 검사지) 올릴 것도 없으므로 건너뛴다.
+      const photoUploaded =
+        report.uri && next.testSheetId != null
+          ? await uploadTestSheetImage(next.testSheetId, report.uri)
+          : true;
+
       if (report.uri) {
         await saveLastReport({
           uri: report.uri,
@@ -385,7 +394,9 @@ export default function AnalysisReport() {
         }).catch(() => {});
       }
       setUnsavedChanges(false);
-      setSaveNotice("기록에 저장했어요.");
+      setSaveNotice(
+        photoUploaded ? "기록에 저장했어요." : "기록에 저장했어요. (사진은 올리지 못했어요)",
+      );
     } catch (error) {
       console.warn("[report] 검사지 서버 저장 실패:", error);
       setSaveNotice("저장하지 못했어요. 잠시 후 다시 시도해 주세요.");
