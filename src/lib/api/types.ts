@@ -31,6 +31,18 @@ export type UserProfile = {
   extraEmail: string | null;
 };
 
+/**
+ * 개인정보 수정에 보낼 값. 바꾸려는 칸만 채워 보낸다.
+ * 빈 문자열은 "지운다"는 뜻이라 undefined와 구분된다.
+ */
+export type UserProfileUpdate = {
+  name?: string;
+  phone?: string;
+  email?: string;
+  guardianEmail?: string;
+  extraEmail?: string;
+};
+
 /** 캘린더에 등록한 일정 하나 */
 export type CalendarVisit = {
   id: string;

@@ -8,8 +8,10 @@
 // 실행: npx tsx lib/labs/evaluate.test.ts  (또는 vitest/jest에 붙여도 됨)
 
 import { evaluate, evaluateRow } from './evaluate';
-import type { ExtractedRow, UserContext } from './types';
-import { parseValueString } from './normalize';
+import type { ExtractedRow, UserContext, Status } from './types';
+import { parseValueString, normalizeUnit, convertUnit } from './normalize';
+import { toIndicatorStatus, ENGINE_STATUS_LABEL } from './bridge';
+import { referenceData } from './evaluate';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean, detail?: unknown) {
@@ -384,6 +386,110 @@ console.log('\n=== 20. 같은 검사가 이름만 다르게 두 번 들어온 �
 
   // 판정이 원본 행과 정확히 짝지어진다
   check('판정마다 원본 행 좌표가 실린다', res.judgments.every((j) => j.sourceIndex !== undefined));
+}
+
+console.log('\n=== 21. 이름이 겹치는 다른 검사가 판정을 잡아먹지 않는다 ===');
+{
+  // 실제 화면 버그: 요침사 WBC / PDW / 풍진 IgM 같은 "이름만 비슷한" 행이
+  // 혈액 항목과 같은 itemId로 매칭돼, 중복 병합이 멀쩡한 판정까지 거둬버렸다.
+  // 그 결과 표는 온통 '확인 필요'가 되고, 추천 질문도 "잘 안 읽혔어요"만 남았다.
+  const ctx: UserContext = { gestationalWeek: 28 };
+  const res = evaluate([
+    row('일반혈액검사(CBC)-[혈구세포-장비측정]_백혈구수', '8.37', { unit: '10^3/uL' }),
+    row('일반혈액검사(CBC)-[혈구세포-장비측정]_혈소판수', '301', { unit: '10^3/uL' }),
+    row('Platelet Distribution Width', '12.1', { unit: '%' }),
+    row('풍진항체(IgG)', '양성(>500)'),
+    row('풍진항체(IgM)', '음성(0.32)'),
+    row('WBC', '0-3', { unit: '/HPF' }),   // 요침사 — 혈액 백혈구가 아니다
+  ], ctx);
+
+  const wbc = res.judgments.find((j) => j.itemId === 'wbc');
+  check('요침사 WBC(/HPF)가 혈액 백혈구 판정을 덮지 않는다', wbc?.status === 'safe' && wbc?.value === 8.37, wbc);
+
+  const plt = res.judgments.find((j) => j.itemId === 'platelet');
+  check('PDW가 혈소판 판정을 덮지 않는다', plt?.status === 'safe' && plt?.value === 301, plt);
+
+  const igm = res.judgments.find((j) => j.sourceName === '풍진항체(IgM)');
+  check('풍진 IgM은 IgG로 매칭되지 않는다', igm?.itemId !== 'rubella_igg', igm?.itemId);
+
+  const rub = res.judgments.find((j) => j.itemId === 'rubella_igg');
+  check("풍진 IgG '양성(>500)'은 면역 있음으로 판정된다", rub?.status === 'safe' && rub?.label === '면역 있음', rub);
+
+  check('보류로 덮인 항목이 없다', res.judgments.filter((j) => j.label === '확인 필요').length === 0,
+    res.judgments.filter((j) => j.label === '확인 필요').map((j) => j.itemName));
+}
+
+console.log('\n=== 22. 정성 결과에 측정치가 괄호로 붙어 있어도 읽는다 ===');
+{
+  const ctx: UserContext = { gestationalWeek: 12 };
+  const hbs = evaluateRow(row('HBsAg', '음성(0.32)'), ctx) as any;
+  check("HBsAg '음성(0.32)' → 음성으로 해석", hbs.status === 'safe', { status: hbs.status, label: hbs.label });
+  const q = parseValueString('음성(4.80)');
+  check("parseValueString('음성(4.80)') → negative + 4.8", q.qualitative === 'negative' && q.value === 4.8, q);
+}
+
+console.log('\n=== 23. 단위 표기가 달라도 같은 단위로 본다 ===');
+{
+  // 실제 화면 버그: 검사지가 '10^3/µL'(µ = U+00B5)로 인쇄되는데 기준표는 'uL'라,
+  // convertUnit이 "알 수 없는 단위"로 판정을 보류했다. 값은 멀쩡히 읽혔는데도
+  // 혈소판이 계속 '확인 필요'로 떴다.
+  const same = normalizeUnit('10^3/uL');
+  check("'10^3/µL'(micro sign) = '10^3/uL'", normalizeUnit('10^3/\u00B5L') === same, normalizeUnit('10^3/\u00B5L'));
+  check("'10^3/μL'(greek mu) = '10^3/uL'", normalizeUnit('10^3/\u03BCL') === same, normalizeUnit('10^3/\u03BCL'));
+  check("'10³/µL'(위첨자) = '10^3/uL'", normalizeUnit('10\u00B3/\u00B5L') === same, normalizeUnit('10\u00B3/\u00B5L'));
+  check("'x10^3/uL'(곱셈 접두) = '10^3/uL'", normalizeUnit('x10^3/uL') === same, normalizeUnit('x10^3/uL'));
+  check("'10E3/uL'(지수 표기) = '10^3/uL'", normalizeUnit('10E3/uL') === same, normalizeUnit('10E3/uL'));
+  check("'10^3 / uL'(공백) = '10^3/uL'", normalizeUnit('10^3 / uL') === same, normalizeUnit('10^3 / uL'));
+
+  // 기준표의 표준 단위는 언제나 자기 자신과 일치해야 한다(환산 없이 통과)
+  const broken = referenceData.items.filter((it: any) => {
+    if (it.valueType !== 'numeric' || !it.unit) return false;
+    const r = convertUnit(1, it.unit, it);
+    return !!r.error || r.converted;
+  });
+  check('기준표의 모든 표준 단위가 자기 자신과 일치한다', broken.length === 0, broken.map((i: any) => i.id));
+
+  // 판정까지 이어지는지
+  const ctx: UserContext = { gestationalWeek: 30 };
+  const plt = evaluateRow(row('혈소판수', '36.2', { unit: '10^3/\u00B5L' }), ctx) as any;
+  check("혈소판 36.2 '10^3/µL' → 보류가 아니라 판정된다", plt.status !== 'indeterminate', { status: plt.status, label: plt.label });
+  const wbc = evaluateRow(row('백혈구수', '8.37', { unit: '10\u00B3/\u03BCL' }), ctx) as any;
+  check("백혈구 8.37 '10³/μL' → 정상 판정", wbc.status === 'safe', { status: wbc.status, notes: wbc.dataQuality?.notes });
+
+  // 단위 환산은 그대로 동작해야 한다 (헤모글로빈 g/L → g/dL)
+  const hb = evaluateRow(row('헤모글로빈', '112', { unit: 'g/L' }), ctx) as any;
+  check("헤모글로빈 112 g/L → 11.2 g/dL로 환산", hb.value === 11.2, hb.value);
+}
+
+console.log('\n=== 24. 상태 칩은 네 가지뿐이다 ===');
+{
+  // 칩 종류가 늘수록 표를 훑을 때 심각도 순서가 안 읽힌다.
+  // 엔진 상태 7종 → 안심 / 주의 / 위험 / 확인 필요 로만 접는다.
+  const ALLOWED = ['안심', '주의', '위험', '확인 필요'];
+  const ALL: Status[] = ['safe', 'watch', 'recheck', 'alert', 'indeterminate', 'info_only', 'unsupported'];
+
+  const outside = ALL.filter((s) => !ALLOWED.includes(toIndicatorStatus(s)));
+  check('엔진 상태 7종이 모두 네 가지 안에 들어간다', outside.length === 0,
+    outside.map((s) => `${s}→${toIndicatorStatus(s)}`));
+
+  check('safe → 안심', toIndicatorStatus('safe') === '안심', toIndicatorStatus('safe'));
+  check('watch → 주의', toIndicatorStatus('watch') === '주의', toIndicatorStatus('watch'));
+  check('recheck → 주의 (재검도 판정은 선 것)', toIndicatorStatus('recheck') === '주의', toIndicatorStatus('recheck'));
+  check('alert → 위험', toIndicatorStatus('alert') === '위험', toIndicatorStatus('alert'));
+  check('indeterminate → 확인 필요 (값을 못 믿겠는 것)',
+    toIndicatorStatus('indeterminate') === '확인 필요', toIndicatorStatus('indeterminate'));
+  check('info_only → 확인 필요 (판정 기준이 없는 것)',
+    toIndicatorStatus('info_only') === '확인 필요', toIndicatorStatus('info_only'));
+  check('unsupported → 확인 필요', toIndicatorStatus('unsupported') === '확인 필요', toIndicatorStatus('unsupported'));
+
+  // 세부 라벨이 칩 상태와 모순되면 안 된다 (watch인데 '확인 필요'라고 적혀 있던 버그)
+  const contradiction = ALL.filter((s) => {
+    const chip = toIndicatorStatus(s);
+    const label = ENGINE_STATUS_LABEL[s];
+    return ALLOWED.includes(label) && label !== chip;
+  });
+  check('세부 라벨이 칩 상태와 모순되지 않는다', contradiction.length === 0,
+    contradiction.map((s) => `${s}: 칩=${toIndicatorStatus(s)} 라벨=${ENGINE_STATUS_LABEL[s]}`));
 }
 
 console.log(`\n----------------------------------------\n최종 ${pass + fail}건 중 PASS ${pass} / FAIL ${fail}\n`);

@@ -1506,6 +1506,34 @@
               "quote": "음성 5.0 IU/mL 이하"
             }
           ]
+        },
+        {
+          "id": "rub_qual_pos",
+          "op": "eq",
+          "value": "positive",
+          "status": "safe",
+          "label": "면역 있음",
+          "message": "검사지에 수치 없이 '양성'으로만 적혀 있어요. 풍진 항체가 있는 것으로 판정된 결과입니다.",
+          "sources": [
+            {
+              "id": "cdc_rubella_2024",
+              "quote": "EIA can reliably detect rubella IgG concentrations greater than 10 IU/ml, which is the cutoff for defining rubella immunity used in the United States."
+            }
+          ]
+        },
+        {
+          "id": "rub_qual_neg",
+          "op": "eq",
+          "value": "negative",
+          "status": "watch",
+          "label": "면역 없음 가능",
+          "message": "검사지에 수치 없이 '음성'으로 적혀 있어요. 풍진 면역이 없을 수 있습니다. 임신 중에는 생백신을 맞을 수 없어 보통 출산 후 접종을 권합니다. 담당 의료진과 상의하세요.",
+          "sources": [
+            {
+              "id": "cdc_rubella_2024",
+              "quote": "greater than 10 IU/ml ... is the cutoff for defining rubella immunity used in the United States."
+            }
+          ]
         }
       ],
       "defaultStatus": "indeterminate",
@@ -1520,7 +1548,15 @@
           "id": "cdc_rubella_2024",
           "quote": "greater than 10 IU/ml ... is the cutoff for defining rubella immunity used in the United States."
         }
-      ]
+      ],
+      "qualitativeAliases": {
+        "면역있음": "positive",
+        "면역 있음": "positive",
+        "immune": "positive",
+        "면역없음": "negative",
+        "면역 없음": "negative",
+        "non-immune": "negative"
+      }
     },
     {
       "id": "hbsag",

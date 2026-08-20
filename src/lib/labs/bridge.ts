@@ -10,7 +10,7 @@ import type { IndicatorStatus, ParsedTestItem } from "@/lib/report";
 /** 엔진 상태 → 배지에 쓸 한국어 라벨 */
 export const ENGINE_STATUS_LABEL: Record<Status, string> = {
   safe: "안심",
-  watch: "확인 필요",
+  watch: "주의",
   recheck: "재검 필요",
   indeterminate: "판정 보류",
   alert: "즉시 상담",
@@ -18,7 +18,18 @@ export const ENGINE_STATUS_LABEL: Record<Status, string> = {
   unsupported: "미지원",
 };
 
-/** 엔진 상태 → 기존 4색 배지 색상 키 (서버 데이터와 호환 유지) */
+/**
+ * 엔진 상태(7종) → 화면 상태 칩(4종).
+ *
+ *   safe                              → 안심
+ *   watch · recheck                   → 주의   (판정은 섰고, 지켜보거나 다시 재야 하는 것)
+ *   alert                             → 위험
+ *   indeterminate                     → 확인 필요 (값을 못 믿겠는 것)
+ *   info_only · unsupported           → 확인 필요 (판정 기준 자체가 없는 것)
+ *
+ * "재검 필요"를 따로 파란 칩으로 빼던 예전 방식은, 칩 종류가 늘수록 사용자가
+ * 심각도 순서를 못 읽는다는 문제가 있었다. 뉘앙스는 상세 시트의 문장으로 전한다.
+ */
 export function toIndicatorStatus(s: Status): IndicatorStatus {
   switch (s) {
     case "safe":
@@ -29,7 +40,7 @@ export function toIndicatorStatus(s: Status): IndicatorStatus {
     case "alert":
       return "위험";
     default:
-      return "미분류";
+      return "확인 필요";
   }
 }
 
@@ -50,20 +61,48 @@ function verificationBadge(v: string): string {
   return "미검증";
 }
 
-/** 판정 결과에서 "다음 진료 때 물어볼 질문" 한 문장 생성 */
+/**
+ * 판정 결과만으로 만드는 "다음 진료 때 물어볼 질문".
+ *
+ * AI가 만든 질문이 있으면 그걸 쓰고, 이건 AI 호출이 실패했을 때의 대비책이다.
+ * 대비책이라도 항목명·수치·기준을 넣어 구체적으로 쓴다 — "애매한 구간이라고
+ * 나왔는데 어떻게 보면 될까요?" 같은 문장이 세 줄 반복되면 아무 도움이 안 된다.
+ */
 export function doctorQuestionOf(j: Judgment): string | undefined {
-  const v = j.value ?? j.grade;
-  if (v === undefined) return undefined;
-  const unit = j.unit && j.unit !== "qualitative" && j.unit !== "categorical" && j.unit !== "dipstick" ? j.unit : "";
+  const raw = j.value ?? j.grade;
+  const unit =
+    j.unit && !["qualitative", "categorical", "dipstick"].includes(j.unit) ? ` ${j.unit}` : "";
+  const value = raw !== undefined ? `${raw}${unit}` : "";
+  const name = j.itemName;
+
+  // 무엇과 비교한 결과인지 — 질문에 넣으면 의사가 바로 맥락을 잡는다.
+  const b = j.basis;
+  const range =
+    b && (b.lower !== undefined || b.upper !== undefined)
+      ? b.lower !== undefined && b.upper !== undefined
+        ? `${b.lower}~${b.upper}`
+        : b.upper !== undefined
+          ? `${b.upper} 이하`
+          : `${b.lower} 이상`
+      : "";
+  const basisPhrase = range ? `${b!.uiLabel} ${range}` : "";
+
   switch (j.status) {
-    case "watch":
-      return `${j.itemName}이 ${v}${unit}였는데, 지금 조치가 필요할까요?`;
-    case "recheck":
-      return `${j.itemName}이 ${v}${unit}였는데 재검이 필요한가요? 언제 다시 하면 될까요?`;
-    case "indeterminate":
-      return `${j.itemName} 결과가 애매한 구간이라고 나왔는데 어떻게 보면 될까요?`;
     case "alert":
-      return `${j.itemName}이 ${v}${unit}로 나왔는데 지금 어떻게 해야 할까요?`;
+      return value
+        ? `${name}이 ${value}로 나왔는데, 지금 어떤 조치가 필요할까요?`
+        : `${name} 결과에 대해 지금 어떤 조치가 필요할까요?`;
+    case "watch":
+      return basisPhrase
+        ? `${name}이 ${value}인데 ${basisPhrase} 기준에서 벗어나 있어요. 지금 관리가 필요할까요?`
+        : `${name}이 ${value}인데, 지금 관리가 필요할까요?`;
+    case "recheck":
+      return `${name}이 ${value}였는데, 다시 검사해야 할까요? 언제 하면 될까요?`;
+    case "indeterminate":
+      // 값이 아예 없는 경우와, 값은 있는데 잘못 읽힌 경우를 구분한다.
+      if (j.label === "결과 없음")
+        return `${name}은 이번 검사지에 결과가 없던데, 받아야 하는 검사인가요?`;
+      return `${name} 수치가 검사지에서 잘 안 읽혔어요. 원본으로 확인해 주실 수 있을까요?`;
     default:
       return undefined;
   }
@@ -99,8 +138,8 @@ function judgmentToItem(j: Judgment, rawName: string, rawValue: string): ParsedT
 
     // --- 엔진이 추가로 실어 보내는 값 (화면에서 근거를 보여주기 위한 것) ---
     engineStatus: j.status,
-    // "판정 보류"보다 "결과 없음"·"확인 필요"가 사용자에게 훨씬 유용하다.
-    // 판정이 준 구체적인 라벨이 있으면 그걸 배지에 쓴다.
+    // 칩에는 안 쓰고(칩은 4종 고정), 상세 시트와 AI 프롬프트에서 쓰는 세부 라벨.
+    // "중등도 빈혈"·"면역 있음"·"기준 없음"처럼 판정이 준 구체적인 말이 있으면 그걸 쓴다.
     badgeLabel: j.label && j.label !== '정상' ? j.label : ENGINE_STATUS_LABEL[j.status],
     basisLabel: basisText(j),
     contrastNote: j.printedRange?.contrastNote,

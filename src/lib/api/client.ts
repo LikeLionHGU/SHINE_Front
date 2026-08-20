@@ -34,6 +34,7 @@ import type {
   ReportSubmission,
   SignupRequest,
   UserProfile,
+  UserProfileUpdate,
   VisitDate,
   VisitDetail,
 } from "./types";
@@ -131,6 +132,28 @@ export async function logout(): Promise<void> {
 /** 마이 페이지 프로필 — GET /api/v1/app/me */
 export async function getUserProfile(): Promise<UserProfile> {
   return withFallback("getUserProfile", () => apiRequest<UserProfile>("/app/me"), () => MOCK_PROFILE);
+}
+
+/**
+ * 개인정보 수정 — PATCH /api/v1/users/me
+ *
+ * 보낸 칸만 바뀐다(부분 수정). 서버는 추가 이메일을 additionalEmail로 부르지만
+ * 화면(UserProfile)은 extraEmail을 쓰고 있어 여기서 이름을 맞춰준다.
+ * 값을 비워서 지우려는 경우가 있으므로 빈 문자열도 그대로 보낸다.
+ *
+ * 저장에 실패하면 화면이 알아야 하므로 목 폴백을 두지 않고 오류를 그대로 던진다.
+ */
+export async function updateUserProfile(patch: UserProfileUpdate): Promise<UserProfile> {
+  const body: Record<string, string> = {};
+  if (patch.name !== undefined) body.name = patch.name.trim();
+  if (patch.phone !== undefined) body.phoneNumber = patch.phone.trim();
+  if (patch.email !== undefined) body.email = patch.email.trim();
+  if (patch.guardianEmail !== undefined) body.guardianEmail = patch.guardianEmail.trim();
+  if (patch.extraEmail !== undefined) body.additionalEmail = patch.extraEmail.trim();
+
+  await apiRequest("/users/me", { method: "PATCH", body });
+  // PATCH 응답 모양이 /app/me와 달라서, 화면이 쓰는 형태로 다시 읽어 온다.
+  return getUserProfile();
 }
 
 /* -------------------------------------------------------------- 임신 정보 */
@@ -492,7 +515,7 @@ const STATUS_LABELS: IndicatorStatus[] = ["안심", "주의", "위험"];
  *
  * 같은 검사지를 두 가지 모양으로 돌려주는 서버가 있어서(표준 REST의 `results[]`
  * 와 POST /reports 응답과 같은 `items[]`) 둘 다 받는다. 한쪽 모양만 보다가
- * 상태(status)를 못 읽어서 전부 "미분류"로 보이던 문제가 있었다.
+ * 상태(status)를 못 읽어서 전부 "확인 필요"로 보이던 문제가 있었다.
  */
 function toRecordDetail(sheet: TestSheetDetailResponse): RecordDetail {
   const rawItems = sheet.items?.length ? sheet.items : (sheet.results ?? []);
@@ -531,7 +554,7 @@ function toParsedItem(result: TestResultResponse): ParsedTestItem {
     originalName: printed && printed !== name ? printed : undefined,
     value: formatResultValue(result),
     // 상태 문자열이 없으면 서버가 판정하지 못한 항목(UNKNOWN)이다.
-    status: STATUS_LABELS.includes(label as IndicatorStatus) ? (label as IndicatorStatus) : "미분류",
+    status: STATUS_LABELS.includes(label as IndicatorStatus) ? (label as IndicatorStatus) : "확인 필요",
     definition: (result.definition ?? result.description ?? "").trim(),
     // verdict를 주는 응답이면 그대로 쓰고, 없으면 측정치와 참고치를 다시 적어준다
     // (진단처럼 읽힐 문장을 새로 만들지 않는다).
@@ -612,6 +635,29 @@ export async function getQuestionsBySheet(testSheetId: string | number): Promise
     },
     () => [],
   );
+}
+
+/**
+ * 직접 적은 질문 추가 — POST /api/v1/questions
+ *
+ * testSheetId를 같이 보내면 그 검사지에 달린 질문이 되어, 캘린더에서 그 검사지
+ * 다음 진료를 펼쳤을 때 함께 보인다.
+ *
+ * 저장 실패를 사용자가 알아야 하므로 목 폴백을 두지 않는다.
+ */
+export async function createQuestion(
+  content: string,
+  testSheetId?: string | number | null,
+): Promise<void> {
+  const text = content.trim();
+  if (!text) return;
+  await apiRequest("/questions", {
+    method: "POST",
+    body: {
+      content: text,
+      ...(testSheetId != null ? { testSheetId: Number(testSheetId) } : {}),
+    },
+  });
 }
 
 /* ------------------------------------------------------------ 검사지 업로드 */

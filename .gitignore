@@ -43,5 +43,7 @@ example
 /ios
 /android
 
-# Claude가 옮겨둔 삭제 대기 파일
-_to_delete/
+# 테스트용 실제 검사지 사진. 이름·검사수치 등 개인 건강정보가 담겨 있어
+# 저장소에 올리지 않는다(공개 저장소라 한 번 올라가면 이력에 남는다).
+assets/images/image.png
+assets/images/testreport.*

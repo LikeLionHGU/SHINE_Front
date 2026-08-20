@@ -16,6 +16,7 @@ import {
   Alert,
   Animated,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -23,6 +24,14 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const BAR_WIDTHS = [100.8, 100.8, 83.2, 73.6];
+
+/** 연도 선택 목록. 오래된 검사지도 올릴 수 있게 과거를 넉넉히 둔다. */
+const YEAR_OPTIONS = (() => {
+  const thisYear = new Date().getFullYear();
+  const years: number[] = [];
+  for (let year = thisYear; year >= thisYear - 20; year--) years.push(year);
+  return years;
+})();
 
 function pad(value: number) {
   return String(value).padStart(2, "0");
@@ -61,6 +70,12 @@ export default function ScanDateConfirm() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  // 연도+월 옆 화살표를 누르면 열리는 연도 목록.
+  //
+  // 예전에는 화살표가 아무 동작도 하지 않았고 월 이동(‹ ›)만 있었다. 지난해나
+  // 그 전 검사지를 올릴 때 월 단위로만 움직이면 수십 번을 눌러야 해서,
+  // 연도를 바로 고를 수 있게 했다.
+  const [yearPickerOpen, setYearPickerOpen] = useState(false);
   const today = useMemo(() => new Date(), []);
 
   useEffect(() => {
@@ -245,13 +260,19 @@ export default function ScanDateConfirm() {
           <View style={[centeredSheetStyle, styles.pickerSheet]}>
             <SafeAreaView edges={["bottom"]}>
               <View style={styles.pickerHeader}>
-                <View style={styles.pickerMonthRow}>
+                <Pressable
+                  style={styles.pickerMonthRow}
+                  hitSlop={8}
+                  onPress={() => setYearPickerOpen((open) => !open)}
+                >
                   <Text style={styles.pickerMonth}>
                     {calendarMonth.getFullYear()}년{" "}
                     {calendarMonth.getMonth() + 1}월
                   </Text>
-                  <ChevronRightIcon size={16} color="#111111" />
-                </View>
+                  <View style={yearPickerOpen ? styles.pickerMonthChevronOpen : undefined}>
+                    <ChevronRightIcon size={16} color="#111111" />
+                  </View>
+                </Pressable>
                 <View style={styles.pickerNav}>
                   <Pressable
                     hitSlop={10}
@@ -287,6 +308,32 @@ export default function ScanDateConfirm() {
                   </Pressable>
                 </View>
               </View>
+
+              {yearPickerOpen && (
+                <ScrollView style={styles.yearList} nestedScrollEnabled>
+                  {YEAR_OPTIONS.map((year) => {
+                    const selected = year === calendarMonth.getFullYear();
+                    return (
+                      <Pressable
+                        key={year}
+                        style={styles.yearOption}
+                        onPress={() => {
+                          setCalendarMonth(
+                            (current) => new Date(year, current.getMonth(), 1),
+                          );
+                          setYearPickerOpen(false);
+                        }}
+                      >
+                        <Text
+                          style={[styles.yearText, selected && styles.yearTextSelected]}
+                        >
+                          {year}년
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              )}
 
               <View style={styles.pickerGrid}>
                 {calendarCells.map((day, index) => {
@@ -485,6 +532,16 @@ const styles = StyleSheet.create({
     fontSize: 15.4,
     lineHeight: 22,
   },
+  pickerMonthChevronOpen: { transform: [{ rotate: "90deg" }] },
+  // 검사지가 몇 해 전 것일 수도 있어 목록을 넉넉히 두고 스크롤한다.
+  yearList: { maxHeight: 168, marginBottom: 8 },
+  yearOption: { height: 42, justifyContent: "center", paddingHorizontal: 4 },
+  yearText: {
+    color: "#707070",
+    fontFamily: "Pretendard-Medium",
+    fontSize: 15,
+  },
+  yearTextSelected: { color: "#FA0C56", fontFamily: "Pretendard-SemiBold" },
   pickerNav: { flexDirection: "row", alignItems: "center", gap: 22 },
   pickerNavPrev: { transform: [{ rotate: "180deg" }] },
   // 요일 헤더 없이 날짜만 7열로 깐다(디자인 911:4657).

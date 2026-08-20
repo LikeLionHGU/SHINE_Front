@@ -178,9 +178,21 @@ export async function parseTestReport(
       conflicts = merged.conflicts;
       rows = toRows(merged.agreed);
       // 두 번 읽어서 값이 갈린 항목은 "확실치 않음"으로 표시해 사용자에게 확인받는다.
-      for (const c of conflicts) {
-        const row = rows.find((r) => r.rawName === c.name);
-        if (row) row.uncertain = `두 번 읽었을 때 값이 달랐어요 (${c.a} / ${c.b}).`;
+      //
+      // 단, 갈린 행이 너무 많으면 2차 추출 자체가 어긋난 것(행이 통째로 밀렸거나
+      // 다른 표를 읽은 것)이지 개별 숫자가 의심스러운 게 아니다. 그때 전부 보류로
+      // 만들면 멀쩡한 항목까지 판정을 잃고, 추천 질문도 "잘 안 읽혔어요"만 남는다.
+      const ratio = rows.length > 0 ? conflicts.length / rows.length : 0;
+      if (ratio > 0.3) {
+        console.warn(
+          `[ocr] 2차 추출이 1차와 ${Math.round(ratio * 100)}% 어긋나 교차검증을 건너뜁니다.`,
+        );
+        conflicts = [];
+      } else {
+        for (const c of conflicts) {
+          const row = rows.find((r) => r.rawName === c.name);
+          if (row) row.uncertain = `두 번 읽었을 때 값이 달랐어요 (${c.a} / ${c.b}).`;
+        }
       }
     } catch {
       // 2차 추출이 실패해도 1차 결과로 계속 진행한다.
@@ -243,9 +255,31 @@ function crossCheck(a: any, b: any): { agreed: any; conflicts: { name: string; a
     if (!other) continue; // 한쪽에만 있는 행은 여기서 판단하지 않는다(항목 자체를 버리지 않기 위해)
     const va = String(r.rawValue ?? "").trim();
     const vb = String(other.rawValue ?? "").trim();
-    if (va !== vb) conflicts.push({ name: String(r.rawName).trim(), a: va, b: vb });
+    if (!sameReading(va, vb)) {
+      conflicts.push({ name: String(r.rawName).trim(), a: va, b: vb });
+    }
   }
   return { agreed: a, conflicts };
+}
+
+/**
+ * 두 번 읽은 값이 "사실상 같은가".
+ *
+ * 공백·대소문자·천단위 쉼표, 그리고 "8.40"과 "8.4" 같은 표기 차이는 같은 값으로 본다.
+ * 이런 것까지 불일치로 세면 멀쩡한 항목이 무더기로 판정 보류가 된다.
+ */
+function sameReading(a: string, b: string): boolean {
+  const norm = (v: string) => v.replace(/[\s,]/g, "").toLowerCase();
+  const na = norm(a);
+  const nb = norm(b);
+  if (na === nb) return true;
+  const fa = parseFloat(na);
+  const fb = parseFloat(nb);
+  // 둘 다 순수 숫자로 읽히면 수치로 비교한다("8.40" vs "8.4").
+  if (Number.isFinite(fa) && Number.isFinite(fb) && /^-?[\d.]+$/.test(na) && /^-?[\d.]+$/.test(nb)) {
+    return fa === fb;
+  }
+  return false;
 }
 
 async function extractOnce(dataUrl: string): Promise<unknown> {
@@ -286,14 +320,28 @@ async function extractOnce(dataUrl: string): Promise<unknown> {
   }
 
   const json = await response.json();
-  const content: string | undefined = json?.choices?.[0]?.message?.content;
+  const choice = json?.choices?.[0];
+  const content: string | undefined = choice?.message?.content;
   if (!content) throw new Error("OpenAI 응답에서 결과를 찾지 못했어요.");
+
+  // 행이 많은 검사지는 응답이 길어 토큰 한도에 걸릴 수 있다. 잘린 채로 파싱하면
+  // 뒷부분 항목이 통째로 사라지므로, 원인을 분명히 알려준다.
+  if (choice?.finish_reason === "length") {
+    throw new Error(
+      "검사지가 길어 OpenAI 응답이 중간에 끊겼어요. max_tokens를 늘리거나 사진을 나눠 올려주세요.",
+    );
+  }
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(content);
+    const text = content.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    parsed = JSON.parse(start !== -1 && end > start ? text.slice(start, end + 1) : text);
   } catch {
-    throw new Error("OpenAI 응답을 JSON으로 해석하지 못했어요.");
+    throw new Error(
+      `OpenAI 응답을 JSON으로 해석하지 못했어요. 받은 내용 앞부분: ${content.slice(0, 200)}`,
+    );
   }
 
   return parsed;

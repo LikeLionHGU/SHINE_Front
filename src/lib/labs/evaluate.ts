@@ -9,7 +9,7 @@ import type {
   PrintedRangeContext, RangeBasis, ReferenceData, Rule, Status, Trimester, UserContext,
 } from './types';
 import { toCitations, citationById, isJudgmentGrade } from './sources';
-import { matchItem, convertUnit, checkPlausible, trimesterOf, normalizeGrade, normalizeQualitative, isEmptyValue, dedupeRows, coreName } from './normalize';
+import { matchItem, convertUnit, checkPlausible, trimesterOf, normalizeGrade, normalizeQualitative, isEmptyValue, dedupeRows, coreName, isMicroscopyUnit } from './normalize';
 import referenceJson from './data/reference_ranges.json';
 
 export const referenceData = referenceJson as unknown as ReferenceData;
@@ -19,6 +19,18 @@ const STATUS_SEVERITY: Record<Status, number> = {
 };
 
 export function severity(s: Status): number { return STATUS_SEVERITY[s] ?? 0; }
+
+/**
+ * 같은 항목이 두 행에서 나왔을 때 "어느 쪽 읽기를 믿을지" 점수.
+ * 높을수록 신뢰할 만하다. 동점이면 판정을 거두고 사용자에게 되묻는다.
+ */
+function fitness(j: Judgment): number {
+  let score = 0;
+  if (j.status !== 'indeterminate') score += 4;      // 이미 판정이 선 쪽
+  if (j.dataQuality?.outOfPlausibleRange !== true) score += 2; // 자릿수가 말이 되는 쪽
+  if (j.dataQuality?.needsUserConfirmation !== true) score += 1; // 단위·해석이 확실한 쪽
+  return score;
+}
 
 // ---------- 참고범위 결정 ----------
 
@@ -150,6 +162,14 @@ export function evaluateRow(row: ExtractedRow, ctx: UserContext): Judgment | { u
   if (!match.item) {
     return { unsupported: true, rawName: row.rawName, rawValue: row.rawValue, reason: match.reason ?? '미지원 항목' };
   }
+  // 요침사의 'WBC 0-3 /HPF'는 혈액 백혈구와 이름만 같은 다른 검사다.
+  // 여기서 걸러내지 않으면 itemId가 겹쳐, 병합 단계에서 혈액 백혈구 판정까지 사라진다.
+  if (isMicroscopyUnit(row.unit) && !isMicroscopyUnit(match.item.unit)) {
+    return {
+      unsupported: true, rawName: row.rawName, rawValue: row.rawValue,
+      reason: `단위가 '${row.unit}'라 현미경 계수 항목으로 보임 — 혈액 ${match.item.name}과(와) 구분함`,
+    };
+  }
   const item = match.item;
 
   // 결과값이 비어 있으면 절대 판정하지 않는다.
@@ -200,6 +220,14 @@ export function evaluateRow(row: ExtractedRow, ctx: UserContext): Judgment | { u
     const q = normalizeQualitative(row.rawValue, item.qualitativeAliases);
     if (q) row = { ...row, qualitative: q };
     else { notes.push(`'${row.rawValue}'를 양성/음성으로 해석하지 못했습니다.`); needsUserConfirmation = true; }
+  }
+  // 수치 항목인데 검사지에 숫자 대신 '양성/음성'만 적힌 경우가 있다.
+  // (풍진 IgG를 '양성(>500)'으로 내보내는 검사기관이 많다.) 숫자 규칙은 전부
+  // 빗나가서 defaultStatus로 떨어지고, 화면에는 '판정 보류'만 남았다.
+  // 숫자가 없을 때만 양성/음성을 읽어, 숫자가 있는 경우의 판정은 건드리지 않는다.
+  if (item.valueType === 'numeric' && row.value === undefined && !row.qualitative) {
+    const q = normalizeQualitative(row.rawValue, item.qualitativeAliases);
+    if (q) row = { ...row, qualitative: q };
   }
 
   if (item.valueType === 'numeric' && value !== undefined) {
@@ -655,7 +683,20 @@ export function evaluate(inputRows: ExtractedRow[], ctx: UserContext): Evaluatio
       String(x.value ?? x.grade ?? x.sourceValue ?? '').trim().toLowerCase();
     const sameValue = key(prev) === key(j);
     if (sameValue) continue; // 똑같은 값이 두 번 읽힌 것 — 하나만 남긴다
-    // 값이 다르면 어느 쪽이 맞는지 모르므로 판정을 거둔다.
+
+    // 값이 다르다고 바로 판정을 거두면 안 된다. 둘 중 한쪽이 명백히 더 신뢰할 만한
+    // 경우(단위가 맞고, 가능한 범위 안이고, 이미 판정이 선 쪽)가 대부분이기 때문이다.
+    // 예전에는 무조건 보류로 만들어서, 이름이 비슷한 부수 지표 한 줄 때문에 멀쩡한
+    // 혈액 항목이 통째로 '확인 필요'가 됐다.
+    const better = fitness(j) - fitness(prev);
+    if (better > 0) {
+      // j가 더 믿을 만하다 — 배열 위치는 유지한 채 내용만 교체한다.
+      Object.assign(prev, j);
+      continue;
+    }
+    if (better < 0) continue; // prev가 더 믿을 만하다 — 그대로 둔다
+
+    // 정말 우열을 가릴 수 없을 때만 판정을 거둔다.
     prev.status = 'indeterminate';
     prev.label = '확인 필요';
     prev.message = `같은 항목이 서로 다른 값으로 읽혔어요 (${key(prev)} / ${key(j)}). 검사지의 값을 확인해 주세요.`;

@@ -26,7 +26,9 @@ const MINUTES = Array.from({ length: 60 }, (_, i) => i);
 
 /** 휠 한 칸 높이. 선택 밴드와 스냅 간격이 이 값을 공유한다. */
 const ITEM_HEIGHT = 28;
-const VISIBLE_ITEMS = 7;
+// 7줄이면 카드 높이가 화면에 남은 공간을 넘어서 휠 위아래가 잘렸다.
+// 5줄이면 선택 밴드 위아래로 두 칸씩 보여 굴리는 느낌은 그대로다.
+const VISIBLE_ITEMS = 5;
 const WHEEL_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
 
 /** 피커 카드가 아래에서 올라올 때의 이동 거리 */
@@ -34,9 +36,6 @@ const PICKER_SLIDE_DISTANCE = 320;
 
 /** 시트가 차지하는 화면 비율. 열릴 때 이 높이만큼 아래에서 올라온다. */
 const SHEET_HEIGHT_RATIO = 0.73;
-
-/** 시간/산부인과 한 줄 높이. 시간 피커를 그 줄 바로 아래에 붙일 때 쓴다. */
-const OPTION_ROW_HEIGHT = 41;
 
 /** 제목/장소 입력 한 줄 높이. 장소 추천 목록을 그 아래에 붙일 때 쓴다. */
 const FIELD_HEIGHT = 41;
@@ -150,7 +149,6 @@ export default function CalendarTimePicker() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   // 시간 피커는 "시간" 행 바로 아래에 붙어 시트 바닥까지 채운다.
-  const [optionCardY, setOptionCardY] = useState<number | null>(null);
   const today = useMemo(() => new Date(), []);
 
   // 최근에 간 곳이 위로 오도록 날짜 내림차순으로 정렬한 뒤 중복을 없앤다.
@@ -375,10 +373,7 @@ export default function CalendarTimePicker() {
           )}
         </View>
 
-        <View
-          style={styles.optionCard}
-          onLayout={(e) => setOptionCardY(e.nativeEvent.layout.y)}
-        >
+        <View style={styles.optionCard}>
           <View style={styles.optionRow}>
             <Text style={styles.optionLabel}>시간</Text>
             <Pressable
@@ -478,7 +473,6 @@ export default function CalendarTimePicker() {
           <Animated.View
             style={[
               styles.pickerCard,
-              optionCardY != null && { top: optionCardY + OPTION_ROW_HEIGHT },
               {
                 opacity: slide,
                 transform: [
@@ -708,14 +702,17 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   // "시간" 행 바로 아래(top은 실제 위치로 계산)부터 시트 바닥까지 채운다.
+  // 예전에는 top(시간 줄 아래)과 bottom을 동시에 잡아 높이가 강제됐다.
+  // 남은 공간보다 내용이 크면 그대로 잘려서, 아래에만 붙이고 높이는 내용에
+  // 맡긴다.
   pickerCard: {
     position: "absolute",
     left: -34,
     right: -34,
     bottom: 0,
-    paddingTop: 28,
+    paddingTop: 20,
     // 휠이 카드 바닥에 딱 붙어 잘려 보여서 아래쪽 여백을 준다.
-    paddingBottom: 36,
+    paddingBottom: 24,
     alignItems: "center",
     backgroundColor: "#FFFCFD",
     elevation: 3,
@@ -795,7 +792,7 @@ const styles = StyleSheet.create({
     fontFamily: "Pretendard-Regular",
   },
   pickerValue: {
-    marginTop: 33,
+    marginTop: 18,
     color: "#111111",
     fontSize: 24,
     lineHeight: 31.2,

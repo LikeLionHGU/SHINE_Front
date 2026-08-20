@@ -3,7 +3,6 @@ import { parseTestReport } from "@/lib/ocr";
 import { generateReportInsights } from "@/lib/insights";
 import { scanDocumentImage } from "@/lib/scan";
 import { currentPregnancyWeek } from "@/lib/pregnancy";
-import { submitReport } from "@/lib/api";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
@@ -116,62 +115,12 @@ export default function ScanAnalyzing() {
         }
       }
 
-      // 서버에 올리고 교정본을 받아온다. 검사항목이 하나도 없으면 보낼 게 없다.
-      let testSheetId: number | undefined;
-      let week: string | undefined;
-
-      if (items && items.length > 0) {
-        try {
-          const corrected = await submitReport({
-            testDate: resolvedTestDate,
-            items,
-            summary,
-            questions,
-            foods,
-          });
-
-          // 서버가 임신 기준으로 다시 판정하고 대표명·검수된 설명으로 바꿔준 값으로 교체한다.
-          // 이때 항목명이 "헤모글로빈" → "혈색소"로 바뀌므로, 사용자가 손에 든 검사지와
-          // 대조할 수 있도록 OCR이 읽은 원문명을 같이 붙여둔다. 서버가 원문을 돌려주지
-          // 않아서 순서로 짝짓는데, 개수가 다르면 잘못 붙을 수 있으니 그때는 포기한다.
-          // 서버도 임신 기준으로 다시 판정해서 돌려주지만, 그 판정에는 근거(출처)가
-          // 붙어 있지 않다. 프론트 판정 엔진(lib/labs)은 학회 원문까지 인용을 달고
-          // 오므로, **판정·설명·근거는 엔진 결과를 그대로 유지**하고 서버에서는
-          // 카탈로그 대표명("헤모글로빈" → "혈색소")만 빌려온다.
-          // (엔진이 판정하지 못한 항목은 서버 값이라도 보여주는 게 낫기 때문에
-          //  engineStatus가 없는 항목만 서버 값으로 대체한다.)
-          if (corrected?.items?.length && items?.length) {
-            const sameLength = items.length === corrected.items.length;
-            items = items.map((item, i) => {
-              const fromServer = sameLength ? corrected.items[i] : undefined;
-              if (!fromServer) return item;
-              if (!item.engineStatus) {
-                // 엔진이 모르는 항목 → 서버 판정을 쓰되 원문명은 유지한다.
-                return { ...fromServer, originalName: item.originalName ?? item.name };
-              }
-              // 엔진이 판정한 항목 → 대표명만 갈아끼운다.
-              const displayName = fromServer.name || item.name;
-              return {
-                ...item,
-                name: displayName,
-                originalName:
-                  item.originalName ?? (displayName !== item.name ? item.name : undefined),
-              };
-            });
-          }
-          if (corrected?.summary) summary = corrected.summary;
-          if (corrected?.questions?.length) questions = corrected.questions;
-          if (corrected?.foods?.length) foods = corrected.foods;
-          if (corrected?.testDate) resolvedTestDate = corrected.testDate;
-          testSheetId = corrected?.testSheetId;
-          week = corrected?.week;
-        } catch (error) {
-          // 서버 전송이 실패해도(로그인 만료, 서버 미기동 등) 프론트 OCR 결과로
-          // 화면은 그대로 보여준다. 다만 판정은 검사지 인쇄 기준이라 임신 기준과
-          // 다를 수 있다.
-          console.warn("[scan] 검사지 서버 전송 실패:", error);
-        }
-      }
+      // 서버 전송은 여기서 하지 않는다.
+      //
+      // 예전에는 스캔이 끝나자마자 자동으로 POST /reports를 보냈다. 그런데 이 시점의
+      // 값은 아직 사용자가 확인하기 전이라, OCR이 잘못 읽은 수치가 그대로 서버에
+      // 기록으로 남았다. 지금은 결과 화면에서 값을 확인·수정한 뒤 "저장하기"를
+      // 눌렀을 때만 서버로 보낸다(analysis/report.tsx의 saveToServer).
 
       await minVisible;
       if (cancelled) return;
@@ -186,8 +135,6 @@ export default function ScanAnalyzing() {
           summary,
           questions,
           foods,
-          testSheetId,
-          week,
           crossFindings,
           unsupported,
           sources,

@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Pressable, ScrollView, Text, View, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import {
   BackChevronIcon,
   BellIcon,
@@ -26,9 +26,22 @@ export default function Settings() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  useEffect(() => {
-    getUserProfile().then(setProfile);
-  }, []);
+  // 개인정보 수정 화면에서 돌아오면 바뀐 값이 바로 보여야 한다.
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      getUserProfile().then((value) => {
+        if (active) setProfile(value);
+      });
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
+
+  /** 개인정보 수정으로 이동. 누른 줄에 커서를 먼저 두도록 field를 넘긴다. */
+  const editProfile = (field: string) =>
+    router.push({ pathname: "/(modals)/profile-edit", params: { field } });
 
   // 서버 호출이 실패해도 기기의 토큰은 지워지므로(logout 내부에서 처리) 항상 로그인 화면으로 보낸다.
   const handleLogout = async () => {
@@ -60,7 +73,7 @@ export default function Settings() {
           <XXLogoIcon width={46} height={17} />
 
           <Text style={styles.sectionTitle}>프로필</Text>
-          <Pressable style={[styles.card, styles.profileCard]}>
+          <Pressable style={[styles.card, styles.profileCard]} onPress={() => editProfile("name")}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>XX</Text>
             </View>
@@ -75,30 +88,43 @@ export default function Settings() {
 
           <Text style={styles.sectionTitle}>개인정보</Text>
           <View style={[styles.card, styles.infoCard]}>
-            <Pressable style={[styles.infoRow, styles.infoRowToDivider]}>
+            <Pressable
+              style={[styles.infoRow, styles.infoRowToDivider]}
+              onPress={() => editProfile("phone")}
+            >
               <Text style={styles.infoLabel}>연락처 정보</Text>
               <Text style={styles.infoValueAuto}>{profile?.phone ?? ""}</Text>
               <View style={styles.infoSpacer} />
               <ChevronRightIcon size={20} />
             </Pressable>
             <View style={styles.dividerSpaced} />
-            <View style={[styles.infoRow, styles.infoRowSpacing]}>
+            <Pressable
+              style={[styles.infoRow, styles.infoRowSpacing]}
+              onPress={() => editProfile("email")}
+            >
               <Text style={styles.infoLabel}>본인 이메일</Text>
               <Text style={styles.infoValueAuto}>{profile?.email ?? ""}</Text>
               <EditPencilIcon />
-            </View>
-            <View style={[styles.infoRow, styles.infoRowSpacing]}>
+            </Pressable>
+            <Pressable
+              style={[styles.infoRow, styles.infoRowSpacing]}
+              onPress={() => editProfile("guardianEmail")}
+            >
               <Text style={styles.infoLabel}>보호자 이메일</Text>
               <Text style={styles.infoValueAuto}>
                 {profile?.guardianEmail ?? ""}
               </Text>
               <EditPencilIcon />
-            </View>
-            <View style={styles.infoRow}>
+            </Pressable>
+            <Pressable style={styles.infoRow} onPress={() => editProfile("extraEmail")}>
               <Text style={styles.infoLabel}>추가 이메일</Text>
-              <View style={styles.addEmailPill} />
+              {profile?.extraEmail ? (
+                <Text style={styles.infoValueAuto}>{profile.extraEmail}</Text>
+              ) : (
+                <View style={styles.addEmailPill} />
+              )}
               <EditPencilIcon />
-            </View>
+            </Pressable>
           </View>
 
           <Text style={styles.sectionTitle}>기본 설정</Text>
@@ -115,13 +141,13 @@ export default function Settings() {
               <ToggleSwitch value={notifications} onValueChange={setNotifications} />
             </View>
             <View style={styles.divider} />
-            <Pressable style={styles.settingsRow}>
+            <Pressable style={styles.settingsRow} onPress={() => router.push("/(modals)/faq")}>
               <FaqIcon size={22} />
               <Text style={styles.settingsLabel}>FAQ</Text>
               <ChevronRightIcon />
             </Pressable>
             <View style={styles.divider} />
-            <Pressable style={styles.settingsRow}>
+            <Pressable style={styles.settingsRow} onPress={() => router.push("/(modals)/terms")}>
               <DocumentIcon size={22} />
               <Text style={styles.settingsLabel}>이용약관</Text>
               <ChevronRightIcon />

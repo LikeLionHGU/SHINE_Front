@@ -5,11 +5,9 @@ import {
 } from "@/components/icons";
 import { FoodImage } from "@/components/food-image";
 import {
+  createQuestion,
   getHome,
   getVisits,
-  getVisitQuestions,
-  saveVisitQuestions,
-  formatVisitDate,
   type CalendarVisit,
   type Home,
 } from "@/lib/api";
@@ -25,7 +23,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { centeredContentStyle, visitDateLabel } from "@/lib/layout";
+import { centeredContentStyle } from "@/lib/layout";
 
 // Figma(node 671:3009 "image 54 1")는 단일 이미지 애셋(은은한 핑크 글로우)이라
 // 별도 삽화 없이 그라디언트로 재현한다. 실제 PNG 애셋을 쓰고 싶다면 Figma에서
@@ -54,8 +52,7 @@ function toVisitDate(isoDate: string): string {
 export default function Home() {
   const router = useRouter();
   const [question, setQuestion] = useState("");
-  // 질문 전송 상태. 저장은 다음 산부인과 일정(없으면 오늘)에 붙는다.
-  const [sending, setSending] = useState(false);
+  // 질문 전송 상태. 저장은 lib/api의 createQuestion(POST /questions)이 맡는다.
   const [sentNotice, setSentNotice] = useState<string | null>(null);
   const [home, setHome] = useState<Home | null>(null);
   const [visits, setVisits] = useState<CalendarVisit[]>([]);
@@ -76,41 +73,35 @@ export default function Home() {
     }, []),
   );
 
-  /** 질문을 붙일 날짜 — 오늘 이후의 가장 가까운 산부인과 일정, 없으면 오늘 */
-  function targetVisitDate(): string {
-    // 이 앱의 날짜 포맷은 ISO가 아니라 "26.08.16"(YY.MM.DD)이다.
-    const today = formatVisitDate(new Date());
-    const upcoming = visits
-      .filter((v) => v.isHospital && v.date >= today)
-      .sort((a, b) => a.date.localeCompare(b.date))[0];
-    return upcoming?.date ?? today;
-  }
+  const latestSheet = home?.latestSheet ?? null;
+  const questions = home?.questions ?? [];
+  const [sendingQuestion, setSendingQuestion] = useState(false);
 
-  /** 직접 적은 질문을 진료 질문 목록에 추가한다. */
+  /**
+   * 직접 적은 질문을 서버에 올린다.
+   *
+   * 최신 검사지가 있으면 그 검사지에 달아서, 캘린더에서 그 검사지 다음 진료를
+   * 펼쳤을 때 추천 질문과 함께 보이게 한다. 검사지가 아직 없으면 검사지 없이
+   * 저장한다. 올린 뒤에는 홈을 다시 읽어 목록에 바로 반영한다.
+   */
   async function submitQuestion() {
     const text = question.trim();
-    if (!text || sending) return;
-    setSending(true);
+    if (!text || sendingQuestion) return;
+    setSendingQuestion(true);
     try {
-      const date = targetVisitDate();
-      const existing = await getVisitQuestions(date).catch(() => [] as string[]);
-      if (existing.some((q) => q.trim() === text)) {
-        setSentNotice("이미 추가된 질문이에요.");
-      } else {
-        await saveVisitQuestions(date, [...existing, text]);
-        setSentNotice(`${visitDateLabel(date)} 진료 질문에 추가했어요.`);
-      }
+      await createQuestion(text, latestSheet?.testSheetId ?? null);
       setQuestion("");
-    } catch {
+      setHome(await getHome());
+      setSentNotice("다음 진료 질문에 추가했어요.");
+    } catch (error) {
+      // 실패를 조용히 넘기면 사용자는 저장된 줄 안다. 화면에도 반드시 알린다.
+      console.warn("[home] 질문 저장 실패:", error);
       setSentNotice("질문을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
-      setSending(false);
+      setSendingQuestion(false);
       setTimeout(() => setSentNotice(null), 2600);
     }
   }
-
-  const latestSheet = home?.latestSheet ?? null;
-  const questions = home?.questions ?? [];
   const nutritions = home?.nutritions ?? [];
 
   // 서버 주간 캘린더에 방금 추가한 일정이 아직 안 반영돼 있어도 홈에서 바로
@@ -179,18 +170,18 @@ export default function Home() {
                 style={styles.input}
                 returnKeyType="send"
                 onSubmitEditing={submitQuestion}
-                editable={!sending}
+                editable={!sendingQuestion}
               />
               {question.trim().length > 0 && (
                 <Pressable
                   onPress={submitQuestion}
-                  disabled={sending}
+                  disabled={sendingQuestion}
                   hitSlop={12}
                   accessibilityRole="button"
                   accessibilityLabel="질문 추가"
                   style={({ pressed }) => [pressed && styles.pressed]}
                 >
-                  <Text style={[styles.send, sending && styles.sendDisabled]}>↑</Text>
+                  <Text style={[styles.send, sendingQuestion && styles.sendDisabled]}>↑</Text>
                 </Pressable>
               )}
             </View>
@@ -238,7 +229,11 @@ export default function Home() {
                 <View key={item.date} style={[styles.dayCard, item.isToday && styles.dayCardSelected]}>
                   <Text style={[styles.dayNumber, item.isToday && styles.daySelectedText]}>{item.day}</Text>
                   <Text style={[styles.dayLabel, item.isToday && styles.daySelectedText]}>{item.dayOfWeek}</Text>
-                  {item.hasAppointment && <View style={styles.eventDot} />}
+                  {item.hasAppointment && (
+                    <View
+                      style={[styles.eventDot, !item.isToday && styles.eventDotOnLight]}
+                    />
+                  )}
                 </View>
               ))}
             </ScrollView>
@@ -303,6 +298,9 @@ const styles = StyleSheet.create({
   dayNumber: { color: "#707070", fontFamily: "Pretendard-Regular", fontSize: 12, lineHeight: 18 },
   dayLabel: { color: "#707070", fontFamily: "Pretendard-Regular", fontSize: 12, lineHeight: 17 },
   daySelectedText: { color: "#FFFCFD" },
+  // 오늘 칸은 배경이 핑크라 흰 점이 보이지만, 나머지 칸은 배경이 흰색이라
+  // 같은 흰 점을 쓰면 일정이 있어도 아무것도 안 보인다.
   eventDot: { position: "absolute", bottom: 9, width: 5, height: 5, borderRadius: 3, backgroundColor: "#FFFCFD" },
+  eventDotOnLight: { backgroundColor: "#FA0C56" },
   appointment: { position: "absolute", bottom: 5, color: "#111", fontFamily: "Pretendard-Regular", fontSize: 8 },
 });

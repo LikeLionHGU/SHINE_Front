@@ -3,7 +3,6 @@ import {
   BackChevronIcon,
   ChevronRightIcon,
   EditOutlineIcon,
-  TrashIcon,
   UpTriangleIcon,
 } from "@/components/icons";
 import { centeredContentStyle } from "@/lib/layout";
@@ -18,18 +17,20 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  deleteVisit,
+  formatVisitDate,
   formatVisitTime,
   getCalendarMonthMarks,
   getGuardianEmail,
   getPregnancyInfo,
-  getVisitDetail,
+  getQuestionsBySheet,
+  getRecords,
   getVisits,
   type CalendarMonthMarks,
   type CalendarVisit,
   type DayMark,
   type PregnancyInfo,
 } from "@/lib/api";
+import type { RecordEntry } from "@/lib/report";
 import {
   Modal,
   Pressable,
@@ -142,7 +143,6 @@ export default function Calendar() {
   // 어떤 일정의 질문 목록이 펼쳐져 있는지. 예전에는 "가장 가까운 진료" 한 건만
   // 펼칠 수 있었는데, 지난 진료의 질문도 확인해야 해서 일정마다 열 수 있게 했다.
   const [openVisitId, setOpenVisitId] = useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<CalendarVisit | null>(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const router = useRouter();
   const [pregnancy, setPregnancy] = useState<PregnancyInfo | null>(null);
@@ -158,6 +158,8 @@ export default function Calendar() {
   useFocusEffect(useCallback(() => {
     let active = true;
     getVisits().then((visits) => { if (active) setUpcomingVisits(visits); });
+    // 진료일마다 어떤 검사지의 질문을 보여줄지 정하려면 검사지 목록이 필요하다.
+    getRecords().then((list) => { if (active) setRecords(list); });
     getCalendarMonthMarks(monthCursor.getFullYear(), monthCursor.getMonth()).then(
       (marks) => { if (active) setMonthMarks(marks); },
     );
@@ -190,63 +192,118 @@ export default function Calendar() {
     [monthCursor, pregnancy, upcomingVisits, monthMarks],
   );
 
-  // "예정된 방문"에는 지금 보고 있는 달의 산부인과 일정만 올린다.
+  // "예정된 방문"에는 지금 보고 있는 달의 산부인과 일정 중 오늘 이후 것만 올린다.
+  // 이미 지나간 진료는 예정이 아니므로 목록에서 뺀다(달력의 원 표시는 그대로 남는다).
   const monthlyHospitalVisits = useMemo(() => {
     const prefix = `${pad2(monthCursor.getFullYear() % 100)}.${pad2(monthCursor.getMonth() + 1)}.`;
+    const today = formatVisitDate(new Date());
     return upcomingVisits.filter(
-      (visit) => visit.isHospital && visit.date.startsWith(prefix),
+      (visit) =>
+        visit.isHospital && visit.date.startsWith(prefix) && visit.date >= today,
     );
   }, [monthCursor, upcomingVisits]);
 
-  // 펼쳐 놓은 일정의 질문 목록.
+  // 진료일마다 "그날 물어볼 질문의 근거가 되는 검사지"를 정한다.
   //
-  // GET /app/visits는 questions를 항상 빈 배열로 주기 때문에 일정 목록만으로는
-  // 질문을 채울 수 없다. AI 추천 질문과 직접 적어둔 질문은 날짜별 상세
-  // (getVisitDetail)에 들어 있어서, 펼친 일정의 날짜로 따로 받아온다.
-  const openVisit = useMemo(
-    () => monthlyHospitalVisits.find((visit) => visit.id === openVisitId) ?? null,
-    [monthlyHospitalVisits, openVisitId],
+  // 검사지를 낸 그 진료에서 결과를 바로 듣는 게 아니라, 다음 진료 때 결과를
+  // 놓고 이야기한다. 그래서 어떤 진료에서 물어볼 질문은 직전 검사지에서 나온
+  // 것이어야 한다.
+  //
+  //   8/11 진료          → 아직 검사지가 없다 → "검사지를 등록해주세요"
+  //   8/11 검사지 업로드
+  //   8/13 진료          → 8/11 검사지 기반 질문
+  //   8/13 검사지 업로드
+  //   8/15 진료          → 8/13 검사지 기반 질문
+  //   8/19 진료          → 8/15 검사지가 없으니 새로 물어볼 것이 없다 (표시 없음)
+  //
+  // 그래서 화살표는 "검사지마다 그 뒤 첫 진료" 한 자리에만 달린다. 그 뒤로 더
+  // 잡힌 진료는 같은 검사지를 또 가리키게 되므로 제외한다.
+  //
+  // 서버의 날짜별 상세(getVisitDetail)는 당일 검사지 질문까지 섞어서 주고 그
+  // 뒤 진료마다 같은 질문을 반복하기 때문에, 검사지별 질문을 직접 받아온다.
+  //
+  // 검사지와 진료가 다른 달에 걸칠 수 있어 판단은 전체 일정으로 한다.
+  const [records, setRecords] = useState<RecordEntry[]>([]);
+
+  const allHospitalVisits = useMemo(
+    () => upcomingVisits.filter((visit) => visit.isHospital),
+    [upcomingVisits],
   );
 
+  const questionSourceByVisitId = useMemo(() => {
+    // getRecords는 최신순이라 오래된 검사지부터 훑도록 뒤집는다.
+    const sheets = [...records]
+      .filter((record) => record.date)
+      .sort((a, b) => (a.date < b.date ? -1 : 1));
+    const source = new Map<string, string | null>();
+
+    // 첫 진료 앞에 검사지가 하나도 없으면 등록을 안내한다.
+    const first = allHospitalVisits[0];
+    if (first && !sheets.some((sheet) => sheet.date < first.date)) {
+      source.set(first.id, null);
+    }
+
+    // 오래된 검사지부터 넣으면, 같은 진료에 여러 검사지가 걸릴 때
+    // 가장 최근 것이 남는다.
+    for (const sheet of sheets) {
+      const target = allHospitalVisits.find((visit) => visit.date > sheet.date);
+      if (target) source.set(target.id, sheet.id);
+    }
+
+    // 자리로 잡힌 진료가 이미 지나갔으면 그 질문을 아직 못 물어봤을 수 있는데,
+    // "예정된 방문" 목록에는 지난 진료가 뜨지 않아 확인할 방법이 없어진다.
+    // 마지막으로 잡힌 자리를 다음 예정 진료로 옮겨준다.
+    //
+    // 옮기는 것은 가장 마지막 자리 하나뿐이다. 지난 자리를 전부 끌어오면 이미
+    // 물어본 오래된 질문까지 다시 뜨고, 예정 진료마다 같은 질문이 반복된다.
+    const today = formatVisitDate(new Date());
+    const nextUpcoming = allHospitalVisits.find((visit) => visit.date >= today);
+    if (nextUpcoming && !source.has(nextUpcoming.id)) {
+      const lastPastWithSlot = allHospitalVisits
+        .filter((visit) => visit.date < today && source.has(visit.id))
+        .pop();
+      if (lastPastWithSlot) {
+        source.set(nextUpcoming.id, source.get(lastPastWithSlot.id) ?? null);
+      }
+    }
+    return source;
+  }, [records, allHospitalVisits]);
+
   const [openQuestions, setOpenQuestions] = useState<string[]>([]);
+  // 한 줄로 줄인 질문 중 사용자가 눌러서 펼쳐 놓은 것들.
+  const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
+  const [questionsLoading, setQuestionsLoading] = useState(false);
 
   useEffect(() => {
-    const date = openVisit?.date;
-    if (!date) {
+    setExpandedQuestions(new Set());
+    if (!openVisitId) {
+      setOpenQuestions([]);
+      return;
+    }
+    const sheetId = questionSourceByVisitId.get(openVisitId) ?? null;
+    if (!sheetId) {
       setOpenQuestions([]);
       return;
     }
     let active = true;
-    getVisitDetail(date).then((detail) => {
+    setQuestionsLoading(true);
+    getQuestionsBySheet(sheetId).then((list) => {
       if (!active) return;
-      const merged = [...detail.suggestedQuestions, ...detail.questions]
-        .map((question) => question.trim())
-        .filter(Boolean);
-      setOpenQuestions([...new Set(merged)]);
+      const texts = list
+        .map((question) => question.content?.trim())
+        .filter((text): text is string => Boolean(text));
+      setOpenQuestions([...new Set(texts)]);
+      setQuestionsLoading(false);
     });
     return () => {
       active = false;
     };
-  }, [openVisit?.date]);
+  }, [openVisitId, questionSourceByVisitId]);
 
 
   const goToMonth = (delta: number) => {
     setMonthCursor(
       (prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1),
-    );
-  };
-
-  // 일정 삭제 — DELETE /api/v1/app/visits/{id}. 지우고 나면 목록과 달력 표시를
-  // 다시 읽어서 원/라벨까지 같이 정리한다.
-  const confirmDelete = async () => {
-    if (!pendingDelete) return;
-    const target = pendingDelete;
-    setPendingDelete(null);
-    setOpenVisitId((open) => (open === target.id ? null : open));
-    await deleteVisit(target.id);
-    setUpcomingVisits(await getVisits());
-    setMonthMarks(
-      await getCalendarMonthMarks(monthCursor.getFullYear(), monthCursor.getMonth()),
     );
   };
 
@@ -397,6 +454,9 @@ export default function Calendar() {
           <View style={styles.visitsCard}>
             <Text style={styles.visitsTitle}>예정된 방문</Text>
             {monthlyHospitalVisits.map((visit, i) => {
+              // 질문을 보여줄 자리가 정해진 진료에만 화살표가 달린다.
+              const hasQuestionSlot = questionSourceByVisitId.has(visit.id);
+              const sourceSheetId = questionSourceByVisitId.get(visit.id) ?? null;
               const isOpen = openVisitId === visit.id;
               return (
                 <View key={visit.id}>
@@ -415,6 +475,7 @@ export default function Calendar() {
                   )}
                   <Pressable
                     style={styles.visitRow}
+                    disabled={!hasQuestionSlot}
                     onPress={() => setOpenVisitId(isOpen ? null : visit.id)}
                   >
                     <View style={styles.visitDateCol}>
@@ -441,39 +502,58 @@ export default function Calendar() {
                     >
                       <EditOutlineIcon size={16} />
                     </Pressable>
-                    <Pressable
-                      style={styles.visitDeleteCol}
-                      hitSlop={10}
-                      onPress={(event) => {
-                        event.stopPropagation();
-                        setPendingDelete(visit);
-                      }}
-                    >
-                      <TrashIcon size={16} />
-                    </Pressable>
-                    <View
-                      style={[styles.visitMarkerCol, isOpen && styles.visitMarkerColOpen]}
-                    >
-                      <UpTriangleIcon size={14} />
-                    </View>
+                    {hasQuestionSlot && (
+                      <View
+                        style={[styles.visitMarkerCol, isOpen && styles.visitMarkerColOpen]}
+                      >
+                        <UpTriangleIcon size={14} />
+                      </View>
+                    )}
                   </Pressable>
 
-                  {/* 일정을 펼치면 그때 물어볼 질문 목록이 나온다. */}
-                  {isOpen && (
+                  {/* 펼치면 직전 검사지에서 나온 질문이 보인다. */}
+                  {hasQuestionSlot && isOpen && (
                     <View style={styles.questionPanel}>
-                      {openQuestions.length === 0 ? (
+                      {!sourceSheetId ? (
+                        <Text style={styles.questionEmptyText}>
+                          검사지를 등록해주세요.
+                        </Text>
+                      ) : questionsLoading ? (
+                        <Text style={styles.questionEmptyText}>
+                          질문을 불러오는 중이에요.
+                        </Text>
+                      ) : openQuestions.length === 0 ? (
                         <Text style={styles.questionEmptyText}>
                           아직 준비된 질문이 없어요. 날짜를 눌러 질문을 추가해보세요.
                         </Text>
                       ) : (
-                        openQuestions.map((question, qi) => (
-                          <View key={qi} style={styles.questionRow}>
-                            <AiQuestionIcon />
-                            <Text style={styles.questionText} numberOfLines={1}>
-                              {question}
-                            </Text>
-                          </View>
-                        ))
+                        openQuestions.map((question, qi) => {
+                          // 질문이 길면 한 줄로 줄여 "..."로 끝나는데, 그러면
+                          // 뒷부분을 볼 방법이 없었다. 누르면 전체가 펼쳐진다.
+                          const expanded = expandedQuestions.has(question);
+                          return (
+                            <Pressable
+                              key={qi}
+                              style={styles.questionRow}
+                              onPress={() =>
+                                setExpandedQuestions((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(question)) next.delete(question);
+                                  else next.add(question);
+                                  return next;
+                                })
+                              }
+                            >
+                              <AiQuestionIcon />
+                              <Text
+                                style={styles.questionText}
+                                numberOfLines={expanded ? undefined : 1}
+                              >
+                                {question}
+                              </Text>
+                            </Pressable>
+                          );
+                        })
                       )}
                     </View>
                   )}
@@ -484,35 +564,6 @@ export default function Calendar() {
           )}
         </ScrollView>
       </SafeAreaView>
-
-      <Modal
-        visible={pendingDelete !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPendingDelete(null)}
-      >
-        <View style={styles.dialogBackdrop}>
-          <View style={styles.dialog}>
-            <Text style={styles.dialogTitle}>일정 삭제</Text>
-            <Text style={styles.dialogQuestion}>이 일정을 삭제하시겠습니까?</Text>
-            <Text style={styles.dialogEmail}>
-              {pendingDelete?.title || pendingDelete?.place || ""}
-            </Text>
-            <Text style={styles.dialogNote}>삭제하면 되돌릴 수 없어요.</Text>
-
-            <View style={styles.dialogDivider} />
-            <View style={styles.dialogActions}>
-              <Pressable style={styles.dialogAction} onPress={() => setPendingDelete(null)}>
-                <Text style={styles.dialogCancelText}>취소</Text>
-              </Pressable>
-              <View style={styles.dialogActionDivider} />
-              <Pressable style={styles.dialogAction} onPress={confirmDelete}>
-                <Text style={styles.dialogConfirmText}>삭제</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       <Modal
         visible={shareDialogOpen}
@@ -828,20 +879,14 @@ const styles = StyleSheet.create({
   },
   visitEditCol: {
     position: "absolute",
-    left: "77%",
+    left: "81.72%",
     width: 16,
     top: 0,
     bottom: 0,
     justifyContent: "center",
   },
-  visitDeleteCol: {
-    position: "absolute",
-    left: "84%",
-    width: 16,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-  },
+  // 접혀 있을 때는 아래(펼칠 수 있다), 펼치면 위(접을 수 있다)를 가리킨다.
+  // 아이콘 자체가 위를 향하고 있어서 접힌 상태에 180도를 준다.
   visitMarkerCol: {
     position: "absolute",
     left: "90%",
@@ -850,10 +895,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: "center",
     alignItems: "center",
-  },
-  // 질문 목록이 열리면 화살표가 아래를 가리킨다.
-  visitMarkerColOpen: {
     transform: [{ rotate: "180deg" }],
+  },
+  visitMarkerColOpen: {
+    transform: [{ rotate: "0deg" }],
   },
   visitDate: {
     textAlign: "center",
@@ -898,6 +943,7 @@ const styles = StyleSheet.create({
     gap: 9,
   },
   questionText: {
+    flexShrink: 1,
     flex: 1,
     color: "#A0A0A0",
     fontSize: 14,

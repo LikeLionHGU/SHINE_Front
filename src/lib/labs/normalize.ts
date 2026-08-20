@@ -38,6 +38,31 @@ export function coreName(raw: string): string {
   return t.replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * 별칭 뒤에 이게 붙어 있으면 "같은 이름의 다른 검사"다 — 부분포함 매칭에서 제외한다.
+ * (normalizeKey를 통과한 뒤의 형태로 적는다: 소문자·공백/괄호 제거)
+ */
+const DISCRIMINATORS = [
+  'igm', 'iga', 'ige',                 // 항체 클래스가 다르면 다른 검사다
+  'mpv', 'pdw', 'pct', 'plcr',         // 혈소판 수가 아니라 부수 지표
+  'width', 'distribution', '분포', '폭', '용적', '부피',
+  'ratio', '비율', '지수', 'index',
+  'sd', 'cv', '편차', '변동',
+];
+
+/**
+ * 현미경 계수 단위. 요침사의 'WBC 0-3 /HPF'는 혈액 백혈구와 이름만 같을 뿐
+ * 완전히 다른 검사인데, 별칭이 정확히 'wbc'라 exact 매칭에 그대로 걸린다.
+ * 단위로 검체를 구분해 잘못 붙는 것을 막는다.
+ */
+const MICROSCOPY_UNITS = ['hpf', 'lpf', 'ul현미경'];
+
+export function isMicroscopyUnit(unit?: string): boolean {
+  if (!unit) return false;
+  const u = normalizeKey(unit);
+  return MICROSCOPY_UNITS.some((m) => u.includes(m));
+}
+
 export interface MatchResult {
   item: LabItem | null;
   matchType: 'exact' | 'normalized' | 'contains' | 'none';
@@ -74,14 +99,35 @@ export function matchItem(rawName: string, items: LabItem[]): MatchResult {
     }
   }
 
+  // 부분포함 매칭은 "같은 검사인데 이름만 다르게 적힌 경우"를 잡으라고 둔 것이지,
+  // "이름이 겹치는 다른 검사"까지 끌어오라는 게 아니다. 실제 검사지에서 이렇게 잘못 붙었다:
+  //   풍진항체(IgM)               → rubella_igg  (IgG와 IgM은 다른 검사)
+  //   Platelet Distribution Width → platelet     (혈소판 수가 아니라 분포폭)
+  // 잘못 붙으면 판정이 틀리는 데서 끝나지 않는다. 같은 itemId가 두 개 생겨서
+  // evaluate의 중복 병합이 "같은 항목이 다른 값으로 읽혔다"고 보고 멀쩡한 항목의
+  // 판정까지 거둬버린다(→ 화면 전체가 '확인 필요'로 덮인다).
   if (key.length >= 4) {
+    const hits = new Map<string, LabItem>();
     for (const item of items) {
       for (const a of item.aliases) {
         const ak = normalizeKey(a);
-        if (ak.length >= 4 && (key.includes(ak) || ak.includes(key))) {
-          return { item, matchType: 'contains' };
-        }
+        if (ak.length < 4) continue;
+        if (!key.includes(ak) && !ak.includes(key)) continue;
+        // 별칭을 뺀 나머지에 '다른 검사임을 뜻하는 말'이 남아 있으면 붙이지 않는다.
+        const leftover = key.length >= ak.length ? key.split(ak).join('') : '';
+        if (DISCRIMINATORS.some((d) => leftover.includes(d))) continue;
+        hits.set(item.id, item);
       }
+    }
+    // 후보가 둘 이상이면 어느 쪽인지 확신할 수 없으므로 매칭하지 않는다.
+    if (hits.size === 1) {
+      return { item: Array.from(hits.values())[0], matchType: 'contains' };
+    }
+    if (hits.size > 1) {
+      return {
+        item: null, matchType: 'none',
+        reason: `'${raw}'이(가) 여러 항목(${Array.from(hits.keys()).join(', ')})에 걸쳐 매칭돼 판정하지 않음`,
+      };
     }
   }
   return { item: null, matchType: 'none', reason: `'${raw}'에 해당하는 항목을 찾지 못함` };
@@ -100,16 +146,64 @@ export interface UnitConversion {
   error?: string;
 }
 
+const SUPERSCRIPT: Record<string, string> = {
+  '\u2070': '0', '\u00B9': '1', '\u00B2': '2', '\u00B3': '3', '\u2074': '4',
+  '\u2075': '5', '\u2076': '6', '\u2077': '7', '\u2078': '8', '\u2079': '9',
+  '\u207B': '-',
+};
+
+/**
+ * 단위 표기를 하나로 맞춘다.
+ *
+ * 검사지(와 그걸 읽은 OCR)는 같은 단위를 제각각 적는다:
+ *   10^3/uL · 10^3/µL · 10³/μL · x10^3/uL · 10E3/uL · ㎕
+ * 기준표에는 'uL' 한 가지로만 적혀 있어서, µ(U+00B5)나 μ(U+03BC)가 섞여 들어오면
+ * convertUnit이 "알 수 없는 단위"로 판정을 보류해 버렸다. 실제로 혈소판이
+ * '10^3/µL'로 읽히는 바람에 멀쩡한 값이 계속 '확인 필요'로 떴다.
+ *
+ * 주의: NFKC는 위첨자 ³을 그냥 '3'으로 바꿔 '10³'을 '103'으로 만들어 버린다.
+ * 그래서 위첨자를 '^3'으로 먼저 펴고 나서 NFKC를 태운다.
+ */
+export function normalizeUnit(raw: string): string {
+  let u = (raw ?? '').trim();
+  if (!u) return '';
+
+  // 1) 위첨자 → ^n  ("10³" → "10^3").  NFKC보다 반드시 먼저.
+  u = u.replace(/[\u2070\u00B9\u00B2\u00B3\u2074-\u2079\u207B]+/g, (m) =>
+    '^' + Array.from(m).map((c) => SUPERSCRIPT[c] ?? '').join(''),
+  );
+
+  // 2) 호환 문자 정규화 (㎕ → μl 등). Hermes에 normalize가 없는 빌드가 있다.
+  if (typeof (u as any).normalize === 'function') u = u.normalize('NFKC');
+
+  u = u.toLowerCase();
+
+  // 3) 마이크로 기호 통일: µ(U+00B5) · μ(U+03BC) → u
+  u = u.replace(/[\u00B5\u03BC]/g, 'u');
+
+  // 4) 곱셈 접두사 제거 ("x10^3/ul", "×10³/µl")
+  u = u.replace(/^[x\u00D7*\u00B7]\s*/, '');
+
+  // 5) 지수 표기 통일 ("10e3" → "10^3")
+  u = u.replace(/(\d)e(\d)/g, '$1^$2');
+
+  // 6) 공백·쉼표·괄호 제거, 맨 앞 '/'는 떼어낸다("/uL"과 "uL"을 같게 본다)
+  u = u.replace(/[\s,()]/g, '').replace(/^\//, '');
+
+  return u;
+}
+
 /** 검사지 단위를 항목 표준 단위로 환산. 모르는 단위면 환산하지 않고 error를 남긴다. */
 export function convertUnit(value: number, unit: string | undefined, item: LabItem): UnitConversion {
   if (!unit) return { value, converted: false };
   const u = unit.trim();
   const std = item.unit.trim();
-  if (normalizeKey(u) === normalizeKey(std)) return { value, converted: false };
+  const key = normalizeUnit(u);
+  if (key === normalizeUnit(std)) return { value, converted: false };
 
   const aliases = item.unitAliases ?? {};
   for (const [k, factor] of Object.entries(aliases)) {
-    if (normalizeKey(k) === normalizeKey(u)) {
+    if (normalizeUnit(k) === key) {
       return { value: roundFloat(value * factor), converted: true, from: u, factor };
     }
   }
@@ -179,14 +273,23 @@ export function isEmptyValue(raw: string | undefined): boolean {
 
 export function normalizeQualitative(raw: string, extra?: Record<string, string>): 'positive' | 'negative' | undefined {
   const s = raw.trim().toLowerCase().replace(/\s/g, '');
-  if (extra) {
-    for (const [k, v] of Object.entries(extra)) {
-      if (k.toLowerCase().replace(/\s/g, '') === s) return v as 'positive' | 'negative';
+  // 검사지는 정성 결과 옆에 측정치를 괄호로 덧붙이는 경우가 많다
+  // ("음성(4.80)", "양성(>500)"). 괄호를 떼기 전 형태로 먼저 맞춰보고,
+  // 안 맞으면 뗀 형태로 한 번 더 본다. 이걸 안 하면 멀쩡한 음성/양성 결과가
+  // '해석하지 못했습니다'로 떨어져 판정이 통째로 보류된다.
+  const stripped = s.replace(/\([^)]*\)/g, '').trim();
+  const forms = stripped && stripped !== s ? [s, stripped] : [s];
+
+  for (const f of forms) {
+    if (extra) {
+      for (const [k, v] of Object.entries(extra)) {
+        if (k.toLowerCase().replace(/\s/g, '') === f) return v as 'positive' | 'negative';
+      }
     }
+    // 주의: '-'는 여기서 음성으로 해석하지 않는다. 검사지에서 '-'는 '결과 없음'인 경우가 더 많다.
+    if (['음성', 'negative', 'neg', 'nonreactive', 'non-reactive', '비반응'].includes(f)) return 'negative';
+    if (['양성', 'positive', 'pos', '+', 'reactive', '반응'].includes(f)) return 'positive';
   }
-  // 주의: '-'는 여기서 음성으로 해석하지 않는다. 검사지에서 '-'는 '결과 없음'인 경우가 더 많다.
-  if (['음성', 'negative', 'neg', 'nonreactive', 'non-reactive', '비반응'].includes(s)) return 'negative';
-  if (['양성', 'positive', 'pos', '+', 'reactive', '반응'].includes(s)) return 'positive';
   return undefined;
 }
 

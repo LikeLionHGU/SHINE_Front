@@ -7,16 +7,14 @@ import {
 } from "@/components/icons";
 import { StatusBadge } from "@/components/status-badge";
 import {
+  createQuestion,
   getQuestionsBySheet,
   getRecordDetail,
-  getVisits,
-  getVisitQuestions,
-  saveVisitQuestions,
-  formatVisitDate,
+  submitReport,
 } from "@/lib/api";
 import { reanalyzeItems, buildEngineQuestions, buildEngineSummary } from "@/lib/labs/bridge";
 import { generateReportInsights } from "@/lib/insights";
-import { centeredContentStyle, centeredSheetStyle, visitDateLabel } from "@/lib/layout";
+import { centeredContentStyle, centeredSheetStyle } from "@/lib/layout";
 import { currentPregnancyWeek } from "@/lib/pregnancy";
 import {
   DEMO_SUMMARY,
@@ -86,6 +84,12 @@ type ReportView = {
   sources?: { label: string; url: string; badge: string }[];
   /** 판정에 쓴 임신 주차. 엔진이 만드는 종합 소견 문장에 쓴다. */
   gestationalWeek?: number;
+  /** 검사지에 인쇄된 검사일("26.08.20"). 서버 저장 때 함께 보낸다. */
+  testDate?: string;
+  /** 서버가 발급한 검사지 id. 있으면 이미 저장된 검사지다. */
+  testSheetId?: number;
+  /** 서버가 계산한 검사 당시 임신 주차 스냅샷. */
+  week?: string;
   /** 서버에서 불러온 지난 검사지인지. 이때는 없는 값을 데모로 채우지 않는다. */
   fromServer?: boolean;
 };
@@ -103,6 +107,15 @@ export default function AnalysisReport() {
   const [question, setQuestion] = useState("");
   const [sendingQuestion, setSendingQuestion] = useState(false);
   const [questionNotice, setQuestionNotice] = useState<string | null>(null);
+  // AI가 추천 질문을 만드는 중인지. 만드는 동안 카드가 비어 보이지 않게 한다.
+  const [generatingInsights, setGeneratingInsights] = useState(false);
+  // AI 질문 생성이 왜 실패했는지. 개발 중에만 화면에 띄워 원인을 바로 본다.
+  const [insightsError, setInsightsError] = useState<string | null>(null);
+  // 서버 저장(POST /reports)은 사용자가 "저장하기"를 누를 때만 한다.
+  const [savingToServer, setSavingToServer] = useState(false);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  // 서버에 저장한 뒤 값을 고쳤는지. 고쳤으면 다시 저장할 수 있게 버튼을 되살린다.
+  const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [activeItemIndex, setActiveItemIndex] = useState<number | null>(null);
   // OCR이 잘못 읽었을 때 사용자가 직접 고치는 흐름. 고치면 그 자리에서 다시 판정한다.
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -206,6 +219,57 @@ export default function AnalysisReport() {
             return value;
           }
         })
+        // 추천 질문·종합 소견이 비어 있으면 여기서 AI에게 만들게 한다.
+        //
+        // 예전에는 검사지를 올리는 순간(scan/analyzing.tsx)에만 만들었다. 그래서
+        // 기록 탭에서 지난 검사지를 열거나, 재판정을 거친 화면에서는 질문이 비어
+        // 엔진이 만든 기계적인 문장으로 떨어졌다. 한 번 만들면 수정분 저장소에
+        // 캐시하므로 화면에 들어올 때마다 다시 부르지는 않는다.
+        .then(async (value) => {
+          if (!value?.items?.length) return value;
+          const hasQuestions = (value.questions ?? []).some((q) => q.trim());
+          const hasSummary = !!value.summary?.trim();
+          if (hasQuestions && hasSummary) return value;
+
+          if (active) setGeneratingInsights(true);
+          try {
+            const gestationalWeek =
+              value.gestationalWeek ?? (await currentPregnancyWeek());
+            const insights = await generateReportInsights(value.items, {
+              gestationalWeek,
+            });
+            const next = {
+              ...value,
+              gestationalWeek,
+              summary: hasSummary ? value.summary : insights.summary,
+              questions: hasQuestions ? value.questions : insights.questions,
+              foods: value.foods?.length ? value.foods : insights.foods,
+            };
+            // 다음 진입 때 또 부르지 않도록 저장해 둔다.
+            await saveReportEdits(editsKey, {
+              items: next.items!,
+              summary: next.summary,
+              questions: next.questions,
+              foods: next.foods,
+              crossFindings: next.crossFindings,
+              unsupported: next.unsupported,
+              sources: next.sources,
+              signature: reportSignature(next.items),
+            }).catch(() => {});
+            return next;
+          } catch (error) {
+            // 실패하면 엔진이 만든 질문으로 화면을 채운다(아래 렌더에서 처리).
+            console.warn("[report] AI 추천 질문 생성 실패:", error);
+            if (active) {
+              setInsightsError(
+                error instanceof Error ? error.message : String(error),
+              );
+            }
+            return value;
+          } finally {
+            if (active) setGeneratingInsights(false);
+          }
+        })
         .then((value) => {
           if (active) {
             setReport(value);
@@ -242,6 +306,81 @@ export default function AnalysisReport() {
         trendNote: activeItem.trendNote,
       }
     : null;
+
+  /**
+   * 확인이 끝난 검사지를 서버에 저장한다(POST /reports).
+   *
+   * 스캔 직후 자동으로 보내지 않는 이유: 그 시점의 값은 아직 사용자가 확인하기
+   * 전이라, OCR이 잘못 읽은 수치가 그대로 기록으로 남는다. 값을 고칠 수 있는
+   * 화면에서 "저장하기"를 눌렀을 때만 보낸다.
+   */
+  async function saveToServer() {
+    if (!report?.items?.length || savingToServer) return;
+    setSavingToServer(true);
+    try {
+      const corrected = await submitReport({
+        testDate: report.testDate,
+        items: report.items,
+        summary: report.summary,
+        questions: report.questions,
+        foods: report.foods,
+      });
+
+      // 서버도 임신 기준으로 다시 판정해 돌려주지만 그 판정에는 근거(출처)가 없다.
+      // 판정·설명·근거는 엔진 결과를 유지하고, 서버에서는 카탈로그 대표명만 빌려온다.
+      let items = report.items;
+      if (corrected?.items?.length && items.length === corrected.items.length) {
+        items = items.map((item, i) => {
+          const fromServer = corrected.items[i];
+          if (!fromServer) return item;
+          if (!item.engineStatus) {
+            // 엔진이 모르는 항목 → 서버 판정을 쓰되 원문명은 유지한다.
+            return { ...fromServer, originalName: item.originalName ?? item.name };
+          }
+          const displayName = fromServer.name || item.name;
+          return {
+            ...item,
+            name: displayName,
+            originalName:
+              item.originalName ?? (displayName !== item.name ? item.name : undefined),
+          };
+        });
+      }
+
+      const next: ReportView = {
+        ...report,
+        items,
+        testSheetId: corrected?.testSheetId,
+        week: corrected?.week,
+        testDate: corrected?.testDate ?? report.testDate,
+      };
+      setReport(next);
+
+      if (report.uri) {
+        await saveLastReport({
+          uri: report.uri,
+          items,
+          testDate: next.testDate,
+          summary: report.summary,
+          questions: report.questions,
+          foods: report.foods,
+          crossFindings: report.crossFindings,
+          unsupported: report.unsupported,
+          sources: report.sources,
+          testSheetId: next.testSheetId,
+          week: next.week,
+        }).catch(() => {});
+      }
+      setUnsavedChanges(false);
+      setSaveNotice("기록에 저장했어요.");
+    } catch (error) {
+      console.warn("[report] 검사지 서버 저장 실패:", error);
+      setSaveNotice("저장하지 못했어요. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setSavingToServer(false);
+      setTimeout(() => setSaveNotice(null), 2600);
+    }
+  }
 
   /** 사용자가 고친 값으로 그 항목만 다시 판정하고 저장한다. */
   async function applyEdit() {
@@ -315,18 +454,24 @@ export default function AnalysisReport() {
       }).catch(() => {});
 
       // 방금 올린 검사지라면 원본(마지막 리포트)도 함께 갱신해 둔다.
+      // 서버 식별자(testSheetId·week·testDate)는 지우지 않고 그대로 넘긴다.
       if (report.uri) {
         await saveLastReport({
           uri: report.uri,
           items: re.items,
+          testDate: report.testDate,
           summary,
           questions,
           foods,
           crossFindings: re.crossFindings,
           unsupported: re.unsupported,
           sources: re.sources,
+          testSheetId: report.testSheetId,
+          week: report.week,
         }).catch(() => {});
       }
+      // 이미 서버에 저장한 검사지라면, 고친 값을 다시 올릴 수 있게 버튼을 되살린다.
+      if (report.testSheetId) setUnsavedChanges(true);
     } finally {
       setSaving(false);
       setEditingIndex(null);
@@ -334,30 +479,25 @@ export default function AnalysisReport() {
     }
   }
 
-  /** 직접 적은 질문을 다음 산부인과 진료 질문 목록에 추가한다. */
+  /**
+   * 직접 적은 질문을 서버에 올린다.
+   *
+   * 지금 보고 있는 검사지가 있으면 그 검사지에 달아서, 캘린더에서 그 검사지
+   * 다음 진료를 펼쳤을 때 추천 질문과 함께 보이게 한다.
+   * (예전에는 그 날 일정의 questions 배열을 통째로 교체하는 방식이라,
+   *  일정이 없는 날은 서버에 붙을 곳이 없어 기기에만 남았다.)
+   */
   async function submitQuestion() {
     const text = question.trim();
     if (!text || sendingQuestion) return;
     setSendingQuestion(true);
     try {
-      // 이 앱의 날짜 포맷은 ISO가 아니라 "26.08.16"(YY.MM.DD)이다.
-      // 문자열 비교로도 시간순 정렬이 되는 포맷이라 그대로 비교·정렬해도 안전하다.
-      const today = formatVisitDate(new Date());
-      const visits = await getVisits().catch(() => []);
-      const upcoming = visits
-        .filter((v) => v.isHospital && v.date >= today)
-        .sort((a, b) => a.date.localeCompare(b.date))[0];
-      const date = upcoming?.date ?? today;
-
-      const existing = await getVisitQuestions(date).catch(() => [] as string[]);
-      if (existing.some((q) => q.trim() === text)) {
-        setQuestionNotice("이미 추가된 질문이에요.");
-      } else {
-        await saveVisitQuestions(date, [...existing, text]);
-        setQuestionNotice(`${visitDateLabel(date)} 진료 질문에 추가했어요.`);
-      }
+      await createQuestion(text, recordId ?? null);
       setQuestion("");
-    } catch {
+      setQuestionNotice("다음 진료 질문에 추가했어요.");
+    } catch (error) {
+      // 실패를 조용히 넘기면 사용자는 저장된 줄 안다. 반드시 알린다.
+      console.warn("[report] 질문 저장 실패:", error);
       setQuestionNotice("질문을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
       setSendingQuestion(false);
@@ -395,9 +535,13 @@ export default function AnalysisReport() {
           <Pressable hitSlop={8} onPress={goBack}>
             <BackChevronIcon size={24} />
           </Pressable>
-          <Text style={styles.headerTitle} pointerEvents="none">
-            분석
-          </Text>
+          {/* 기록 탭에서 지난 검사지를 열었을 때는 제목을 두지 않는다.
+              분석 탭 스택에서 온 경우에만 "분석"을 보여준다. */}
+          {from !== "record" && (
+            <Text style={styles.headerTitle} pointerEvents="none">
+              분석
+            </Text>
+          )}
           <Pressable hitSlop={8} onPress={() => router.replace("/(tabs)/home")}>
             <CloseIcon size={24} />
           </Pressable>
@@ -582,10 +726,7 @@ export default function AnalysisReport() {
                               {item.value || "-"}
                             </Text>
                             <View style={styles.colStatus}>
-                              <StatusBadge
-                                status={item.status}
-                                label={item.badgeLabel}
-                              />
+                              <StatusBadge status={item.status} />
                             </View>
                           </Pressable>
                         ))}
@@ -654,6 +795,13 @@ export default function AnalysisReport() {
                 // 저장된 AI 질문이 있으면 그걸 쓰고, 없으면 판정 결과로 즉석에서 만든다.
                 // 예전에는 여기서 DEMO 예시("Ex) 당 수치가…")로 떨어졌는데, 내 검사지와
                 // 아무 상관 없는 문장이라 사용자에게는 앱이 동작하지 않는 것으로 보였다.
+                if (generatingInsights) {
+                  return (
+                    <Text style={styles.cardHint}>
+                      검사 결과를 바탕으로 질문을 만드는 중이에요…
+                    </Text>
+                  );
+                }
                 const saved = report.questions?.filter((q) => q.trim()) ?? [];
                 const list = saved.length > 0 ? saved : buildEngineQuestions(report.items ?? []);
                 if (list.length > 0) {
@@ -672,6 +820,11 @@ export default function AnalysisReport() {
                   </Text>
                 );
               })()}
+              {/* 개발 중에만 보이는 진단 문구. AI가 실패하면 엔진 문장으로 대체되는데,
+                  그 사실이 화면에 안 보이면 "AI가 만든 질문"으로 오해하게 된다. */}
+              {__DEV__ && !!insightsError && (
+                <Text style={styles.debugNote}>AI 질문 생성 실패 · {insightsError}</Text>
+              )}
               <View style={styles.inputWrap}>
                 <TextInput
                   value={question}
@@ -737,6 +890,43 @@ export default function AnalysisReport() {
                   </Text>
                 ))}
             </View>
+            {/* 방금 올린 검사지이고 아직 서버에 저장하지 않았을 때만 보여준다.
+                스캔 직후 자동 전송을 없앤 대신, 값을 확인·수정한 뒤 여기서 저장한다. */}
+            {report.uri && !report.fromServer && (
+              <View style={styles.saveBox}>
+                {report.testSheetId && !unsavedChanges ? (
+                  <Text style={styles.savedText}>
+                    기록에 저장됨{report.week ? ` · ${report.week}` : ""}
+                  </Text>
+                ) : (
+                  <>
+                    <Text style={styles.saveHint}>
+                      {unsavedChanges
+                        ? "수정한 값이 아직 기록에 반영되지 않았어요."
+                        : "수치를 확인하고 저장하면 기록 탭에서 다시 볼 수 있어요."}
+                    </Text>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.saveButton,
+                        (savingToServer || !report.items?.length) && styles.saveDisabled,
+                        pressed && styles.pressed,
+                      ]}
+                      onPress={saveToServer}
+                      disabled={savingToServer || !report.items?.length}
+                    >
+                      <Text style={styles.saveButtonText}>
+                        {savingToServer
+                          ? "저장하는 중…"
+                          : unsavedChanges
+                            ? "수정한 값으로 다시 저장"
+                            : "저장하기"}
+                      </Text>
+                    </Pressable>
+                  </>
+                )}
+                {!!saveNotice && <Text style={styles.saveNotice}>{saveNotice}</Text>}
+              </View>
+            )}
           </ScrollView>
         )}
       </SafeAreaView>
@@ -762,7 +952,7 @@ export default function AnalysisReport() {
                     {detail.originalName}
                   </Text>
                 )}
-                <StatusBadge status={detail.status} label={detail.badgeLabel} />
+                <StatusBadge status={detail.status} />
               </View>
               {!!detail.definition && (
                 <Text style={styles.sheetDefinition}>{detail.definition}</Text>
@@ -773,6 +963,13 @@ export default function AnalysisReport() {
                 showsVerticalScrollIndicator={false}
               >
                 <Text style={styles.sheetVerdict}>{detail.verdict}</Text>
+                {/* 칩에서 뺀 세부 판정("중등도 빈혈", "기준 없음")은 여기서 되살린다.
+                    표에서는 심각도만 보이고, 자세한 말은 열어봤을 때 나오게 한다. */}
+                {!!detail.badgeLabel && detail.badgeLabel !== detail.status && (
+                  <View style={styles.basisChip}>
+                    <Text style={styles.basisText}>판정 · {detail.badgeLabel}</Text>
+                  </View>
+                )}
                 {/* 무엇과 비교해서 나온 판정인지 — 사용자가 가장 먼저 궁금해하는 것. */}
                 {!!detail.basisLabel && (
                   <View style={styles.basisChip}>
@@ -811,7 +1008,7 @@ export default function AnalysisReport() {
                   }}
                 >
                   <Text style={styles.editBtnText}>
-                    {detail.status === "미분류"
+                    {detail.status === "확인 필요"
                       ? "숫자를 직접 입력하기"
                       : "숫자가 잘못 읽혔나요? 수정하기"}
                   </Text>
@@ -1173,6 +1370,21 @@ const styles = StyleSheet.create({
   sendArrow: { color: "#FA0C56", fontFamily: "Pretendard-SemiBold", fontSize: 18, paddingHorizontal: 6 },
   sendDisabled: { opacity: 0.4 },
   sentNotice: { marginTop: 6, color: "#3A6B5C", fontFamily: "Pretendard-Medium", fontSize: 12 },
+
+  debugNote: { color: "#B03A2E", fontFamily: "Pretendard-Regular", fontSize: 11, lineHeight: 16 },
+  saveBox: { marginTop: 4, gap: 8, alignItems: "stretch" },
+  saveHint: { textAlign: "center", color: "#8A8A82", fontFamily: "Pretendard-Regular", fontSize: 12.5 },
+  saveButton: {
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: "#FA0C56",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveButtonText: { color: "#FFFDF9", fontFamily: "Pretendard-SemiBold", fontSize: 16 },
+  saveDisabled: { opacity: 0.45 },
+  savedText: { textAlign: "center", color: "#2E7D52", fontFamily: "Pretendard-Medium", fontSize: 13 },
+  saveNotice: { textAlign: "center", color: "#3A6B5C", fontFamily: "Pretendard-Medium", fontSize: 12 },
 
   sheetScroll: { maxHeight: 320 },
   basisChip: {

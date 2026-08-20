@@ -160,9 +160,35 @@ export function takePendingScan(uri: string): PendingScan | null {
 export const DEMO_SUMMARY =
   "관련 결과 전체적으로 안정적인 수치를 띄며 B형·C형 간염, 매독, HIV 검사에서 모두 이상이 발견되지 않았어요.\n지금 시기에는 비타민 D를 충분히 보충해주는 것이 좋아요.";
 
-// "미분류"는 서버가 판정하지 못한 항목(카탈로그 미매칭, 혈액형처럼 정상/이상 개념이
-// 없는 항목)이다. OCR은 이 값을 만들지 않고, 지난 검사지를 서버에서 불러올 때만 나온다.
-export type IndicatorStatus = "안심" | "주의" | "위험" | "미분류";
+/**
+ * 화면에 뜨는 상태 칩은 이 네 가지뿐이다.
+ *
+ *   안심 · 주의 · 위험  — 판정이 선 경우
+ *   확인 필요           — 값을 못 받아왔거나(결과 없음·자릿수 의심),
+ *                        그 값에 대한 판정 기준이 없는 경우
+ *
+ * "중등도 빈혈", "면역 있음", "기준 없음" 같은 세부 라벨은 칩에 쓰지 않고
+ * badgeLabel로 따로 들고 다니다가 상세 시트에서만 보여준다. 칩이 항목마다
+ * 다른 글자를 달고 있으면 표를 훑을 때 심각도가 한눈에 안 들어온다.
+ */
+export type IndicatorStatus = "안심" | "주의" | "위험" | "확인 필요";
+
+/**
+ * 서버 응답이나 구버전 저장본이 주는 상태 문자열("미분류", 빈 값 등)을
+ * 위 네 가지 중 하나로 맞춘다. 모르는 값은 전부 "확인 필요"로 모은다.
+ */
+export function normalizeIndicatorStatus(s: string | null | undefined): IndicatorStatus {
+  switch ((s ?? "").trim()) {
+    case "안심":
+      return "안심";
+    case "주의":
+      return "주의";
+    case "위험":
+      return "위험";
+    default:
+      return "확인 필요";
+  }
+}
 
 // lib/ocr.ts(OpenAI Vision)가 검사지 사진에서 실제로 읽어낸 한 줄.
 // definition/verdict는 report.tsx의 지표 상세 하단 시트(기존 DEMO_INDICATORS와
