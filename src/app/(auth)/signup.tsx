@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useScrollToTop } from "@/lib/use-scroll-top";
 import { headerBar } from "@/lib/theme";
 import {
   Pressable,
@@ -44,6 +45,8 @@ function formatPhone(value: string) {
 // 두 프레임은 입력 전/후 상태 차이일 뿐이라 화면 하나에서
 // 폼 상태로 처리한다 (플레이스홀더 vs 입력값 텍스트).
 export default function Signup() {
+  // 화면에 들어올 때마다 스크롤을 맨 위로 되돌린다.
+  const scrollRef = useScrollToTop();
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -100,7 +103,7 @@ export default function Signup() {
           </View>
         </View>
 
-        <ScrollView
+        <ScrollView ref={scrollRef}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >

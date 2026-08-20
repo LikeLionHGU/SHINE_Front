@@ -4,6 +4,27 @@ import type { ParsedTestItem } from "@/lib/report";
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
 const OPENAI_MODEL = process.env.EXPO_PUBLIC_OPENAI_MODEL || "gpt-4o-mini";
 
+/**
+ * AI 요약·질문 생성을 통째로 끄는 스위치 (.env의 EXPO_PUBLIC_DISABLE_AI_INSIGHTS=1).
+ *
+ * 왜 필요한가: OpenAI 하루 요청 한도(RPD)에 걸리면 이 호출만 429로 실패한다.
+ * 화면은 판정 엔진이 만든 문장으로 대체되어 정상 동작하지만, 시연 중에 굳이
+ * 실패할 호출을 보낼 이유가 없다. 미리 꺼두면 대기 시간도, 오류 문구도 없다.
+ *
+ * 검사지 OCR(lib/ocr.ts)은 이 스위치와 무관하다 — 그건 없으면 화면 자체가 못 뜬다.
+ */
+export const AI_INSIGHTS_DISABLED =
+  process.env.EXPO_PUBLIC_DISABLE_AI_INSIGHTS === "1" ||
+  process.env.EXPO_PUBLIC_DISABLE_AI_INSIGHTS === "true";
+
+/** 스위치가 꺼져 있어 건너뛴 것인지, 진짜 실패인지 호출부가 구분하려고 쓴다. */
+export class AiInsightsDisabledError extends Error {
+  constructor() {
+    super("AI 요약이 꺼져 있어요 (EXPO_PUBLIC_DISABLE_AI_INSIGHTS)");
+    this.name = "AiInsightsDisabledError";
+  }
+}
+
 // 판정은 이미 lib/labs(학회 기준표 lookup)가 끝냈다. 이 프롬프트는 "이미 정해진
 // 판정과 문구 안에서" 요약·질문·음식만 쓰게 제한한다. 모델이 판정을 바꾸거나
 // 없는 항목을 지어내지 못하도록 규칙을 앞에 못 박아 둔다.
@@ -202,10 +223,44 @@ function weekContext(week?: number): string {
   return `임신 주차: ${week}주차 (${trimester})\n이 주차의 산전검사 맥락: ${schedule}`;
 }
 
+/**
+ * 요청 한도(429)에 걸린 시각 + 서버가 알려준 재시도 가능 시각.
+ *
+ * 한도에 걸린 뒤에도 화면에 들어올 때마다 다시 부르면, 될 리 없는 요청으로
+ * 남은 한도를 계속 갉아먹고 한도가 풀리는 시점만 뒤로 밀린다. 서버가 알려준
+ * 시각까지는 아예 부르지 않고 즉시 실패시킨다 — 화면은 판정 엔진이 만든
+ * 문장으로 채워지므로 사용자에게는 빈 화면이 보이지 않는다.
+ */
+let rateLimitedUntil = 0;
+
+/** "Please try again in 28m48s" · "try again in 1.5s"에서 남은 시간(ms)을 읽는다. */
+function retryAfterMs(errText: string): number {
+  const withMinutes = errText.match(/try again in (\d+)m([\d.]+)s/i);
+  if (withMinutes) {
+    return (Number(withMinutes[1]) * 60 + Number(withMinutes[2])) * 1000;
+  }
+  const seconds = errText.match(/try again in ([\d.]+)s/i);
+  if (seconds) return Number(seconds[1]) * 1000;
+  // 알려주지 않으면 1분 뒤에 다시 본다.
+  return 60_000;
+}
+
 export async function generateReportInsights(
   items: ParsedTestItem[],
   ctx: InsightContext = {},
 ): Promise<ReportInsights> {
+  // 스위치가 켜져 있으면 호출하지 않는다. 호출부는 이 오류를 받고
+  // 판정 엔진이 만든 문장으로 채운다.
+  if (AI_INSIGHTS_DISABLED) throw new AiInsightsDisabledError();
+
+  const waitMs = rateLimitedUntil - Date.now();
+  if (waitMs > 0) {
+    const minutes = Math.floor(waitMs / 60_000);
+    const seconds = Math.ceil((waitMs % 60_000) / 1000);
+    throw new Error(
+      `OpenAI 요청 한도를 다 써서 ${minutes > 0 ? `${minutes}분 ` : ""}${seconds}초 뒤에 다시 시도할 수 있어요.`,
+    );
+  }
   if (!OPENAI_API_KEY) {
     throw new Error(
       "OpenAI API 키가 설정되지 않았어요. .env 파일에 EXPO_PUBLIC_OPENAI_API_KEY를 추가하고 개발 서버를 재시작해주세요.",
@@ -256,6 +311,14 @@ export async function generateReportInsights(
 
   if (!response.ok) {
     const errText = await response.text().catch(() => "");
+    // 429는 "지금은 안 된다"는 뜻이지 고칠 수 있는 오류가 아니다.
+    // 풀릴 때까지 더 부르지 않도록 잠가둔다.
+    if (response.status === 429) {
+      rateLimitedUntil = Date.now() + retryAfterMs(errText);
+      console.warn(
+        `[insights] OpenAI 요청 한도 초과. ${Math.ceil((rateLimitedUntil - Date.now()) / 1000)}초 동안 호출을 멈춥니다.`,
+      );
+    }
     throw new Error(`OpenAI 요청 실패 (${response.status}): ${errText.slice(0, 300)}`);
   }
 

@@ -5,6 +5,7 @@ import {
   EditOutlineIcon,
   UpTriangleIcon,
 } from "@/components/icons";
+import { useScrollToTop } from "@/lib/use-scroll-top";
 import { headerBar } from "@/lib/theme";
 import { centeredContentStyle } from "@/lib/layout";
 import {
@@ -136,6 +137,8 @@ function buildMonthWeeks(
 }
 
 export default function Calendar() {
+  // 화면에 들어올 때마다 스크롤을 맨 위로 되돌린다.
+  const scrollRef = useScrollToTop();
   const [monthCursor, setMonthCursor] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -318,7 +321,7 @@ export default function Calendar() {
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView style={centeredContentStyle} contentContainerStyle={styles.scrollContent}>
+        <ScrollView ref={scrollRef} style={centeredContentStyle} contentContainerStyle={styles.scrollContent}>
           {/* 안내 말풍선(디자인 y=118)은 헤더와 월 선택 줄 사이에 놓인다. */}
           <View style={styles.calloutRow}>
             {calloutVisible && (

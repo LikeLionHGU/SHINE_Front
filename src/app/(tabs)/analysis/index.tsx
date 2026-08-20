@@ -1,4 +1,5 @@
 import { BackChevronIcon, ChevronRightIcon, SearchIcon } from "@/components/icons";
+import { useScrollToTop } from "@/lib/use-scroll-top";
 import { cardShadow, colors, font, headerBar, radius, tracking } from "@/lib/theme";
 import { StatusBadge } from "@/components/status-badge";
 import { baselineOf, MiniTrendLine } from "@/components/trend-chart";
@@ -18,6 +19,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 // 날짜를 오갈 수 있다(라벨 이동). 행을 누르면 개별 추이 상세
 // ([indicatorId].tsx, node 837:5500)로 이동한다.
 export default function Analysis() {
+  // 화면에 들어올 때마다 스크롤을 맨 위로 되돌린다.
+  const scrollRef = useScrollToTop();
   const router = useRouter();
   const [checking, setChecking] = useState(true);
   const [query, setQuery] = useState("");
@@ -103,7 +106,7 @@ export default function Analysis() {
         )}
 
         {indicators.length > 0 && (
-          <ScrollView style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <ScrollView ref={scrollRef} style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             <View style={styles.dateNav}>
               <Pressable
                 hitSlop={8}

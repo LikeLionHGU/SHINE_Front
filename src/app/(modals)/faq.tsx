@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useScrollToTop } from "@/lib/use-scroll-top";
 import { headerBar } from "@/lib/theme";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -51,6 +52,8 @@ const FAQS: Faq[] = [
 // 설정 화면과 같은 배경·카드·구분선 스타일을 그대로 쓰고, 질문을 누르면
 // 답이 아래로 펼쳐지는 아코디언 한 개만 얹었다.
 export default function Faq() {
+  // 화면에 들어올 때마다 스크롤을 맨 위로 되돌린다.
+  const scrollRef = useScrollToTop();
   const router = useRouter();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
@@ -71,7 +74,7 @@ export default function Faq() {
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <XXLogoIcon />
           <Text style={styles.heading}>자주 묻는 질문</Text>
 

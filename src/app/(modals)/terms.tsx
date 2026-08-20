@@ -1,4 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useScrollToTop } from "@/lib/use-scroll-top";
 import { headerBar } from "@/lib/theme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -66,6 +67,8 @@ const CLAUSES: Clause[] = [
 // FAQ 화면과 같은 배경·카드 스타일을 쓰고, 조항을 위에서 아래로 읽어 내려가는
 // 형태라 접고 펴는 동작은 두지 않았다.
 export default function Terms() {
+  // 화면에 들어올 때마다 스크롤을 맨 위로 되돌린다.
+  const scrollRef = useScrollToTop();
   const router = useRouter();
 
   function goBack() {
@@ -85,7 +88,7 @@ export default function Terms() {
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <XXLogoIcon />
           <Text style={styles.heading}>서비스 이용약관</Text>
           <Text style={styles.updated}>최종 수정일 2026. 08. 20</Text>

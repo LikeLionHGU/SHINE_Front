@@ -15,13 +15,17 @@ import {
   submitReport,
   uploadTestSheetImage,
 } from "@/lib/api";
-import { generateReportInsights } from "@/lib/insights";
+import { AI_INSIGHTS_DISABLED, generateReportInsights } from "@/lib/insights";
 import {
   buildEngineQuestions,
   buildEngineSummary,
   reanalyzeItems,
 } from "@/lib/labs/bridge";
-import { centeredContentStyle, centeredSheetStyle } from "@/lib/layout";
+import {
+  centeredContentStyle,
+  centeredSheetStyle,
+  MAX_CONTENT_WIDTH,
+} from "@/lib/layout";
 import { currentPregnancyWeek } from "@/lib/pregnancy";
 import {
   DEMO_SUMMARY,
@@ -34,7 +38,8 @@ import {
   type ParsedTestItem,
   type ReportFood,
 } from "@/lib/report";
-import { cardShadow, headerBar, tracking } from "@/lib/theme";
+import { cardShadow, colors, font, headerBar, tracking } from "@/lib/theme";
+import { useScrollToTop } from "@/lib/use-scroll-top";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -108,6 +113,8 @@ type ReportView = {
 };
 
 export default function AnalysisReport() {
+  // 화면에 들어올 때마다 스크롤을 맨 위로 되돌린다.
+  const scrollRef = useScrollToTop();
   const router = useRouter();
   const { from, recordId } = useLocalSearchParams<{
     from?: string;
@@ -139,7 +146,9 @@ export default function AnalysisReport() {
   const [imageAspect, setImageAspect] = useState(310.088 / 509);
   // 서버에 저장된 검사지 사진은 인증이 걸려 있어, 토큰 없이 요청하면 401이 나고
   // 빈 칸만 보인다. 로컬에서 방금 찍은 사진(file://)에는 필요 없다.
-  const [authHeaders, setAuthHeaders] = useState<Record<string, string> | undefined>();
+  const [authHeaders, setAuthHeaders] = useState<
+    Record<string, string> | undefined
+  >();
 
   useEffect(() => {
     loadAuthToken().then((token) => {
@@ -194,7 +203,8 @@ export default function AnalysisReport() {
     // 다만 getSizeWithHeaders는 웹(react-native-web)에 없는 경우가 있어,
     // 있을 때만 쓰고 없으면 헤더 없는 쪽으로 떨어뜨린다(비율만 못 맞을 뿐이다).
     // blob: 주소는 이미 내려받은 사진이라 헤더가 필요 없다.
-    const headers = report?.fromServer && !uri.startsWith("blob:") ? authHeaders : undefined;
+    const headers =
+      report?.fromServer && !uri.startsWith("blob:") ? authHeaders : undefined;
     if (headers && typeof Image.getSizeWithHeaders === "function") {
       Image.getSizeWithHeaders(uri, headers, onSize, () => {});
     } else {
@@ -327,11 +337,14 @@ export default function AnalysisReport() {
             return next;
           } catch (error) {
             // 실패하면 엔진이 만든 질문으로 화면을 채운다(아래 렌더에서 처리).
-            console.warn("[report] AI 추천 질문 생성 실패:", error);
-            if (active) {
-              setInsightsError(
-                error instanceof Error ? error.message : String(error),
-              );
+            // 스위치로 꺼둔 경우는 '실패'가 아니라 의도한 동작이라 조용히 넘어간다.
+            if (!AI_INSIGHTS_DISABLED) {
+              console.warn("[report] AI 추천 질문 생성 실패:", error);
+              if (active) {
+                setInsightsError(
+                  error instanceof Error ? error.message : String(error),
+                );
+              }
             }
             return value;
           } finally {
@@ -435,9 +448,15 @@ export default function AnalysisReport() {
       //  · 기록 탭에서 연 지난 검사지는 uri가 없다 — 올릴 사진 자체가 없다.
       //  · 값을 고쳐 다시 저장할 때는 이미 올린 사진을 또 보내지 않는다.
       //    서버는 갈아끼우기만 하므로 결과는 같은데 통신만 낭비된다.
-      const sheetKey = next.testSheetId != null ? String(next.testSheetId) : null;
+      const sheetKey =
+        next.testSheetId != null ? String(next.testSheetId) : null;
       let photoUploaded = true;
-      if (report.uri && !report.fromServer && sheetKey && !uploadedPhotoSheets.current.has(sheetKey)) {
+      if (
+        report.uri &&
+        !report.fromServer &&
+        sheetKey &&
+        !uploadedPhotoSheets.current.has(sheetKey)
+      ) {
         photoUploaded = await uploadTestSheetImage(sheetKey, report.uri);
         if (photoUploaded) uploadedPhotoSheets.current.add(sheetKey);
       }
@@ -661,6 +680,7 @@ export default function AnalysisReport() {
 
         {report && (
           <ScrollView
+            ref={scrollRef}
             style={centeredContentStyle}
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
@@ -676,7 +696,9 @@ export default function AnalysisReport() {
                     source={{
                       uri: photoUri,
                       // blob:이면 이미 받아온 사진이라 헤더가 필요 없다.
-                      ...(report.fromServer && authHeaders && !photoUri.startsWith("blob:")
+                      ...(report.fromServer &&
+                      authHeaders &&
+                      !photoUri.startsWith("blob:")
                         ? { headers: authHeaders }
                         : {}),
                     }}
@@ -1024,47 +1046,72 @@ export default function AnalysisReport() {
                   </Text>
                 ))}
             </View>
-            {/* 방금 올린 검사지이고 아직 서버에 저장하지 않았을 때만 보여준다.
-                스캔 직후 자동 전송을 없앤 대신, 값을 확인·수정한 뒤 여기서 저장한다. */}
-            {report.uri && !report.fromServer && (
-              <View style={styles.saveBox}>
-                {report.testSheetId && !unsavedChanges ? (
-                  <Text style={styles.savedText}>
-                    기록에 저장됨{report.week ? ` · ${report.week}` : ""}
-                  </Text>
-                ) : (
-                  <>
-                    <Text style={styles.saveHint}>
-                      {unsavedChanges
-                        ? "수정한 값이 아직 기록에 반영되지 않았어요."
-                        : "수치를 확인하고 저장하면 기록 탭에서 다시 볼 수 있어요."}
-                    </Text>
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.saveButton,
-                        (savingToServer || !report.items?.length) &&
-                          styles.saveDisabled,
-                        pressed && styles.pressed,
-                      ]}
-                      onPress={saveToServer}
-                      disabled={savingToServer || !report.items?.length}
-                    >
-                      <Text style={styles.saveButtonText}>
-                        {savingToServer
-                          ? "저장하는 중…"
-                          : unsavedChanges
-                            ? "수정한 값으로 다시 저장"
-                            : "저장하기"}
-                      </Text>
-                    </Pressable>
-                  </>
-                )}
-                {!!saveNotice && (
-                  <Text style={styles.saveNotice}>{saveNotice}</Text>
-                )}
+
+            {/* Figma 1279:1227 — 추천 재료로 만든 제품 안내.
+                눌렀을 때 갈 곳이 아직 정해지지 않아 동작은 비워뒀다. */}
+            <View style={styles.mealBanner}>
+              <Image
+                source={require("@/assets/images/Wlogo.png")}
+                style={styles.mealBannerLogo}
+                resizeMode="cover"
+              />
+              <View style={styles.mealBannerText}>
+                <Text style={styles.mealBannerTitle}>
+                  지금 필요한 영양소, 맛있게 채워보세요
+                </Text>
+                <Text style={styles.mealBannerSub}>
+                  추천 재료로 만든 도시락 & 쉐이크를 만나보세요!
+                </Text>
               </View>
-            )}
+              <ChevronRightIcon size={24} />
+            </View>
           </ScrollView>
+        )}
+
+        {/* 저장하기는 화면 아래에 계속 떠 있는다.
+            예전에는 스크롤 맨 끝에 있어서, 항목이 많은 검사지는 한참 내려야
+            버튼이 보였다. 값을 확인하다가 아무 때나 저장할 수 있어야 한다. */}
+        {report?.uri && !report.fromServer && (
+          <View style={styles.saveFloating} pointerEvents="box-none">
+            {/* 밑으로 지나가는 내용이 버튼 뒤에서 자연스럽게 사라지도록 깔아둔다.
+                깔지 않으면 글자 위에 글자가 겹쳐 읽기 어렵다. */}
+            <LinearGradient
+              colors={["rgba(255,235,243,0)", "#FFEBF3"]}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+            <View style={styles.saveFloatingInner}>
+              {report.testSheetId && !unsavedChanges ? (
+                <Text style={styles.savedText}>
+                  기록에 저장됨{report.week ? ` · ${report.week}` : ""}
+                </Text>
+              ) : (
+                <>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.saveButton,
+                      (savingToServer || !report.items?.length) &&
+                        styles.saveDisabled,
+                      pressed && styles.pressed,
+                    ]}
+                    onPress={saveToServer}
+                    disabled={savingToServer || !report.items?.length}
+                  >
+                    <Text style={styles.saveButtonText}>
+                      {savingToServer
+                        ? "저장하는 중…"
+                        : unsavedChanges
+                          ? "수정한 값으로 다시 저장"
+                          : "저장하기"}
+                    </Text>
+                  </Pressable>
+                </>
+              )}
+              {!!saveNotice && (
+                <Text style={styles.saveNotice}>{saveNotice}</Text>
+              )}
+            </View>
+          </View>
         )}
       </SafeAreaView>
 
@@ -1274,7 +1321,9 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 24,
+    // 떠 있는 저장 버튼(안내문 + 52px 버튼 + 위아래 여백)에 마지막 카드가
+    // 가려지지 않도록 그만큼 비워둔다.
+    paddingBottom: 116,
     gap: 12,
   },
   pressed: { opacity: 0.78 },
@@ -1574,7 +1623,57 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     letterSpacing: tracking(11),
   },
-  saveBox: { marginTop: 4, gap: 8, alignItems: "stretch" },
+  // 시안 1279:1227 — 361x65, r7, 테두리 #CFCFCF.
+  // 로고 12~51 · 글자 61부터 · 화살표 323~347 → 좌우 여백 12, 로고~글자 간격 10.
+  mealBanner: {
+    height: 65,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+  },
+  // 로고 이미지가 배경(베이지)까지 포함한 정사각형이라 cover로 꽉 채운다.
+  mealBannerLogo: {
+    width: 39,
+    height: 39,
+    borderRadius: 4,
+    marginRight: 10,
+  },
+  mealBannerText: { flex: 1 },
+  mealBannerTitle: {
+    color: colors.text,
+    fontFamily: font.medium,
+    fontSize: 14,
+    lineHeight: 20,
+    letterSpacing: tracking(14),
+  },
+  mealBannerSub: {
+    color: colors.textHint,
+    fontFamily: font.medium,
+    fontSize: 12,
+    lineHeight: 18,
+    letterSpacing: tracking(12),
+  },
+
+  saveFloating: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: 20,
+    paddingBottom: 12,
+    alignItems: "center",
+  },
+  // 넓은 화면에서도 본문과 같은 폭·같은 좌우 여백으로 맞춘다.
+  saveFloatingInner: {
+    width: "100%",
+    maxWidth: MAX_CONTENT_WIDTH,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
   saveHint: {
     textAlign: "center",
     color: "#8A8A82",
@@ -1797,7 +1896,12 @@ const styles = StyleSheet.create({
   },
   // 질문은 두세 줄이 되므로 아이콘을 첫 줄에 맞춘다
   // (가운데 정렬이면 아이콘이 줄 사이로 내려간다).
-  exampleRow: { flexDirection: "row", alignItems: "flex-start", gap: 9, marginBottom: 4 },
+  exampleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    marginBottom: 4,
+  },
   exampleIcon: { paddingTop: 3 },
   example: {
     flex: 1,
@@ -1862,7 +1966,7 @@ const styles = StyleSheet.create({
     // 곡선을 따라 잘리지 않고 사각형 그대로 보이는 경우가 있다).
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "#CFCFCF",
+    borderColor: "#A0A0A0",
     borderBottomWidth: 0,
     paddingHorizontal: 20,
     paddingTop: 16,

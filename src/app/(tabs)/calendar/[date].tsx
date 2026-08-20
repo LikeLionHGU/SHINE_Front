@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useScrollToTop } from "@/lib/use-scroll-top";
 import { headerBar } from "@/lib/theme";
 import {
   Modal,
@@ -65,6 +66,8 @@ function toVisitKey(value: string | undefined) {
 // 진료가 있는 날짜를 눌렀을 때 여는 상세 화면.
 // 당일/이전 검사지와 다음 진료 때 물어볼 질문을 관리한다.
 export default function CalendarDay() {
+  // 화면에 들어올 때마다 스크롤을 맨 위로 되돌린다.
+  const scrollRef = useScrollToTop();
   const router = useRouter();
   const { date } = useLocalSearchParams<{ date: string }>();
   // 직접 입력한 질문들. 마지막 칸을 채우면 아래에 추가 칸이 생긴다.
@@ -236,7 +239,7 @@ export default function CalendarDay() {
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent}>
           <Text style={styles.dateText}>{formatDate(date)}</Text>
 
           {/* 이 날 등록된 일정들. 산부인과·타 병원이 섞여 있어도 각각 관리한다. */}

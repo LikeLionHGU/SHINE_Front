@@ -1,4 +1,5 @@
 import { ChevronRightIcon, XXLogoIcon } from "@/components/icons";
+import { useScrollToTop } from "@/lib/use-scroll-top";
 import { headerBar } from "@/lib/theme";
 import { centeredContentStyle } from "@/lib/layout";
 import { getRecords } from "@/lib/api";
@@ -14,6 +15,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 // 목록은 서버(GET /api/v1/app/records)에서 받아온다 — 서버가 없거나 요청이
 // 실패하면 @/lib/api가 데모 데이터로 되돌린다.
 export default function Record() {
+  // 화면에 들어올 때마다 스크롤을 맨 위로 되돌린다.
+  const scrollRef = useScrollToTop();
   const router = useRouter();
   const [records, setRecords] = useState<RecordEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +48,7 @@ export default function Record() {
           <View style={{ width: 24, height: 24 }} />
         </View>
 
-        <ScrollView style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scrollRef} style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <XXLogoIcon />
           <Text style={styles.heading}>차곡차곡 쌓인{"\n"}나의 건강 기록</Text>
 

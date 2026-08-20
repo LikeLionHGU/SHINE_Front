@@ -5,6 +5,7 @@ import {
   UploadCloudIcon,
   XXLogoIcon,
 } from "@/components/icons";
+import { useScrollToTop } from "@/lib/use-scroll-top";
 import { centeredContentStyle, centeredSheetStyle } from "@/lib/layout";
 import { cardShadow, colors, font, headerBar, radius, tracking, type as t } from "@/lib/theme";
 import { LinearGradient } from "expo-linear-gradient";
@@ -29,6 +30,8 @@ type PickMethod = "camera" | "library";
 // 사진이 선택되면 같은 화면에 미리보기 + "완료" 버튼이 나타나고, 완료를 누르면
 // analyzing 화면으로 넘어가 스캔 애니메이션 후 결과 화면으로 이동한다.
 export default function ScanStart() {
+  // 화면에 들어올 때마다 스크롤을 맨 위로 되돌린다.
+  const scrollRef = useScrollToTop();
   const router = useRouter();
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [method, setMethod] = useState<PickMethod | null>(null);
@@ -92,7 +95,7 @@ export default function ScanStart() {
           </Pressable>
         </View>
 
-        <ScrollView style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scrollRef} style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <XXLogoIcon />
           <Text style={styles.heading}>산전 검사지를{"\n"}업로드 해주세요</Text>
 

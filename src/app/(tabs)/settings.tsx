@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { useScrollToTop } from "@/lib/use-scroll-top";
 import { headerBar } from "@/lib/theme";
 import { Pressable, ScrollView, Text, View, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -21,6 +22,8 @@ import { getUserProfile, logout, type UserProfile } from "@/lib/api";
 // Figma: 환경설정 (바텀탭 "마이")
 // 프로필 카드, 개인정보(연락처/이메일), 기본 설정(카메라 동의/알림/FAQ/이용약관/환경설정).
 export default function Settings() {
+  // 화면에 들어올 때마다 스크롤을 맨 위로 되돌린다.
+  const scrollRef = useScrollToTop();
   const router = useRouter();
   const [cameraConsent, setCameraConsent] = useState(true);
   const [notifications, setNotifications] = useState(true);
@@ -70,7 +73,7 @@ export default function Settings() {
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent}>
           <XXLogoIcon />
 
           <Text style={styles.sectionTitle}>프로필</Text>

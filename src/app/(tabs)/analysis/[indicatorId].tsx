@@ -1,4 +1,5 @@
 import { BackChevronIcon, UpTriangleIcon } from "@/components/icons";
+import { useScrollToTop } from "@/lib/use-scroll-top";
 import { cardShadow, colors, font, headerBar, radius, tracking } from "@/lib/theme";
 import { StatusBadge } from "@/components/status-badge";
 import { chartWidthFor, TrendChart } from "@/components/trend-chart";
@@ -16,6 +17,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 // 종합 추이 상세 설명. 지표는 서버(GET /api/v1/app/trends/{id})에서 받아온다.
 // id는 검사 항목 코드 소문자다(hb, wbc, ferritin, vit_d, tsh).
 export default function AnalysisDetail() {
+  // 화면에 들어올 때마다 스크롤을 맨 위로 되돌린다.
+  const scrollRef = useScrollToTop();
   const router = useRouter();
   const { indicatorId } = useLocalSearchParams<{ indicatorId: string }>();
   const { width: windowWidth } = useWindowDimensions();
@@ -85,7 +88,7 @@ export default function AnalysisDetail() {
           <Text style={styles.headerTitle} pointerEvents="none">분석</Text>
         </View>
 
-        <ScrollView style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scrollRef} style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {/* 제목 줄을 누르면 항목 설명이 접혔다 펴진다.
               설명이 길어 차트를 아래로 밀어내는 경우가 있어 접을 수 있게 했다. */}
           <Pressable

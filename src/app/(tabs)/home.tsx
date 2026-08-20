@@ -1,4 +1,5 @@
 import { FoodImage } from "@/components/food-image";
+import { useScrollToTop } from "@/lib/use-scroll-top";
 import {
   AiQuestionIcon,
   ChevronRightIcon,
@@ -60,6 +61,8 @@ function toVisitDate(isoDate: string): string {
 // 주간 캘린더를 전부 받는다. 검사지를 아직 안 올렸으면 latestSheet가 null이고
 // questions·nutritions가 빈 배열로 오는데, 그때는 각 카드가 안내 문구로 바뀐다.
 export default function Home() {
+  // 화면에 들어올 때마다 스크롤을 맨 위로 되돌린다.
+  const scrollRef = useScrollToTop();
   const router = useRouter();
   const [question, setQuestion] = useState("");
   // 질문 전송 상태. 저장은 lib/api의 createQuestion(POST /questions)이 맡는다.
@@ -136,7 +139,7 @@ export default function Home() {
         style={StyleSheet.absoluteFill}
       />
       <SafeAreaView style={styles.safeArea} edges={["top"]}>
-        <ScrollView
+        <ScrollView ref={scrollRef}
           style={centeredContentStyle}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}

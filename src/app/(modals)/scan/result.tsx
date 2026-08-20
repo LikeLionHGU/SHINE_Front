@@ -1,4 +1,5 @@
 import { CloseIcon, XXLogoIcon } from "@/components/icons";
+import { useScrollToTop } from "@/lib/use-scroll-top";
 import { headerBar } from "@/lib/theme";
 import { centeredContentStyle, centeredSheetStyle } from "@/lib/layout";
 import { DEMO_SUMMARY } from "@/lib/report";
@@ -15,6 +16,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 // dismissTo하기 때문에 실제 앱 흐름에서는 도달하지 않는 레거시 화면이다 —
 // 그래도 스타일은 다른 화면과 일관되게 반응형으로 맞춰둔다.)
 export default function ScanResult() {
+  // 화면에 들어올 때마다 스크롤을 맨 위로 되돌린다.
+  const scrollRef = useScrollToTop();
   const router = useRouter();
   const { uri } = useLocalSearchParams<{ uri?: string }>();
   // report.tsx와 동일하게, 고정 height 대신 사진 원본 비율로 보여준다.
@@ -49,7 +52,7 @@ export default function ScanResult() {
             <CloseIcon size={24} />
           </Pressable>
         </View>
-        <ScrollView style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scrollRef} style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <Text style={styles.heading}>검사지 분석이{"\n"}완료됐어요</Text>
           {!!uri && <Image source={{ uri }} style={[styles.preview, { aspectRatio: imageAspect }]} resizeMode="contain" />}
           <View style={styles.summaryCard}>

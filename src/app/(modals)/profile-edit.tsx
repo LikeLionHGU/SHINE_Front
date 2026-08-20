@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useScrollToTop } from "@/lib/use-scroll-top";
 import { headerBar } from "@/lib/theme";
 import {
   Pressable,
@@ -38,6 +39,8 @@ const PHONE = /^[+0-9][0-9 -]{7,19}$/;
 // 마이 페이지 > 개인정보 수정.
 // 서버는 보낸 칸만 바꾸므로(PATCH), 실제로 값이 달라진 칸만 골라 보낸다.
 export default function ProfileEdit() {
+  // 화면에 들어올 때마다 스크롤을 맨 위로 되돌린다.
+  const scrollRef = useScrollToTop();
   const router = useRouter();
   const { field } = useLocalSearchParams<{ field?: FieldKey }>();
 
@@ -146,7 +149,7 @@ export default function ProfileEdit() {
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView
+        <ScrollView ref={scrollRef}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
