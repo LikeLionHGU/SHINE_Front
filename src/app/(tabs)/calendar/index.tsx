@@ -249,6 +249,23 @@ export default function Calendar() {
       const target = allHospitalVisits.find((visit) => visit.date > sheet.date);
       if (target) source.set(target.id, sheet.id);
     }
+
+    // 자리로 잡힌 진료가 이미 지나갔으면 그 질문을 아직 못 물어봤을 수 있는데,
+    // "예정된 방문" 목록에는 지난 진료가 뜨지 않아 확인할 방법이 없어진다.
+    // 마지막으로 잡힌 자리를 다음 예정 진료로 옮겨준다.
+    //
+    // 옮기는 것은 가장 마지막 자리 하나뿐이다. 지난 자리를 전부 끌어오면 이미
+    // 물어본 오래된 질문까지 다시 뜨고, 예정 진료마다 같은 질문이 반복된다.
+    const today = formatVisitDate(new Date());
+    const nextUpcoming = allHospitalVisits.find((visit) => visit.date >= today);
+    if (nextUpcoming && !source.has(nextUpcoming.id)) {
+      const lastPastWithSlot = allHospitalVisits
+        .filter((visit) => visit.date < today && source.has(visit.id))
+        .pop();
+      if (lastPastWithSlot) {
+        source.set(nextUpcoming.id, source.get(lastPastWithSlot.id) ?? null);
+      }
+    }
     return source;
   }, [records, allHospitalVisits]);
 
