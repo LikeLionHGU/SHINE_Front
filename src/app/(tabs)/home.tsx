@@ -4,7 +4,15 @@ import {
   XXLogoIcon,
 } from "@/components/icons";
 import { FoodImage } from "@/components/food-image";
-import { getHome, getVisits, type CalendarVisit, type Home } from "@/lib/api";
+import {
+  getHome,
+  getVisits,
+  getVisitQuestions,
+  saveVisitQuestions,
+  formatVisitDate,
+  type CalendarVisit,
+  type Home,
+} from "@/lib/api";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
@@ -17,7 +25,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { centeredContentStyle } from "@/lib/layout";
+import { centeredContentStyle, visitDateLabel } from "@/lib/layout";
 
 // Figma(node 671:3009 "image 54 1")는 단일 이미지 애셋(은은한 핑크 글로우)이라
 // 별도 삽화 없이 그라디언트로 재현한다. 실제 PNG 애셋을 쓰고 싶다면 Figma에서
@@ -46,6 +54,9 @@ function toVisitDate(isoDate: string): string {
 export default function Home() {
   const router = useRouter();
   const [question, setQuestion] = useState("");
+  // 질문 전송 상태. 저장은 다음 산부인과 일정(없으면 오늘)에 붙는다.
+  const [sending, setSending] = useState(false);
+  const [sentNotice, setSentNotice] = useState<string | null>(null);
   const [home, setHome] = useState<Home | null>(null);
   const [visits, setVisits] = useState<CalendarVisit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,6 +75,39 @@ export default function Home() {
       };
     }, []),
   );
+
+  /** 질문을 붙일 날짜 — 오늘 이후의 가장 가까운 산부인과 일정, 없으면 오늘 */
+  function targetVisitDate(): string {
+    // 이 앱의 날짜 포맷은 ISO가 아니라 "26.08.16"(YY.MM.DD)이다.
+    const today = formatVisitDate(new Date());
+    const upcoming = visits
+      .filter((v) => v.isHospital && v.date >= today)
+      .sort((a, b) => a.date.localeCompare(b.date))[0];
+    return upcoming?.date ?? today;
+  }
+
+  /** 직접 적은 질문을 진료 질문 목록에 추가한다. */
+  async function submitQuestion() {
+    const text = question.trim();
+    if (!text || sending) return;
+    setSending(true);
+    try {
+      const date = targetVisitDate();
+      const existing = await getVisitQuestions(date).catch(() => [] as string[]);
+      if (existing.some((q) => q.trim() === text)) {
+        setSentNotice("이미 추가된 질문이에요.");
+      } else {
+        await saveVisitQuestions(date, [...existing, text]);
+        setSentNotice(`${visitDateLabel(date)} 진료 질문에 추가했어요.`);
+      }
+      setQuestion("");
+    } catch {
+      setSentNotice("질문을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setSending(false);
+      setTimeout(() => setSentNotice(null), 2600);
+    }
+  }
 
   const latestSheet = home?.latestSheet ?? null;
   const questions = home?.questions ?? [];
@@ -108,11 +152,18 @@ export default function Home() {
             {loading ? (
               <Text style={styles.cardHint}>질문을 불러오는 중이에요...</Text>
             ) : questions.length > 0 ? (
+              // 추천 질문을 눌러 입력창에 담고, 다듬어서 바로 추가할 수 있게 한다.
               questions.slice(0, 2).map((item) => (
-                <View key={item.questionId} style={styles.exampleRow}>
+                <Pressable
+                  key={item.questionId}
+                  style={({ pressed }) => [styles.exampleRow, pressed && styles.pressed]}
+                  onPress={() => setQuestion(item.content)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`추천 질문 담기: ${item.content}`}
+                >
                   <AiQuestionIcon />
                   <Text style={styles.example} numberOfLines={1}>{item.content}</Text>
-                </View>
+                </Pressable>
               ))
             ) : (
               <Text style={styles.cardHint}>
@@ -127,9 +178,23 @@ export default function Home() {
                 placeholderTextColor="#A0A0A0"
                 style={styles.input}
                 returnKeyType="send"
+                onSubmitEditing={submitQuestion}
+                editable={!sending}
               />
-              {question.length > 0 && <Text style={styles.send}>↑</Text>}
+              {question.trim().length > 0 && (
+                <Pressable
+                  onPress={submitQuestion}
+                  disabled={sending}
+                  hitSlop={12}
+                  accessibilityRole="button"
+                  accessibilityLabel="질문 추가"
+                  style={({ pressed }) => [pressed && styles.pressed]}
+                >
+                  <Text style={[styles.send, sending && styles.sendDisabled]}>↑</Text>
+                </Pressable>
+              )}
             </View>
+            {!!sentNotice && <Text style={styles.sentNotice}>{sentNotice}</Text>}
           </View>
 
           <Pressable style={({ pressed }) => [styles.analysisCard, pressed && styles.pressed]} onPress={() =>
@@ -210,7 +275,9 @@ const styles = StyleSheet.create({
   uploadTitle: { color: "#111", fontFamily: "Pretendard-SemiBold", fontSize: 18, lineHeight: 26 },
   uploadButton: { position: "absolute", right: 20, bottom: 16, height: 28, paddingHorizontal: 16, borderRadius: 6, justifyContent: "center", backgroundColor: "#FFF" },
   uploadButtonText: { color: "#111", fontFamily: "Pretendard-SemiBold", fontSize: 12 },
-  questionCard: { height: 113, paddingHorizontal: 18, paddingTop: 11, borderRadius: 14, backgroundColor: "#FFFCFD", ...shadow },
+  sendDisabled: { opacity: 0.4 },
+  sentNotice: { marginTop: 2, paddingHorizontal: 18, color: "#3A6B5C", fontFamily: "Pretendard-Medium", fontSize: 12 },
+  questionCard: { minHeight: 113, paddingHorizontal: 18, paddingTop: 11, borderRadius: 14, backgroundColor: "#FFFCFD", ...shadow },
   exampleRow: { height: 21, flexDirection: "row", alignItems: "center", gap: 9 },
   example: { color: "#707070", fontFamily: "Pretendard-Medium", fontSize: 14, flex: 1 },
   cardHint: { paddingVertical: 6, color: "#A0A0A0", fontFamily: "Pretendard-Regular", fontSize: 13, lineHeight: 20 },

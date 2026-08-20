@@ -1,0 +1,342 @@
+{
+  "registry_version": "1.0.0",
+  "updated_at": "2026-08-19",
+  "verification_legend": {
+    "primary_verified": "발행 기관의 원문 페이지/PDF를 직접 열어 해당 문장을 확인함",
+    "mirror_verified": "발행 기관 사이트는 접근 차단되어, 원문과 동일한 미러 PDF에서 문장을 확인함",
+    "secondary_only": "원문 접근 실패. 원문을 인용한 2차 자료에서만 확인함",
+    "unverified": "확인 실패. 서비스 판정에 사용 금지"
+  },
+  "trust_tier_policy": {
+    "A": "국제·국내 학회의 공식 진료지침 (판정 근거로 사용)",
+    "B": "동료심사 논문의 인구 기반 참고구간, 특히 한국인 코호트 (판정 근거로 사용)",
+    "C": "국내 의료기관·수탁검사기관이 공개한 참고치 (비교·경고 표시용으로만 사용)",
+    "D": "원문 미검증 (판정에 사용 금지, evaluate()에서 자동 차단)"
+  },
+  "sources": {
+    "acog_pb233_2021": {
+      "title": "ACOG Practice Bulletin No. 233: Anemia in Pregnancy",
+      "publisher": "American College of Obstetricians and Gynecologists",
+      "published": "2021-08",
+      "citation_ko": "미국산부인과학회 진료지침 제233호 (2021)",
+      "url": "https://acinoedudoc.com/wp-content/uploads/2024/04/2021-ACOG-Anemia_in_pregnancy.pdf",
+      "canonical_url": "https://journals.lww.com/greenjournal/abstract/2021/08000/anemia_in_pregnancy__acog_practice_bulletin,.34.aspx",
+      "trust_tier": "A",
+      "verification": "mirror_verified",
+      "verified_at": "2026-08-19",
+      "note": "acog.org 본사이트는 HTTP 402로 접근 차단. 2026년 현행 여부는 배포 전 1회 재확인 권장."
+    },
+    "acog_pb222_2020": {
+      "title": "ACOG Practice Bulletin No. 222: Gestational Hypertension and Preeclampsia",
+      "publisher": "American College of Obstetricians and Gynecologists",
+      "published": "2020-06",
+      "citation_ko": "미국산부인과학회 진료지침 제222호 (2020)",
+      "url": "https://s3.amazonaws.com/cdn.smfm.org/media/4542/ACOG_Gestational_Hypertension_and_Preeclampsia.pdf",
+      "trust_tier": "A",
+      "verification": "mirror_verified",
+      "verified_at": "2026-08-19",
+      "note": "SMFM(미국모체태아의학회)이 호스팅하는 원문 PDF. 원문의 '100,000 x 10^9/L' 표기는 단위 오기이며 올바른 값은 100,000/uL."
+    },
+    "acog_cc8_2025": {
+      "title": "ACOG Clinical Consensus No. 8: Tailored Prenatal Care Delivery for Pregnant Individuals",
+      "publisher": "American College of Obstetricians and Gynecologists",
+      "published": "2025-05",
+      "citation_ko": "미국산부인과학회 임상합의 제8호 (2025) — 산전 기본검사 목록",
+      "url": "https://cdn-links.lww.com/permalink/aog/e/aog_145_5_2025_03_28_jones_25-345_sdc5.pdf",
+      "trust_tier": "A",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19"
+    },
+    "who_2024": {
+      "title": "Guideline on haemoglobin cutoffs to define anaemia in individuals and populations",
+      "publisher": "World Health Organization",
+      "published": "2024-03-05",
+      "citation_ko": "세계보건기구 빈혈 헤모글로빈 기준 가이드라인 (2024)",
+      "url": "https://www.who.int/publications-detail-redirect/9789240088542",
+      "supporting_url": "https://www.ncbi.nlm.nih.gov/books/NBK602183/table/fm-ch1.tab2/",
+      "trust_tier": "A",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19",
+      "note": "2024년 개정에서 임산부 컷오프는 변경되지 않았음. 변경된 건 생후 6~23개월 소아(110 -> 105 g/L)뿐. 임산부 값(110/105/110 g/L)은 ACOG PB233·CDC와 완전히 일치한다.",
+      "scope_verified": "Table 3 'Haemoglobin cutoffs to define anaemia severity in individuals' — 임신 1·2·3분기 행을 원문 표에서 직접 확인함 (2026-08-20).",
+      "pregnancy_rows": {
+        "T1": {
+          "no_anaemia": ">=110 g/L",
+          "mild": "100-109",
+          "moderate": "70-99",
+          "severe": "<70"
+        },
+        "T2": {
+          "no_anaemia": ">=105 g/L",
+          "mild": "95-104",
+          "moderate": "70-94",
+          "severe": "<70"
+        },
+        "T3": {
+          "no_anaemia": ">=110 g/L",
+          "mild": "100-109",
+          "moderate": "70-99",
+          "severe": "<70"
+        }
+      },
+      "limitation": "원문에 '3분기 임산부 컷오프는 NHANES II 표본 수 한계로 근거가 불충분했다'는 서술이 있음. 그래서 이 앱은 WHO를 단독 근거로 쓰지 않고 ACOG PB233(2021)을 1차 근거로, WHO를 교차 확인용으로 병기한다."
+    },
+    "ata_2026": {
+      "title": "American Thyroid Association 2026 Guidelines for Thyroid Disease in Preconception, Pregnancy, and Postpartum",
+      "publisher": "American Thyroid Association / Thyroid",
+      "published": "2026-06-01",
+      "citation_ko": "미국갑상선학회 2026 임신 전·중·후 갑상선질환 가이드라인",
+      "url": "https://journals.sagepub.com/doi/full/10.1177/10507256261445624",
+      "doi": "10.1177/10507256261445624",
+      "trust_tier": "A",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19",
+      "supersedes": "ata_2017",
+      "note": "ATA 2017을 대체함. TPO 항체로 치료 여부를 가르는 기준이 삭제됨."
+    },
+    "kta_2023": {
+      "title": "2023 대한갑상선학회 임신 중 및 산후 갑상선질환의 진단 및 치료 권고안",
+      "publisher": "대한갑상선학회 / International Journal of Thyroidology 2023;16(1):51",
+      "published": "2023",
+      "citation_ko": "대한갑상선학회 2023 권고안",
+      "url": "https://synapse.koreamed.org/upload/synapsexml/1186ijt/pdf/ijt-16-1-51.pdf",
+      "trust_tier": "A",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19",
+      "note": "Table 1에 한국인 임신부 삼분기별 TSH·fT4 참고구간(Moon et al., Kim et al.) 수록."
+    },
+    "kda_2025": {
+      "title": "당뇨병 진료지침 제9판",
+      "publisher": "대한당뇨병학회",
+      "published": "2025",
+      "citation_ko": "대한당뇨병학회 진료지침 제9판 (2025)",
+      "url": "https://diabetes.or.kr/bbs/download.php?code=guide&number=1522",
+      "trust_tier": "A",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19"
+    },
+    "ada_soc_2026": {
+      "title": "Standards of Care in Diabetes—2026, Section 15: Management of Diabetes in Pregnancy",
+      "publisher": "American Diabetes Association / Diabetes Care 2026;49(Suppl 1):S321-S339",
+      "published": "2025-12-08",
+      "citation_ko": "미국당뇨병학회 진료표준 2026 제15장",
+      "url": "https://diabetesjournals.org/care/article/49/Supplement_1/S321/163918/15-Management-of-Diabetes-in-Pregnancy-Standards",
+      "supporting_url": "https://diabetesjournals.org/care/article/48/Supplement_1/S306/157565/15-Management-of-Diabetes-in-Pregnancy-Standards",
+      "trust_tier": "A",
+      "verification": "secondary_only",
+      "verified_at": "2026-08-19",
+      "note": "2026판 원문은 HTTP 403. 동일 수치를 2025판 원문(직접 확인)과 2026판 인용 요약본으로 교차검증함. 혈당 목표·GDM 컷오프는 2025->2026 변경 없음."
+    },
+    "uspstf_iron_2024": {
+      "title": "Iron Deficiency and Iron Deficiency Anemia During Pregnancy: Screening and Supplementation (Grade I)",
+      "publisher": "U.S. Preventive Services Task Force",
+      "published": "2024-08-20",
+      "citation_ko": "미국질병예방특별위원회 2024 — 근거 불충분(Grade I)",
+      "url": "https://www.uspreventiveservicestaskforce.org/uspstf/document/RecommendationStatementFinal/iron-deficiency-anemia-in-pregnant-women-screening-and-supplementation",
+      "trust_tier": "A",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19"
+    },
+    "uspstf_syphilis_2025": {
+      "title": "Syphilis Infection During Pregnancy: Screening (Grade A)",
+      "publisher": "U.S. Preventive Services Task Force",
+      "published": "2025-05-13",
+      "citation_ko": "미국질병예방특별위원회 2025 매독 선별 권고",
+      "url": "https://www.uspreventiveservicestaskforce.org/uspstf/recommendation/syphilis-infection-in-pregnancy-screening",
+      "trust_tier": "A",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19",
+      "supersedes": "uspstf_syphilis_2018"
+    },
+    "uspstf_hbv_2019": {
+      "title": "Hepatitis B Virus Infection in Pregnant Women: Screening (Grade A)",
+      "publisher": "U.S. Preventive Services Task Force",
+      "published": "2019-07-23",
+      "citation_ko": "미국질병예방특별위원회 2019 B형간염 선별 권고",
+      "url": "https://www.uspreventiveservicestaskforce.org/uspstf/recommendation/hepatitis-b-virus-infection-in-pregnant-women-screening",
+      "trust_tier": "A",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19"
+    },
+    "uspstf_hiv_2019": {
+      "title": "HIV Infection: Screening (Pregnant Persons) (Grade A)",
+      "publisher": "U.S. Preventive Services Task Force",
+      "published": "2019-06-11",
+      "citation_ko": "미국질병예방특별위원회 2019 HIV 선별 권고 (개정 진행 중)",
+      "url": "https://www.uspreventiveservicestaskforce.org/uspstf/recommendation/human-immunodeficiency-virus-hiv-infection-screening",
+      "trust_tier": "A",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19",
+      "note": "페이지에 'This topic is being updated' 표시. 개정 시 갱신 필요."
+    },
+    "cdc_hbv_2023": {
+      "title": "Screening and Testing for Hepatitis B Virus Infection: CDC Recommendations — United States, 2023 (MMWR Recomm Rep 72(RR-1))",
+      "publisher": "U.S. Centers for Disease Control and Prevention",
+      "published": "2023-03-10",
+      "citation_ko": "미국 질병통제예방센터 2023 B형간염 검사 권고",
+      "url": "https://www.cdc.gov/mmwr/volumes/72/rr/rr7201a1.htm",
+      "trust_tier": "A",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19"
+    },
+    "cdc_rubella_2024": {
+      "title": "Rubella Serology Testing",
+      "publisher": "U.S. Centers for Disease Control and Prevention",
+      "published": "2024-06-10",
+      "citation_ko": "미국 질병통제예방센터 풍진 혈청검사 안내 (2024)",
+      "url": "https://www.cdc.gov/rubella/php/laboratories/serology-testing.html",
+      "trust_tier": "A",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19"
+    },
+    "medicina_2025_kr_cbc": {
+      "title": "Physiological Changes and Trimester-Specific Reference Intervals for CBC Parameters in Korean Pregnant Women",
+      "publisher": "Medicina 2025;61(9):1665 (일산차병원, 차의과학대학교)",
+      "published": "2025",
+      "citation_ko": "한국인 임산부 삼분기별 혈액검사 참고구간 연구 (2025)",
+      "url": "https://www.mdpi.com/1648-9144/61/9/1665",
+      "trust_tier": "B",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19",
+      "sample_size": "1분기 160명 / 2분기 382명 / 3분기 497명",
+      "note": "한국인 대상 실측 데이터. 미국 표(Abbassi-Ghanavati)보다 한국 사용자에게 더 적합."
+    },
+    "annlabmed_2015_kr_thyroid": {
+      "title": "Trimester-Specific Reference Intervals of Thyroid Function Tests in Korean Pregnant Women",
+      "publisher": "Annals of Laboratory Medicine 2015;35(2):198-204",
+      "published": "2015",
+      "citation_ko": "한국인 임신부 갑상선 참고구간 연구 (2015, Moon et al.)",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4330169",
+      "trust_tier": "B",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19",
+      "sample_size": "465명, Roche Elecsys"
+    },
+    "jcem_2022_tsh_meta": {
+      "title": "Interpretation of Thyroid Function Tests in Pregnancy: Individual Participant Data Meta-Analysis",
+      "publisher": "Journal of Clinical Endocrinology & Metabolism 2022;107(10):2925",
+      "published": "2022",
+      "citation_ko": "임신 중 갑상선기능검사 해석 IPD 메타분석 (63,198명)",
+      "url": "https://academic.oup.com/jcem/article/107/10/2925/6647985",
+      "open_pdf": "https://archive.fetalmedicine.org/var/pdf/publications/1329.pdf",
+      "trust_tier": "B",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19",
+      "note": "22개 코호트 63,198명. 1분기 TSH 상한이 코호트별 2.24~6.02 mIU/L로 3배 편차."
+    },
+    "jcm_2016_rubella": {
+      "title": "Assessing Immunity to Rubella Virus: a Plea for Standardization of IgG (Immuno)assays",
+      "publisher": "Journal of Clinical Microbiology 2016 (Bouthry et al.)",
+      "published": "2016",
+      "citation_ko": "풍진 IgG 검사법 표준화 연구 (2016)",
+      "url": "https://journals.asm.org/doi/10.1128/jcm.00383-16",
+      "trust_tier": "B",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19"
+    },
+    "rbe_2025_lipid": {
+      "title": "Reference intervals of lipid profiles during pregnancy: a systematic review and meta-analysis",
+      "publisher": "Reproductive Biology and Endocrinology 2025",
+      "published": "2025",
+      "citation_ko": "임신 중 지질 참고구간 메타분석 (13개 연구 54,517명)",
+      "url": "https://link.springer.com/article/10.1186/s12958-025-01450-8",
+      "trust_tier": "B",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19"
+    },
+    "amc_nm_ferritin": {
+      "title": "서울아산병원 핵의학과 검사 참고치 — 페리틴",
+      "publisher": "서울아산병원",
+      "citation_ko": "서울아산병원 페리틴 참고치",
+      "url": "https://nm.amc.seoul.kr/asan/depts/nm/K/bbsDetail.do?menuId=920&contentId=112163",
+      "trust_tier": "C",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19"
+    },
+    "snuh_nm_ferritin": {
+      "title": "서울대학교병원 핵의학과 검사 참고치 — 페리틴",
+      "publisher": "서울대학교병원",
+      "citation_ko": "서울대병원 페리틴 참고치",
+      "url": "http://dept.snuh.org/dept/NM/bbs/bbsView.do?menuId=004013010&pageIndex=1&cid=13705",
+      "trust_tier": "C",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19"
+    },
+    "amc_nm_tsh": {
+      "title": "서울아산병원 핵의학과 검사 참고치 — TSH",
+      "publisher": "서울아산병원",
+      "citation_ko": "서울아산병원 TSH 참고치",
+      "url": "https://www.amc.seoul.kr/asan/depts/nm/K/bbsDetail.do?menuId=920&contentId=112075",
+      "trust_tier": "C",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19"
+    },
+    "snuh_nm_tsh": {
+      "title": "서울대학교병원 핵의학과 검사 참고치 — TSH",
+      "publisher": "서울대학교병원",
+      "citation_ko": "서울대병원 TSH 참고치",
+      "url": "http://dept.snuh.org/dept/NM/bbs/bbsView.do?menuId=004013010&cid=13602&pageIndex=1",
+      "trust_tier": "C",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19"
+    },
+    "seegene_rubella": {
+      "title": "씨젠의료재단 여성의학 검사안내 — 풍진 IgG 판정기준",
+      "publisher": "씨젠의료재단",
+      "citation_ko": "씨젠의료재단 풍진 판정기준",
+      "url": "https://www.seegenemedical.com/e-book/access/ecatalogt.jsp?callmode=normal&catimage=&eclang=ko&Dir=83&um=s&start=124",
+      "trust_tier": "C",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19"
+    },
+    "amc_proteinuria": {
+      "title": "서울아산병원 건강정보 — 단백뇨",
+      "publisher": "서울아산병원",
+      "citation_ko": "서울아산병원 단백뇨 안내",
+      "url": "https://www.amc.seoul.kr/asan/mobile/healthinfo/management/managementDetail.do?managementId=87",
+      "trust_tier": "C",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19"
+    },
+    "snuh_gdm": {
+      "title": "서울대학교병원 건강정보 — 임신성 당뇨병",
+      "publisher": "서울대학교병원",
+      "citation_ko": "서울대병원 임신성 당뇨병 안내",
+      "url": "https://www.snuh.org/health/nMedInfo/nView.do?category=DIS&medid=AA000265",
+      "trust_tier": "C",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19"
+    },
+    "york_nhs_lft": {
+      "title": "Liver Function Tests in Pregnancy — Reference Ranges",
+      "publisher": "York and Scarborough Teaching Hospitals NHS Foundation Trust",
+      "citation_ko": "영국 York NHS 임신 중 간기능검사 참고구간",
+      "url": "https://www.yorkhospitals.nhs.uk/seecmsfile/?id=6821",
+      "trust_tier": "C",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19",
+      "note": "Abbassi-Ghanavati 2009 및 Larsson 2008을 인용한 2차 재수록본. 원논문 대조 전까지는 판정에 사용하지 않고 참고 표시용으로만 사용."
+    },
+    "abbassi_2009": {
+      "title": "Pregnancy and Laboratory Studies: A Reference Table for Clinicians",
+      "publisher": "Obstetrics & Gynecology 2009;114:1326-31",
+      "published": "2009",
+      "citation_ko": "임신 중 검사 참고표 (Abbassi-Ghanavati et al., 2009)",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/19935037/",
+      "trust_tier": "D",
+      "verification": "unverified",
+      "verified_at": "2026-08-19",
+      "note": "원문 PDF 확보 실패(LWW 402, PubMed reCAPTCHA, Williams 부록은 이미지). 이 출처만 근거로 하는 수치는 판정에 사용하지 않음. 학교 도서관 계정으로 1부 확보 시 승격 가능."
+    },
+    "immunize_hepb_pregnancy": {
+      "title": "Ask the Experts: Hepatitis B — Pregnancy, Perinatal & Infants",
+      "publisher": "Immunize.org (CDC 권고 해설)",
+      "citation_ko": "Immunize.org B형간염 백신·임신 Q&A",
+      "url": "https://www.immunize.org/ask-experts/topic/hepb/pregnancy-perinatal-infants/",
+      "trust_tier": "C",
+      "verification": "primary_verified",
+      "verified_at": "2026-08-19",
+      "note": "ACIP 권고를 해설하는 자료. B형간염 백신이 사백신이라 임신 중 접종 가능하다는 서술의 근거로만 사용."
+    }
+  }
+}

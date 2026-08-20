@@ -8,6 +8,7 @@ import { centeredContentStyle, centeredSheetStyle } from "@/lib/layout";
 import { parseTestReport } from "@/lib/ocr";
 import { setPendingScan, type ParsedTestItem } from "@/lib/report";
 import { scanDocumentImage } from "@/lib/scan";
+import { currentPregnancyWeek } from "@/lib/pregnancy";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -99,7 +100,10 @@ export default function ScanDateConfirm() {
       setFinalUri(resolvedUri);
 
       try {
-        const result = await parseTestReport(resolvedUri);
+        // 임신 주수를 함께 넘겨야 판정 엔진이 삼분기별 기준을 적용할 수 있다.
+        // (헤모글로빈 1분기 11.0 / 2분기 10.5 / 3분기 11.0 등)
+        const gestationalWeek = await currentPregnancyWeek();
+        const result = await parseTestReport(resolvedUri, { gestationalWeek });
         if (cancelled) return;
         setItems(result.items);
         const parsedDate = parseReportDate(result.reportDate);

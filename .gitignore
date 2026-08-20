@@ -42,3 +42,6 @@ example
 # generated native folders
 /ios
 /android
+
+# Claude가 옮겨둔 삭제 대기 파일
+_to_delete/

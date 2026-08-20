@@ -25,6 +25,14 @@ export type LastReport = {
   testSheetId?: number;
   /** 서버가 계산한 검사 당시 임신 주차 스냅샷("12주차"). 서버 전송에 실패했으면 없다. */
   week?: string;
+  /** 여러 항목을 함께 봐야 나오는 소견(전자간증 조합, 빈혈 전 단계 철결핍 등). */
+  crossFindings?: { name: string; message: string; status: IndicatorStatus; conditions: string[] }[];
+  /** 판정 엔진이 아직 모르는 항목. 조용히 빼지 않고 화면에 밝힌다. */
+  unsupported?: { name: string; value: string }[];
+  /** 화면 하단 출처 표기. */
+  sources?: { label: string; url: string; badge: string }[];
+  /** 모델이 스스로 "못 읽겠다"고 남긴 부분. */
+  unreadable?: { reason: string; location: string }[];
 };
 
 export async function saveLastReport(data: {
@@ -36,6 +44,10 @@ export async function saveLastReport(data: {
   foods?: ReportFood[];
   testSheetId?: number;
   week?: string;
+  crossFindings?: LastReport["crossFindings"];
+  unsupported?: LastReport["unsupported"];
+  sources?: LastReport["sources"];
+  unreadable?: LastReport["unreadable"];
 }) {
   const report: LastReport = { ...data, uploadedAt: new Date().toISOString() };
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(report));
@@ -52,6 +64,70 @@ export async function loadLastReport(): Promise<LastReport | null> {
   } catch {
     return null;
   }
+}
+
+
+// ---- 사용자가 직접 고친 값 (검사지별로 따로 보관) ----
+//
+// 왜 별도 저장소인가:
+// 분석 화면은 포커스될 때마다 원본을 다시 읽어온다(로컬 마지막 리포트 또는 서버의
+// 지난 검사지). 편집 결과를 그 원본에 섞어두면 다음 진입 때 통째로 덮어써진다.
+// 그래서 "원본"과 "사용자 수정분"을 분리해 두고, 화면에서 원본 위에 수정분을 덧씌운다.
+// 서버에서 불러온 검사지(uri가 없는 경우)도 이 저장소에는 남길 수 있다.
+
+const EDITS_KEY = "shine.report.edits.v1";
+
+export type ReportEdits = {
+  items: ParsedTestItem[];
+  summary?: string;
+  questions?: string[];
+  foods?: ReportFood[];
+  crossFindings?: LastReport["crossFindings"];
+  unsupported?: LastReport["unsupported"];
+  sources?: LastReport["sources"];
+  /** 어떤 원본에 대한 수정인지 확인용 — 원본이 바뀌면 이 수정분은 버린다. */
+  signature: string;
+  editedAt: string;
+};
+
+/** 원본이 바뀌었는지 판별하는 지문. 항목 수 + 항목명 목록이면 충분하다. */
+export function reportSignature(items: ParsedTestItem[] | undefined): string {
+  if (!items?.length) return "empty";
+  // 재판정은 항목을 심각도순으로 다시 정렬하므로, 순서에 흔들리지 않도록 정렬해서 만든다.
+  // 값이 아니라 "어떤 항목들이 있는지"만 본다 — 값이 바뀌는 게 곧 수정이므로.
+  const names = items.map((i) => i.originalName || i.name).sort();
+  return `${items.length}|${names.join(",")}`;
+}
+
+type EditsStore = Record<string, ReportEdits>;
+
+async function readEditsStore(): Promise<EditsStore> {
+  try {
+    const raw = await AsyncStorage.getItem(EDITS_KEY);
+    return raw ? (JSON.parse(raw) as EditsStore) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** key: 기록 탭에서 연 검사지는 recordId, 방금 올린 검사지는 "last" */
+export async function saveReportEdits(key: string, edits: Omit<ReportEdits, "editedAt">) {
+  const store = await readEditsStore();
+  store[key] = { ...edits, editedAt: new Date().toISOString() };
+  await AsyncStorage.setItem(EDITS_KEY, JSON.stringify(store));
+}
+
+export async function loadReportEdits(key: string): Promise<ReportEdits | null> {
+  const store = await readEditsStore();
+  return store[key] ?? null;
+}
+
+/** 새 검사지를 올렸을 때처럼 원본이 갈아끼워지면 그 키의 수정분은 버린다. */
+export async function clearReportEdits(key: string) {
+  const store = await readEditsStore();
+  if (!(key in store)) return;
+  delete store[key];
+  await AsyncStorage.setItem(EDITS_KEY, JSON.stringify(store));
 }
 
 // scan/date-confirm.tsx가 OCR로 미리 읽어둔 검사항목·검사일을, 다음 단계인
@@ -108,6 +184,36 @@ export type ParsedTestItem = {
    * 대조할 수 있도록 원문을 같이 들고 다닌다. 대표명과 같으면 비워둔다.
    */
   originalName?: string;
+
+  // ---- 판정 엔진(lib/labs)이 채우는 값 ----
+  // 서버/구버전 데이터에는 없을 수 있으므로 전부 선택 필드다. 화면은 값이 있으면
+  // 근거를 함께 보여주고, 없으면 예전처럼 status/verdict만 보여준다.
+
+  /** 엔진이 낸 세분화 상태. "recheck"(재검 필요) "indeterminate"(판정 보류) 등 6종. */
+  engineStatus?:
+    | "safe"
+    | "watch"
+    | "recheck"
+    | "indeterminate"
+    | "alert"
+    | "info_only"
+    | "unsupported";
+  /** 배지에 표시할 라벨 ("재검 필요", "판정 보류", "참고"). */
+  badgeLabel?: string;
+  /** 무엇과 비교해서 나온 판정인지 ("임신 주수 기준 10.1~14.1"). */
+  basisLabel?: string;
+  /** 검사지 기준과 임신 중 기준이 엇갈릴 때의 설명. 이 앱의 핵심 가치. */
+  contrastNote?: string;
+  /** 함께 알려야 하는 주의사항 (검사법 편차, 참고범위와 임상기준의 차이 등). */
+  caveats?: string[];
+  /** 이 판정의 근거. 비어 있으면 화면에 판정을 띄우지 않는다. */
+  citations?: { label: string; url: string; quote?: string; badge: string }[];
+  /** 다음 진료 때 물어보면 좋을 질문 한 문장. */
+  doctorQuestion?: string;
+  /** 이전 검사 대비 변화가 클 때의 안내. */
+  trendNote?: string;
+  /** OCR을 못 믿겠는 항목 — 사용자에게 "이 숫자 맞나요?" 하고 되물어야 한다. */
+  needsConfirm?: boolean;
 };
 
 export type IndicatorDetail = {

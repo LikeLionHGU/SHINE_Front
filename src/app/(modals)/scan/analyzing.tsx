@@ -1,7 +1,8 @@
-import { saveLastReport, takePendingScan, type ParsedTestItem, type ReportFood } from "@/lib/report";
+import { saveLastReport, clearReportEdits, takePendingScan, type ParsedTestItem, type ReportFood } from "@/lib/report";
 import { parseTestReport } from "@/lib/ocr";
 import { generateReportInsights } from "@/lib/insights";
 import { scanDocumentImage } from "@/lib/scan";
+import { currentPregnancyWeek } from "@/lib/pregnancy";
 import { submitReport } from "@/lib/api";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -48,9 +49,21 @@ export default function ScanAnalyzing() {
     (async () => {
       const minVisible = new Promise<void>((resolve) => setTimeout(resolve, MIN_VISIBLE_MS));
 
+      // 임신 주차는 두 군데에 쓰인다.
+      //  (1) 판정 엔진 — 삼분기별 기준(헤모글로빈 11 / 10.5 / 11 등)을 고르는 데
+      //  (2) AI 종합 분석 프롬프트 — "임신 28주차에 받은 이번 검사는…" 처럼 주차에 맞춰 설명하게
+      // 한 번만 구해서 둘 다 넘긴다.
+      const gestationalWeek = await currentPregnancyWeek();
+
       let finalUri = uri ?? null;
       let items: ParsedTestItem[] | undefined;
       let resolvedTestDate = testDate;
+      // 판정 엔진이 함께 돌려주는 값들 — 항목 하나만 봐서는 안 보이는 소견,
+      // 아직 지원하지 않는 항목, 화면 하단에 표기할 출처 목록.
+      let crossFindings: Awaited<ReturnType<typeof parseTestReport>>["crossFindings"] | undefined;
+      let unsupported: Awaited<ReturnType<typeof parseTestReport>>["unsupported"] | undefined;
+      let sources: Awaited<ReturnType<typeof parseTestReport>>["sources"] | undefined;
+      let unreadable: Awaited<ReturnType<typeof parseTestReport>>["unreadable"] | undefined;
 
       if (uri) {
         const pending = takePendingScan(uri);
@@ -70,8 +83,12 @@ export default function ScanAnalyzing() {
           }
 
           try {
-            const result = await parseTestReport(finalUri);
+            const result = await parseTestReport(finalUri, { gestationalWeek });
             items = result.items;
+            crossFindings = result.crossFindings;
+            unsupported = result.unsupported;
+            sources = result.sources;
+            unreadable = result.unreadable;
             resolvedTestDate = resolvedTestDate ?? toStoredDate(result.reportDate);
           } catch (error) {
             // OCR 파싱이 실패해도(키 미설정, 네트워크 오류 등) 스캔 자체는
@@ -88,7 +105,7 @@ export default function ScanAnalyzing() {
 
       if (items && items.length > 0) {
         try {
-          const insights = await generateReportInsights(items);
+          const insights = await generateReportInsights(items, { gestationalWeek });
           summary = insights.summary;
           questions = insights.questions;
           foods = insights.foods;
@@ -117,12 +134,29 @@ export default function ScanAnalyzing() {
           // 이때 항목명이 "헤모글로빈" → "혈색소"로 바뀌므로, 사용자가 손에 든 검사지와
           // 대조할 수 있도록 OCR이 읽은 원문명을 같이 붙여둔다. 서버가 원문을 돌려주지
           // 않아서 순서로 짝짓는데, 개수가 다르면 잘못 붙을 수 있으니 그때는 포기한다.
-          if (corrected?.items?.length) {
-            const ocrNames = items?.map((item) => item.name) ?? [];
-            const sameLength = ocrNames.length === corrected.items.length;
-            items = corrected.items.map((item, i) => {
-              const printed = sameLength ? ocrNames[i] : undefined;
-              return printed && printed !== item.name ? { ...item, originalName: printed } : item;
+          // 서버도 임신 기준으로 다시 판정해서 돌려주지만, 그 판정에는 근거(출처)가
+          // 붙어 있지 않다. 프론트 판정 엔진(lib/labs)은 학회 원문까지 인용을 달고
+          // 오므로, **판정·설명·근거는 엔진 결과를 그대로 유지**하고 서버에서는
+          // 카탈로그 대표명("헤모글로빈" → "혈색소")만 빌려온다.
+          // (엔진이 판정하지 못한 항목은 서버 값이라도 보여주는 게 낫기 때문에
+          //  engineStatus가 없는 항목만 서버 값으로 대체한다.)
+          if (corrected?.items?.length && items?.length) {
+            const sameLength = items.length === corrected.items.length;
+            items = items.map((item, i) => {
+              const fromServer = sameLength ? corrected.items[i] : undefined;
+              if (!fromServer) return item;
+              if (!item.engineStatus) {
+                // 엔진이 모르는 항목 → 서버 판정을 쓰되 원문명은 유지한다.
+                return { ...fromServer, originalName: item.originalName ?? item.name };
+              }
+              // 엔진이 판정한 항목 → 대표명만 갈아끼운다.
+              const displayName = fromServer.name || item.name;
+              return {
+                ...item,
+                name: displayName,
+                originalName:
+                  item.originalName ?? (displayName !== item.name ? item.name : undefined),
+              };
             });
           }
           if (corrected?.summary) summary = corrected.summary;
@@ -143,6 +177,8 @@ export default function ScanAnalyzing() {
       if (cancelled) return;
 
       if (finalUri) {
+        // 새 검사지를 올렸으니 이전 검사지에 대한 수정분은 더 이상 유효하지 않다.
+        await clearReportEdits("last").catch(() => {});
         await saveLastReport({
           uri: finalUri,
           items,
@@ -152,6 +188,10 @@ export default function ScanAnalyzing() {
           foods,
           testSheetId,
           week,
+          crossFindings,
+          unsupported,
+          sources,
+          unreadable,
         }).catch(() => {});
       }
       router.dismissTo("/(tabs)/analysis/report");
