@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { headerBar } from "@/lib/theme";
 import {
   Animated,
   Easing,
@@ -547,11 +548,7 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     paddingBottom: 24,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
+header: { ...headerBar, justifyContent: "space-between" },
   sheetContent: {
     flex: 1,
   },

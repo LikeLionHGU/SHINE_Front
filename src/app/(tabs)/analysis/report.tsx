@@ -32,6 +32,7 @@ import {
   type ParsedTestItem,
   type ReportFood,
 } from "@/lib/report";
+import { cardShadow, headerBar, tracking } from "@/lib/theme";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
@@ -395,7 +396,9 @@ export default function AnalysisReport() {
       }
       setUnsavedChanges(false);
       setSaveNotice(
-        photoUploaded ? "기록에 저장했어요." : "기록에 저장했어요. (사진은 올리지 못했어요)",
+        photoUploaded
+          ? "기록에 저장했어요."
+          : "기록에 저장했어요. (사진은 올리지 못했어요)",
       );
     } catch (error) {
       console.warn("[report] 검사지 서버 저장 실패:", error);
@@ -1176,23 +1179,16 @@ export default function AnalysisReport() {
   );
 }
 
-const shadow = {
-  shadowColor: "#000",
-  shadowOffset: { width: 0, height: 3 },
-  shadowOpacity: 0.06,
-  shadowRadius: 3,
-  elevation: 2,
-};
+// Figma base shadow — 정의는 lib/theme.ts 한 곳에만 둔다.
+const shadow = cardShadow;
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
+    ...headerBar,
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingTop: 6,
   },
   headerTitle: {
     position: "absolute",
@@ -1202,6 +1198,7 @@ const styles = StyleSheet.create({
     color: "#111",
     fontFamily: "Pretendard-Medium",
     fontSize: 16,
+    letterSpacing: tracking(16),
   },
   content: {
     paddingHorizontal: 16,
@@ -1222,12 +1219,14 @@ const styles = StyleSheet.create({
     color: "#111",
     fontFamily: "Pretendard-SemiBold",
     fontSize: 18,
+    letterSpacing: tracking(18),
   },
   emptyBody: {
     color: "#707070",
     fontFamily: "Pretendard-Regular",
     fontSize: 14,
     textAlign: "center",
+    letterSpacing: tracking(14),
   },
   emptyButton: {
     marginTop: 12,
@@ -1242,6 +1241,7 @@ const styles = StyleSheet.create({
     color: "#FFFDF9",
     fontFamily: "Pretendard-SemiBold",
     fontSize: 16,
+    letterSpacing: 1.2,
   },
 
   sectionTitle: {
@@ -1249,6 +1249,7 @@ const styles = StyleSheet.create({
     color: "#111",
     fontFamily: "Pretendard-SemiBold",
     fontSize: 16,
+    letterSpacing: tracking(16),
   },
 
   // ---- 판정 엔진(lib/labs)이 만든 근거를 보여주는 요소들 ----
@@ -1263,17 +1264,20 @@ const styles = StyleSheet.create({
     color: "#6B4A0E",
     fontFamily: "Pretendard-SemiBold",
     fontSize: 13,
+    letterSpacing: tracking(13),
   },
   crossBody: {
     color: "#7A5410",
     fontFamily: "Pretendard-Regular",
     fontSize: 12.5,
     lineHeight: 19,
+    letterSpacing: tracking(12.5),
   },
   crossCond: {
     color: "#9A7A3A",
     fontFamily: "Pretendard-Regular",
     fontSize: 11.5,
+    letterSpacing: tracking(11.5),
   },
 
   unsupportedBox: {
@@ -1290,17 +1294,20 @@ const styles = StyleSheet.create({
     color: "#5C5C57",
     fontFamily: "Pretendard-SemiBold",
     fontSize: 12.5,
+    letterSpacing: tracking(12.5),
   },
   unsupportedItem: {
     color: "#8A8A82",
     fontFamily: "Pretendard-Regular",
     fontSize: 12,
+    letterSpacing: tracking(12),
   },
   unsupportedHint: {
     color: "#A0A0A0",
     fontFamily: "Pretendard-Regular",
     fontSize: 11,
     marginTop: 2,
+    letterSpacing: tracking(11),
   },
 
   sourceBox: {
@@ -1314,23 +1321,27 @@ const styles = StyleSheet.create({
     color: "#707070",
     fontFamily: "Pretendard-Medium",
     fontSize: 12,
+    letterSpacing: tracking(12),
   },
   sourceItem: {
     color: "#8A8A82",
     fontFamily: "Pretendard-Regular",
     fontSize: 11,
     lineHeight: 17,
+    letterSpacing: tracking(11),
   },
   sourceBadge: {
     color: "#2E7D52",
     fontFamily: "Pretendard-SemiBold",
     fontSize: 10,
+    letterSpacing: tracking(10),
   },
   sourceHint: {
     color: "#A0A0A0",
     fontFamily: "Pretendard-Regular",
     fontSize: 10.5,
     marginTop: 2,
+    letterSpacing: tracking(10.5),
   },
 
   // ---- OCR 오독 확인·수정 ----
@@ -1345,18 +1356,21 @@ const styles = StyleSheet.create({
     color: "#4A4A44",
     fontFamily: "Pretendard-SemiBold",
     fontSize: 13,
+    letterSpacing: tracking(13),
   },
   missingBody: {
     color: "#5C5C57",
     fontFamily: "Pretendard-Regular",
     fontSize: 12.5,
     lineHeight: 19,
+    letterSpacing: tracking(12.5),
   },
   missingNames: {
     color: "#8A8A82",
     fontFamily: "Pretendard-Medium",
     fontSize: 11.5,
     marginTop: 2,
+    letterSpacing: tracking(11.5),
   },
   confirmCard: {
     backgroundColor: "#E6EEF7",
@@ -1369,18 +1383,21 @@ const styles = StyleSheet.create({
     color: "#22507C",
     fontFamily: "Pretendard-SemiBold",
     fontSize: 13,
+    letterSpacing: tracking(13),
   },
   confirmBody: {
     color: "#2A5D8F",
     fontFamily: "Pretendard-Regular",
     fontSize: 12.5,
     lineHeight: 19,
+    letterSpacing: tracking(12.5),
   },
   confirmNames: {
     color: "#4C7BAD",
     fontFamily: "Pretendard-Medium",
     fontSize: 11.5,
     marginTop: 2,
+    letterSpacing: tracking(11.5),
   },
   editBtn: {
     alignSelf: "flex-start",
@@ -1395,6 +1412,7 @@ const styles = StyleSheet.create({
     color: "#5C5C57",
     fontFamily: "Pretendard-Medium",
     fontSize: 12.5,
+    letterSpacing: tracking(12.5),
   },
   editSheet: {
     position: "absolute",
@@ -1407,17 +1425,24 @@ const styles = StyleSheet.create({
     gap: 9,
     ...shadow,
   },
-  editTitle: { color: "#111", fontFamily: "Pretendard-SemiBold", fontSize: 16 },
+  editTitle: {
+    color: "#111",
+    fontFamily: "Pretendard-SemiBold",
+    fontSize: 16,
+    letterSpacing: tracking(16),
+  },
   editHint: {
     color: "#707070",
     fontFamily: "Pretendard-Regular",
     fontSize: 12.5,
     lineHeight: 19,
+    letterSpacing: tracking(12.5),
   },
   editOriginal: {
     color: "#A0A0A0",
     fontFamily: "Pretendard-Regular",
     fontSize: 12,
+    letterSpacing: tracking(12),
   },
   editInput: {
     height: 48,
@@ -1429,6 +1454,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#111",
     marginTop: 2,
+    letterSpacing: tracking(16),
   },
   editRow: { flexDirection: "row", gap: 8, marginTop: 6 },
   editAction: {
@@ -1443,12 +1469,14 @@ const styles = StyleSheet.create({
     color: "#5C5C57",
     fontFamily: "Pretendard-Medium",
     fontSize: 14,
+    letterSpacing: tracking(14),
   },
   editSave: { backgroundColor: "#FA0C56" },
   editSaveText: {
     color: "#FFFDF9",
     fontFamily: "Pretendard-SemiBold",
     fontSize: 14,
+    letterSpacing: tracking(14),
   },
   editDisabled: { opacity: 0.45 },
 
@@ -1457,6 +1485,7 @@ const styles = StyleSheet.create({
     fontFamily: "Pretendard-SemiBold",
     fontSize: 18,
     paddingHorizontal: 6,
+    letterSpacing: tracking(18),
   },
   sendDisabled: { opacity: 0.4 },
   sentNotice: {
@@ -1464,6 +1493,7 @@ const styles = StyleSheet.create({
     color: "#3A6B5C",
     fontFamily: "Pretendard-Medium",
     fontSize: 12,
+    letterSpacing: tracking(12),
   },
 
   debugNote: {
@@ -1471,6 +1501,7 @@ const styles = StyleSheet.create({
     fontFamily: "Pretendard-Regular",
     fontSize: 11,
     lineHeight: 16,
+    letterSpacing: tracking(11),
   },
   saveBox: { marginTop: 4, gap: 8, alignItems: "stretch" },
   saveHint: {
@@ -1478,6 +1509,7 @@ const styles = StyleSheet.create({
     color: "#8A8A82",
     fontFamily: "Pretendard-Regular",
     fontSize: 12.5,
+    letterSpacing: tracking(12.5),
   },
   saveButton: {
     height: 52,
@@ -1490,6 +1522,7 @@ const styles = StyleSheet.create({
     color: "#FFFDF9",
     fontFamily: "Pretendard-SemiBold",
     fontSize: 16,
+    letterSpacing: 1.2,
   },
   saveDisabled: { opacity: 0.45 },
   savedText: {
@@ -1497,12 +1530,14 @@ const styles = StyleSheet.create({
     color: "#2E7D52",
     fontFamily: "Pretendard-Medium",
     fontSize: 13,
+    letterSpacing: tracking(13),
   },
   saveNotice: {
     textAlign: "center",
     color: "#3A6B5C",
     fontFamily: "Pretendard-Medium",
     fontSize: 12,
+    letterSpacing: tracking(12),
   },
 
   sheetScroll: { maxHeight: 320 },
@@ -1518,6 +1553,7 @@ const styles = StyleSheet.create({
     color: "#5C5C57",
     fontFamily: "Pretendard-Medium",
     fontSize: 11.5,
+    letterSpacing: tracking(11.5),
   },
   contrastBox: {
     backgroundColor: "#E6EEF7",
@@ -1528,6 +1564,7 @@ const styles = StyleSheet.create({
     fontFamily: "Pretendard-Regular",
     fontSize: 12.5,
     lineHeight: 19,
+    letterSpacing: tracking(12.5),
   },
   caveatBox: {
     backgroundColor: "#FAFAF8",
@@ -1538,6 +1575,7 @@ const styles = StyleSheet.create({
     fontFamily: "Pretendard-Regular",
     fontSize: 12,
     lineHeight: 18,
+    letterSpacing: tracking(12),
   },
   askBox: {
     color: "#3A6B5C",
@@ -1545,6 +1583,7 @@ const styles = StyleSheet.create({
     fontFamily: "Pretendard-Medium",
     fontSize: 12.5,
     lineHeight: 19,
+    letterSpacing: tracking(12.5),
   },
   citeBox: {
     marginTop: 12,
@@ -1559,11 +1598,13 @@ const styles = StyleSheet.create({
     fontFamily: "Pretendard-Regular",
     fontSize: 11,
     lineHeight: 17,
+    letterSpacing: tracking(11),
   },
   citeBadge: {
     color: "#2E7D52",
     fontFamily: "Pretendard-SemiBold",
     fontSize: 10,
+    letterSpacing: tracking(10),
   },
   // aspectRatio는 렌더링 시 실제 업로드 사진 비율로 덮어쓴다(기본값은 초기 로딩 중 fallback).
   imageWrap: {
@@ -1590,6 +1631,7 @@ const styles = StyleSheet.create({
     fontFamily: "Pretendard-Regular",
     fontSize: 12,
     marginTop: -4,
+    letterSpacing: tracking(12),
   },
 
   card: {
@@ -1607,13 +1649,19 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     height: 24,
   },
-  cardTitle: { color: "#111", fontFamily: "Pretendard-SemiBold", fontSize: 16 },
+  cardTitle: {
+    color: "#111",
+    fontFamily: "Pretendard-SemiBold",
+    fontSize: 16,
+    letterSpacing: tracking(16),
+  },
   summaryText: {
     color: "#111",
     fontFamily: "Pretendard-Regular",
     fontSize: 14,
     lineHeight: 20,
     paddingBottom: 14,
+    letterSpacing: tracking(14),
   },
 
   // parseTestReport(lib/ocr.ts)가 읽어낸 검사항목/수치/상태 표.
@@ -1628,6 +1676,7 @@ const styles = StyleSheet.create({
     color: "#707070",
     fontFamily: "Pretendard-Medium",
     fontSize: 12,
+    letterSpacing: tracking(12),
   },
   tableRow: {
     flexDirection: "row",
@@ -1643,6 +1692,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     paddingRight: 6,
+    letterSpacing: tracking(13),
   },
   colName: { flex: 1.15, paddingRight: 6 },
   tableCellOriginal: {
@@ -1651,6 +1701,7 @@ const styles = StyleSheet.create({
     fontFamily: "Pretendard-Regular",
     fontSize: 11,
     lineHeight: 15,
+    letterSpacing: tracking(11),
   },
   cardHint: {
     paddingVertical: 8,
@@ -1659,6 +1710,7 @@ const styles = StyleSheet.create({
     fontFamily: "Pretendard-Regular",
     fontSize: 13,
     lineHeight: 20,
+    letterSpacing: tracking(13),
   },
   colValue: { flex: 0.95 },
   colStatus: { width: 65, alignItems: "flex-start" },
@@ -1669,11 +1721,16 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     borderRadius: 14,
     backgroundColor: "#FFFCFD",
-    gap: 8,
+    gap: 10,
     ...shadow,
   },
   exampleRow: { flexDirection: "row", alignItems: "center", gap: 9 },
-  example: { color: "#707070", fontFamily: "Pretendard-Medium", fontSize: 14 },
+  example: {
+    color: "#707070",
+    fontFamily: "Pretendard-Medium",
+    fontSize: 14,
+    letterSpacing: tracking(14),
+  },
   inputWrap: {
     height: 41,
     borderRadius: 8,
@@ -1686,6 +1743,7 @@ const styles = StyleSheet.create({
     color: "#111",
     fontFamily: "Pretendard-Medium",
     fontSize: 14,
+    letterSpacing: tracking(14),
   },
 
   ingredients: { paddingBottom: 12, gap: 8 },
@@ -1703,6 +1761,7 @@ const styles = StyleSheet.create({
     color: "#707070",
     fontFamily: "Pretendard-Medium",
     fontSize: 12,
+    letterSpacing: tracking(12),
   },
 
   // justifyContent: "flex-end"이라 시트(유일한 in-flow 자식)는 항상 하단에
@@ -1755,18 +1814,25 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingRight: 28,
   },
-  sheetTitle: { color: "#111", fontFamily: "Pretendard-Medium", fontSize: 16 },
+  sheetTitle: {
+    color: "#111",
+    fontFamily: "Pretendard-Medium",
+    fontSize: 16,
+    letterSpacing: tracking(16),
+  },
   sheetTitleOriginal: {
     flex: 1,
     color: "#A0A0A0",
     fontFamily: "Pretendard-Regular",
     fontSize: 12,
+    letterSpacing: tracking(12),
   },
   sheetDefinition: {
     color: "#111",
     fontFamily: "Pretendard-Regular",
     fontSize: 12,
     lineHeight: 18,
+    letterSpacing: tracking(12),
   },
   sheetDivider: {
     height: StyleSheet.hairlineWidth,
@@ -1777,5 +1843,6 @@ const styles = StyleSheet.create({
     fontFamily: "Pretendard-Regular",
     fontSize: 12,
     lineHeight: 18,
+    letterSpacing: tracking(12),
   },
 });

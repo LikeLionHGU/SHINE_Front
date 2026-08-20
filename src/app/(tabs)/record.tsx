@@ -1,4 +1,5 @@
 import { ChevronRightIcon, XXLogoIcon } from "@/components/icons";
+import { headerBar } from "@/lib/theme";
 import { centeredContentStyle } from "@/lib/layout";
 import { getRecords } from "@/lib/api";
 import type { RecordEntry } from "@/lib/report";
@@ -45,7 +46,7 @@ export default function Record() {
         </View>
 
         <ScrollView style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <XXLogoIcon width={44} />
+          <XXLogoIcon />
           <Text style={styles.heading}>차곡차곡 쌓인{"\n"}나의 건강 기록</Text>
 
           <View style={styles.timeline}>
@@ -100,7 +101,7 @@ const shadow = {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 6 },
+header: { ...headerBar, justifyContent: "space-between", paddingHorizontal: 16 },
   headerTitle: { position: "absolute", left: 0, right: 0, textAlign: "center", color: "#111", fontFamily: "Pretendard-Medium", fontSize: 16 },
   pressed: { opacity: 0.78 },
 

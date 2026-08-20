@@ -280,6 +280,14 @@ export type TrendIndicator = {
   trendSummary: string;
   /** 차트 y축 하단/상단 기준값 (이 범위로 정규화해서 그린다) */
   range: [number, number];
+  /**
+   * 이 검사 항목의 기본 평균 수치. 분석 목록의 작은 꺾은선 아래에 점선으로 깔린다
+   * (Figma 837:4354) — "내 값이 평균보다 위냐 아래냐"를 한눈에 보여주는 기준선이다.
+   *
+   * 서버가 항목별 평균을 내려주기 전까지는 range의 중앙값으로 대신한다
+   * (components/trend-chart.tsx의 baselineOf 참고).
+   */
+  average?: number;
   /** y축 라벨, 위→아래 순서 */
   zoneLabels: [string, string, string];
   history: TrendPoint[];

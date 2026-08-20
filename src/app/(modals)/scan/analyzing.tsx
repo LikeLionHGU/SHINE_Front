@@ -3,6 +3,7 @@ import { parseTestReport } from "@/lib/ocr";
 import { generateReportInsights } from "@/lib/insights";
 import { scanDocumentImage } from "@/lib/scan";
 import { currentPregnancyWeek } from "@/lib/pregnancy";
+import { colors, font, tracking } from "@/lib/theme";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
@@ -152,7 +153,7 @@ export default function ScanAnalyzing() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={["#FFFCFD", "#FFEBF3"]} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={[colors.bgFrom, colors.bgTo]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.center}>
           <Text style={styles.text}>업로드한 사진을 스캔 후{"\n"}검사 결과를 보기 쉽게 바꾸는 중이에요</Text>
@@ -179,7 +180,16 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 16, paddingHorizontal: 48 },
-  text: { color: "#A0A0A0", fontFamily: "Pretendard-Medium", fontSize: 14, lineHeight: 22, textAlign: "center" },
+  // Figma 837:4616 — Medium 14 / 행간 22 / 자간 -0.42 / #A0A0A0, 296px 폭에서 2줄.
+  text: {
+    fontFamily: font.medium,
+    fontSize: 14,
+    lineHeight: 22,
+    letterSpacing: tracking(14),
+    color: colors.textHint,
+    textAlign: "center",
+  },
+  // Figma 837:4617 — 100.8 폭 블록, 막대 4개(h3.2, 간격 4.8, r440).
   bars: { width: 100.8, gap: 4.8, alignItems: "flex-start" },
-  bar: { height: 3.2, borderRadius: 220, backgroundColor: "#FA0C56" },
+  bar: { height: 3.2, borderRadius: 220, backgroundColor: colors.brandStrong },
 });

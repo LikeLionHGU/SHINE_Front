@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { headerBar } from "@/lib/theme";
 import {
   Pressable,
   ScrollView,
@@ -150,7 +151,7 @@ export default function ProfileEdit() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <XXLogoIcon width={46} height={17} />
+          <XXLogoIcon />
           <Text style={styles.heading}>개인정보</Text>
 
           {loading ? (
@@ -206,12 +207,7 @@ export default function ProfileEdit() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingTop: 10,
-  },
+header: { ...headerBar, paddingHorizontal: 12 },
   headerTitle: {
     flex: 1,
     textAlign: "center",

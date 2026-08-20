@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { headerBar } from "@/lib/theme";
 import { Pressable, ScrollView, Text, View, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -70,7 +71,7 @@ export default function Settings() {
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <XXLogoIcon width={46} height={17} />
+          <XXLogoIcon />
 
           <Text style={styles.sectionTitle}>프로필</Text>
           <Pressable style={[styles.card, styles.profileCard]} onPress={() => editProfile("name")}>
@@ -180,12 +181,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingTop: 10,
-  },
+header: { ...headerBar, paddingHorizontal: 12 },
   headerTitle: {
     flex: 1,
     textAlign: "center",

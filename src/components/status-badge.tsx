@@ -41,8 +41,15 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 50,
   },
+  // 시안(Frame2085671652): 안쪽 글자칸이 31x20으로 고정이라 "안심"과 "위험"의
+  // 배지 폭이 같다. 글자 수에 따라 배지가 들쭉날쭉하면 표를 훑을 때 눈에 걸린다.
+  // 다만 "확인 필요"는 31을 넘으므로 고정폭이 아니라 최소폭으로 둔다.
   text: {
     fontFamily: "Pretendard-SemiBold",
     fontSize: 12,
+    lineHeight: 20,
+    letterSpacing: -0.36,
+    minWidth: 31,
+    textAlign: "center",
   },
 });

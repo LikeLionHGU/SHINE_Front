@@ -1,6 +1,7 @@
-import { BackChevronIcon, ChevronRightIcon } from "@/components/icons";
+import { BackChevronIcon, ChevronRightIcon, SearchIcon } from "@/components/icons";
+import { cardShadow, colors, font, headerBar, radius, tracking } from "@/lib/theme";
 import { StatusBadge } from "@/components/status-badge";
-import { MiniTrendLine } from "@/components/trend-chart";
+import { baselineOf, MiniTrendLine } from "@/components/trend-chart";
 import { centeredContentStyle } from "@/lib/layout";
 import { getTrends } from "@/lib/api";
 import type { TrendIndicator } from "@/lib/report";
@@ -139,24 +140,28 @@ export default function Analysis() {
 
             <View style={styles.card}>
               {filtered.map((item, index) => (
-                <Pressable
-                  key={item.id}
-                  style={({ pressed }) => [
-                    styles.row,
-                    index < filtered.length - 1 && styles.rowDivider,
-                    pressed && styles.pressed,
-                  ]}
-                  onPress={() => router.push(`/(tabs)/analysis/${item.id}`)}
-                >
-                  <Text style={styles.rowTitle} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                  <View style={styles.rowRight}>
-                    <MiniTrendLine values={item.history.map((h) => h.value)} />
-                    <StatusBadge status={item.status} />
-                    <ChevronRightIcon size={20} />
-                  </View>
-                </Pressable>
+                <View key={item.id}>
+                  <Pressable
+                    style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+                    onPress={() => router.push(`/(tabs)/analysis/${item.id}`)}
+                  >
+                    <Text style={styles.rowTitle} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    {/* 점선은 이 항목의 기본 평균 수치 — 값이 평균 위인지 아래인지 바로 보이게 한다. */}
+                    <View style={styles.rowChart}>
+                      <MiniTrendLine
+                        values={item.history.map((h) => h.value)}
+                        baseline={baselineOf(item)}
+                      />
+                    </View>
+                    <View style={styles.rowBadge}>
+                      <StatusBadge status={item.status} />
+                    </View>
+                    <ChevronRightIcon size={24} />
+                  </Pressable>
+                  {index < filtered.length - 1 && <View style={styles.rowDivider} />}
+                </View>
               ))}
               {filtered.length === 0 && (
                 <View style={styles.noResult}>
@@ -171,27 +176,10 @@ export default function Analysis() {
   );
 }
 
-function SearchIcon() {
-  return (
-    <View style={styles.searchIcon}>
-      <View style={styles.searchIconCircle} />
-      <View style={styles.searchIconHandle} />
-    </View>
-  );
-}
-
-const shadow = {
-  shadowColor: "#000",
-  shadowOffset: { width: 0, height: 3 },
-  shadowOpacity: 0.06,
-  shadowRadius: 3,
-  elevation: 2,
-};
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 6 },
+header: { ...headerBar, justifyContent: "space-between", paddingHorizontal: 16 },
   headerTitle: { position: "absolute", left: 0, right: 0, textAlign: "center", color: "#111", fontFamily: "Pretendard-Medium", fontSize: 16 },
   pressed: { opacity: 0.78 },
 
@@ -201,29 +189,58 @@ const styles = StyleSheet.create({
   emptyButton: { marginTop: 12, height: 46, paddingHorizontal: 24, borderRadius: 12, backgroundColor: "#FA0C56", alignItems: "center", justifyContent: "center" },
   emptyButtonText: { color: "#FFFDF9", fontFamily: "Pretendard-SemiBold", fontSize: 16 },
 
-  content: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 24, gap: 12 },
+  // 시안 좌표(393 기준): 날짜 줄 top 123 · 검색창 163 · 카드 217.
+  content: { paddingHorizontal: 16, paddingTop: 28, paddingBottom: 24, gap: 12 },
   dateNav: { flexDirection: "row", alignItems: "center", gap: 2, alignSelf: "flex-start" },
-  dateHeading: { color: "#414141", fontFamily: "Pretendard-SemiBold", fontSize: 20, letterSpacing: -1, textAlign: "center", minWidth: 79 },
+  dateHeading: {
+    color: colors.textStrong,
+    fontFamily: font.semiBold,
+    fontSize: 18,
+    textAlign: "center",
+    minWidth: 79,
+  },
 
+  // 검색창 — 시안 360x40, r10, base shadow
   searchWrap: {
     height: 40,
     borderRadius: 10,
-    backgroundColor: "#FFFCFD",
+    backgroundColor: colors.surface,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    ...shadow,
+    ...cardShadow,
   },
-  searchInput: { flex: 1, height: "100%", color: "#111", fontFamily: "Pretendard-Regular", fontSize: 14 },
-  searchIcon: { width: 16, height: 16, alignItems: "center", justifyContent: "center" },
-  searchIconCircle: { width: 11, height: 11, borderRadius: 6, borderWidth: 1.4, borderColor: "#A0A0A0", position: "absolute", top: 0, left: 0 },
-  searchIconHandle: { width: 5, height: 1.4, backgroundColor: "#A0A0A0", position: "absolute", bottom: 0, right: 0, transform: [{ rotate: "45deg" }] },
+  searchInput: {
+    flex: 1,
+    height: "100%",
+    color: colors.text,
+    fontFamily: font.regular,
+    fontSize: 14,
+  },
 
-  card: { borderRadius: 14, backgroundColor: "#FFFCFD", paddingHorizontal: 18, ...shadow },
-  row: { height: 48, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#E5E5E5" },
-  rowTitle: { flex: 1, color: "#111", fontFamily: "Pretendard-Medium", fontSize: 16 },
-  rowRight: { flexDirection: "row", alignItems: "center", gap: 10 },
+  // 목록 카드 — 시안 361폭, 항목명 left 18 / 화살표 right 7.
+  card: {
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    paddingLeft: 18,
+    paddingRight: 7,
+    ...cardShadow,
+  },
+  // 한 행 48px. 오른쪽 묶음은 시안 x좌표 그대로 폭을 고정한다
+  // (꺾은선 46 -> 간격 31 -> 배지 -> 간격 2 -> 화살표 24).
+  row: { height: 48, flexDirection: "row", alignItems: "center" },
+  rowTitle: {
+    flex: 1,
+    color: colors.text,
+    fontFamily: font.medium,
+    fontSize: 16,
+    letterSpacing: tracking(16),
+  },
+  rowChart: { width: 46, marginRight: 31 },
+  rowBadge: { marginRight: 2 },
+  // 구분선은 화살표 밑까지 오지 않는다 (시안: 카드 안 18~340).
+  rowDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.divider, marginRight: 14 },
+
   noResult: { paddingVertical: 24, alignItems: "center" },
-  noResultText: { color: "#A0A0A0", fontFamily: "Pretendard-Regular", fontSize: 14 },
+  noResultText: { color: colors.textHint, fontFamily: font.regular, fontSize: 14 },
 });

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { headerBar } from "@/lib/theme";
 import {
   Modal,
   Pressable,
@@ -387,13 +388,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingTop: 10,
-  },
+header: { ...headerBar, justifyContent: "space-between", paddingHorizontal: 12 },
   headerTitle: {
     color: "#000000",
     fontSize: 16,

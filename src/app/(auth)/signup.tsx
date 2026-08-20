@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { headerBar } from "@/lib/theme";
 import {
   Pressable,
   ScrollView,
@@ -95,7 +96,7 @@ export default function Signup() {
             <BackChevronIcon />
           </Pressable>
           <View style={styles.logo}>
-            <XXLogoIcon width={65} height={24} />
+            <XXLogoIcon />
           </View>
         </View>
 
@@ -293,10 +294,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
+header: { ...headerBar, paddingHorizontal: 16 },
   logo: {
     marginTop: 23,
   },

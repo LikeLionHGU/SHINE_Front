@@ -293,8 +293,11 @@ export function ChevronRightIcon({
   );
 }
 
+// 크기는 기록 화면 기준(폭 44)으로 모든 화면이 같다. 예전에는 화면마다
+// 65 / 46 / 44를 따로 넘겨서 홈만 로고가 유독 컸다. 호출부에서 width를
+// 넘기지 말 것 — 넘기는 순간 다시 화면마다 달라진다.
 export function XXLogoIcon({
-  width = 65,
+  width = 44,
   height = (width * 15) / 36,
   color = "#FF0A68",
 }: {
@@ -448,14 +451,28 @@ export function AiQuestionIcon({ size = 16 }: { size?: number }) {
   );
 }
 
-export function SparkleIcon({ size = 16 }: { size?: number }) {
+/**
+ * 돋보기 (Figma search-md, 분석 목록 검색창).
+ *
+ * 시안의 바깥 상자는 19.2, 글리프는 그 안쪽 12.5%를 뺀 14.4를 채운다 —
+ * viewBox 24 기준으로 3~21이 곧 그 비율이다.
+ */
+export function SearchIcon({
+  size = 19.2,
+  color = "#A0A0A0",
+}: {
+  size?: number;
+  color?: string;
+}) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx={11} cy={11} r={8} stroke={color} strokeWidth={2} />
       <Path
-        d="M7.8 1.5C8.25 4.83 9.96 6.54 13.3 7C9.96 7.45 8.25 9.16 7.8 12.5C7.35 9.16 5.64 7.45 2.3 7C5.64 6.54 7.35 4.83 7.8 1.5Z"
-        fill="#FA0C56"
+        d="M21 21L16.65 16.65"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
       />
-      <Path d="M12.8 11.2V14M11.4 12.6h2.8" stroke="#FF91B8" strokeWidth={1.2} strokeLinecap="round" />
     </Svg>
   );
 }

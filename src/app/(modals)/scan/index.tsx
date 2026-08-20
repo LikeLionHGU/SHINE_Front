@@ -1,10 +1,12 @@
 import {
   BackChevronIcon,
   CameraIcon,
+  CloseIcon,
   UploadCloudIcon,
   XXLogoIcon,
 } from "@/components/icons";
 import { centeredContentStyle, centeredSheetStyle } from "@/lib/layout";
+import { cardShadow, colors, font, headerBar, radius, tracking, type as t } from "@/lib/theme";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
@@ -77,21 +79,30 @@ export default function ScanStart() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={["#FFFCFD", "#FFEBF3"]} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={[colors.bgFrom, colors.bgTo]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
         <View style={styles.header}>
-          <Pressable hitSlop={8} onPress={handleClose}>
+          <Pressable hitSlop={8} onPress={handleClose} accessibilityRole="button" accessibilityLabel="뒤로">
             <BackChevronIcon size={24} />
+          </Pressable>
+          {/* Figma 837:4594 — 뒤로가기와 짝을 이루는 닫기 버튼. 스캔을 중간에
+              그만둘 때 홈으로 바로 빠져나가는 길이 없어서 빠져 있었다. */}
+          <Pressable hitSlop={8} onPress={handleClose} accessibilityRole="button" accessibilityLabel="닫기">
+            <CloseIcon size={24} />
           </Pressable>
         </View>
 
         <ScrollView style={centeredContentStyle} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <XXLogoIcon width={65} />
+          <XXLogoIcon />
           <Text style={styles.heading}>산전 검사지를{"\n"}업로드 해주세요</Text>
 
           <View style={styles.cardsRow}>
             <Pressable
-              style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.card,
+                method === "camera" && imageUri ? styles.cardSelected : null,
+                pressed && styles.pressed,
+              ]}
               onPress={pickFromCamera}
             >
               <CameraIcon size={24} />
@@ -141,39 +152,33 @@ const PREVIEW_HEIGHT = 320;
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingTop: 6,
-  },
+header: { ...headerBar, justifyContent: "space-between", paddingHorizontal: 16 },
   content: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 24, gap: 12 },
-  heading: { marginTop: -8, marginBottom: 4, color: "#4C4C4C", fontFamily: "Pretendard-SemiBold", fontSize: 24, lineHeight: 32 },
-  cardsRow: { flexDirection: "row", gap: 9 },
+  // Figma 837:4570 — 24/32, 자간 -0.72. (홈 대제목만 줄 단위로 -0.64가 따로 걸려 있다.)
+  heading: { marginTop: -8, marginBottom: 4, ...t.heading24, letterSpacing: tracking(24) },
+  // Figma: 카드 left 15 / 201, 폭 176 → 사이 간격 10
+  cardsRow: { flexDirection: "row", gap: 10 },
   card: {
     flex: 1,
     height: 74,
-    borderRadius: 14,
-    backgroundColor: "#FFFCFD",
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2,
+    // Figma 837:4572 — 아이콘과 라벨 사이 16
+    gap: 16,
+    ...cardShadow,
   },
+  // 선택된 카드는 3px 핑크 테두리로 바뀌고 그림자는 빠진다(Figma 837:4575).
   cardSelected: {
     borderWidth: 3,
-    borderColor: "#FA0C56",
+    borderColor: colors.brandStrong,
     shadowOpacity: 0,
     elevation: 0,
   },
   pressed: { opacity: 0.78 },
-  cardLabel: { color: "#111", fontFamily: "Pretendard-Medium", fontSize: 16 },
+  cardLabel: { fontFamily: font.medium, fontSize: 16, lineHeight: 21, letterSpacing: tracking(16), color: colors.text },
   // ㄱ자 모서리로 감싸는 미리보기 틀은 항상 같은 크기다. 사진 비율에 따라
   // 틀이 늘었다 줄었다 하면 아래 "완료" 버튼과 여백이 매번 달라 보인다.
   // 안쪽 사진만 contain으로 맞춰서, 세로 사진이든 가로 사진이든 잘리지 않고
@@ -187,22 +192,30 @@ const styles = StyleSheet.create({
   preview: {
     width: "100%",
     height: "100%",
-    borderRadius: 8,
-    backgroundColor: "#FFF0F6",
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfacePink,
   },
-  corner: { position: "absolute", width: CORNER_SIZE, height: CORNER_SIZE, borderColor: "#707070" },
+  corner: { position: "absolute", width: CORNER_SIZE, height: CORNER_SIZE, borderColor: colors.textSub },
   cornerTL: { top: -8, left: -8, borderTopWidth: 2, borderLeftWidth: 2, borderTopLeftRadius: 6 },
   cornerTR: { top: -8, right: -8, borderTopWidth: 2, borderRightWidth: 2, borderTopRightRadius: 6 },
   cornerBL: { bottom: -8, left: -8, borderBottomWidth: 2, borderLeftWidth: 2, borderBottomLeftRadius: 6 },
   cornerBR: { bottom: -8, right: -8, borderBottomWidth: 2, borderRightWidth: 2, borderBottomRightRadius: 6 },
+  // Figma 588:5552 — 361×46, r12, #FA0C56. 글자만 자간이 양수(+1.2)라
+  // 본문 규칙(-3%)을 따르지 않는다. 버튼 텍스트라 일부러 벌려둔 값이므로 그대로 둔다.
   completeButton: {
     marginHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 16,
     height: 46,
     borderRadius: 12,
-    backgroundColor: "#FA0C56",
+    backgroundColor: colors.brandStrong,
     alignItems: "center",
     justifyContent: "center",
   },
-  completeButtonText: { color: "#FFFDF9", fontFamily: "Pretendard-SemiBold", fontSize: 20, letterSpacing: 1.2 },
+  completeButtonText: {
+    color: "#FFFDF9",
+    fontFamily: font.semiBold,
+    fontSize: 20,
+    lineHeight: 26,
+    letterSpacing: 1.2,
+  },
 });

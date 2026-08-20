@@ -5,6 +5,7 @@ import {
   EditOutlineIcon,
   UpTriangleIcon,
 } from "@/components/icons";
+import { headerBar } from "@/lib/theme";
 import { centeredContentStyle } from "@/lib/layout";
 import {
   hasSeenShareTip,
@@ -613,13 +614,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingTop: 14,
-  },
+header: { ...headerBar, justifyContent: "space-between", paddingHorizontal: 16 },
   headerSpacer: {
     width: 20,
   },

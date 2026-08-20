@@ -9,6 +9,7 @@ import { parseTestReport } from "@/lib/ocr";
 import { setPendingScan, type ParsedTestItem } from "@/lib/report";
 import { scanDocumentImage } from "@/lib/scan";
 import { currentPregnancyWeek } from "@/lib/pregnancy";
+import { colors, font, headerBar, radius, tracking, type as t } from "@/lib/theme";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -205,7 +206,7 @@ export default function ScanDateConfirm() {
         ) : (
           <>
             <View style={[centeredContentStyle, styles.content]}>
-              <XXLogoIcon width={65} />
+              <XXLogoIcon />
               <Text style={styles.heading}>검사 날짜를{"\n"}확인해주세요</Text>
 
               {/* Figma 911:4419 — "날짜" 라벨 + 값 칩 한 줄.
@@ -396,13 +397,7 @@ export default function ScanDateConfirm() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingTop: 6,
-  },
+header: { ...headerBar, justifyContent: "space-between", paddingHorizontal: 16 },
   center: {
     flex: 1,
     alignItems: "center",
@@ -411,23 +406,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 48,
   },
   loadingText: {
-    color: "#A0A0A0",
-    fontFamily: "Pretendard-Medium",
+    fontFamily: font.medium,
     fontSize: 14,
     lineHeight: 22,
+    letterSpacing: tracking(14),
+    color: colors.textHint,
     textAlign: "center",
   },
   bars: { width: 100.8, gap: 4.8, alignItems: "flex-start" },
-  bar: { height: 3.2, borderRadius: 220, backgroundColor: "#FA0C56" },
+  bar: { height: 3.2, borderRadius: 220, backgroundColor: colors.brandStrong },
   content: { paddingHorizontal: 16, paddingTop: 24, gap: 12 },
-  heading: {
-    marginTop: -8,
-    marginBottom: 4,
-    color: "#4C4C4C",
-    fontFamily: "Pretendard-SemiBold",
-    fontSize: 24,
-    lineHeight: 32,
-  },
+  // Figma 911:4743 — 24/32, 자간 -0.72, 2줄 68px.
+  heading: { marginTop: -8, marginBottom: 4, minHeight: 64, ...t.heading24, letterSpacing: tracking(24) },
 
   // Figma 911:4419 — 361x50 / radius 8 / secondary_pink / base shadow
   dateField: {
@@ -435,31 +425,36 @@ const styles = StyleSheet.create({
     height: 50,
     paddingLeft: 15,
     paddingRight: 9,
-    borderRadius: 8,
-    backgroundColor: "#FFF0F6",
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfacePink,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     boxShadow: "0 3px 3px rgba(0, 0, 0, 0.06)",
   },
   dateLabel: {
-    color: "#A0A0A0",
-    fontFamily: "Pretendard-Medium",
+    fontFamily: font.medium,
     fontSize: 14,
+    lineHeight: 20,
+    letterSpacing: tracking(14),
+    color: colors.textHint,
   },
   // Figma 911:4422 — 80x30 흰 칩. 값이 없으면 빈 칩만 보인다.
   dateChip: {
     width: 80,
     height: 30,
-    borderRadius: 4,
-    backgroundColor: "#FFFCFD",
+    borderRadius: radius.tile,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
+  // Figma 911:4752 — 날짜 값만 자간이 -0.14로 따로 지정돼 있다(본문 -3% 규칙 예외).
   dateChipText: {
-    color: "#111111",
-    fontFamily: "Pretendard-Medium",
+    fontFamily: font.medium,
     fontSize: 14,
+    lineHeight: 18,
+    letterSpacing: -0.14,
+    color: colors.text,
   },
 
   bottomArea: { paddingHorizontal: 16, paddingBottom: 12, gap: 14 },
@@ -477,24 +472,27 @@ const styles = StyleSheet.create({
   toastText: {
     textAlign: "center",
     color: "#FFFDF9",
-    fontFamily: "Pretendard-Medium",
+    fontFamily: font.medium,
     fontSize: 12,
     lineHeight: 22,
+    letterSpacing: tracking(12),
   },
   pressed: { opacity: 0.78 },
   // Figma 911:4396 / 911:4474 — 361x46 / radius 12 / 활성 #FA0C56, 비활성 #A0A0A0
   confirmButton: {
     height: 46,
     borderRadius: 12,
-    backgroundColor: "#FA0C56",
+    backgroundColor: colors.brandStrong,
     alignItems: "center",
     justifyContent: "center",
   },
-  confirmButtonDisabled: { backgroundColor: "#A0A0A0" },
+  confirmButtonDisabled: { backgroundColor: colors.textHint },
+  // 버튼 글자만 자간이 양수(+1.2)다 — 본문 -3% 규칙의 예외.
   confirmButtonText: {
     color: "#FFFDF9",
-    fontFamily: "Pretendard-SemiBold",
+    fontFamily: font.semiBold,
     fontSize: 20,
+    lineHeight: 26,
     letterSpacing: 1.2,
   },
 

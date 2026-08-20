@@ -1,4 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { headerBar } from "@/lib/theme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -85,7 +86,7 @@ export default function Terms() {
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <XXLogoIcon width={46} height={17} />
+          <XXLogoIcon />
           <Text style={styles.heading}>서비스 이용약관</Text>
           <Text style={styles.updated}>최종 수정일 2026. 08. 20</Text>
 
@@ -117,12 +118,7 @@ export default function Terms() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingTop: 10,
-  },
+header: { ...headerBar, paddingHorizontal: 12 },
   headerTitle: {
     flex: 1,
     textAlign: "center",

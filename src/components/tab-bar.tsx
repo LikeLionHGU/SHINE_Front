@@ -2,6 +2,7 @@ import { ComponentType } from "react";
 import { usePathname } from "expo-router";
 import { Pressable, Text, View, StyleSheet } from "react-native";
 import type { BottomTabBarProps } from "expo-router/build/react-navigation/bottom-tabs";
+import { colors, font, radius, tabBarShadow, tracking } from "@/lib/theme";
 import {
   AnalysisTabIcon,
   CalendarTabIcon,
@@ -67,7 +68,8 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
           const focused = state.index === index;
           const TabIcon = TAB_ICONS[route.name] ?? HomeTabIcon;
           const label = TAB_LABELS[route.name] ?? route.name;
-          const color = focused ? "#111111" : "#A0A0A0";
+          // Figma 837:4303 — 비활성 아이콘·라벨은 #A0A0A0가 아니라 #707070.
+          const color = focused ? colors.text : colors.textSub;
 
           return (
             <Pressable
@@ -92,7 +94,7 @@ export function CustomTabBar({ state, navigation, insets }: BottomTabBarProps) {
                 }
               }}
             >
-              <TabIcon size={26} color={color} />
+              <TabIcon size={28} color={color} />
               <Text style={[styles.label, focused && styles.labelActive]}>{label}</Text>
             </Pressable>
           );
@@ -107,19 +109,13 @@ const styles = StyleSheet.create({
   // 그림자 전용 — borderRadius/overflow를 주지 않아 그림자가 사각형 그대로
   // 자연스럽게 퍼진다(각진 실루엣이라 완전한 라운드 그림자는 아니지만,
   // 웹에서 그림자가 둥근 모서리 밖으로 깨져 보이는 것보다 훨씬 낫다).
-  shadowWrap: {
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 8,
-  },
+  shadowWrap: { ...tabBarShadow },
   // 배경 채우기 + 둥근 모서리는 여기서만 담당하고, overflow: hidden으로
   // 실제로 그 모양 밖으로는 아무것도(그림자 포함) 삐져나오지 않게 자른다.
   container: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: colors.white,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
     overflow: "hidden",
     paddingTop: 12,
     paddingHorizontal: 10,
@@ -137,10 +133,12 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    fontFamily: "Pretendard-Medium",
-    color: "#707070",
+    lineHeight: 16,
+    fontFamily: font.medium,
+    letterSpacing: tracking(12),
+    color: colors.textSub,
   },
   labelActive: {
-    color: "#111111",
+    color: colors.text,
   },
 });

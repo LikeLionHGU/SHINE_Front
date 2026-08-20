@@ -1,6 +1,7 @@
-import { BackChevronIcon, ChevronDownIcon, UpTriangleIcon } from "@/components/icons";
+import { BackChevronIcon, UpTriangleIcon } from "@/components/icons";
+import { cardShadow, colors, font, headerBar, radius, tracking } from "@/lib/theme";
 import { StatusBadge } from "@/components/status-badge";
-import { TrendChart } from "@/components/trend-chart";
+import { chartWidthFor, TrendChart } from "@/components/trend-chart";
 import { centeredContentStyle, MAX_CONTENT_WIDTH } from "@/lib/layout";
 import { getTrend } from "@/lib/api";
 import type { TrendIndicator } from "@/lib/report";
@@ -40,12 +41,6 @@ export default function AnalysisDetail() {
     };
   }, [indicatorId]);
 
-  // 최근 두 검사 사이의 변화 방향으로 화살표를 결정한다.
-  // 측정이 1회뿐이면 비교할 이전 값이 없어 위쪽으로 둔다.
-  const history = indicator?.history ?? [];
-  const trendingUp =
-    history.length < 2 || history[history.length - 1].value >= history[history.length - 2].value;
-
   function goBack() {
     if (router.canGoBack()) router.back();
     else router.push("/(tabs)/analysis");
@@ -72,10 +67,11 @@ export default function AnalysisDetail() {
     );
   }
 
-  // 300으로 고정 상한을 두면 화면이 넓어져도(태블릿/웹) 차트가 그대로
-  // 300px에 묶여 카드 안에서 작고 왼쪽에 치우쳐 보인다 — MAX_CONTENT_WIDTH
-  // 기준으로 상한을 잡아서, 콘텐츠 폭이 커지는 만큼 차트도 같이 커지게 한다.
-  const chartWidth = Math.min(windowWidth - 32 - 30 - 34, MAX_CONTENT_WIDTH - 32 - 30 - 34);
+  // 차트 폭은 카드 폭에서 구간 라벨 칸과 말풍선 자리를 뺀 나머지다
+  // (시안 361 카드 → 그래프 277). 화면이 넓어져도(태블릿/웹) 카드가 커지는
+  // 만큼 그래프도 같이 커지도록 MAX_CONTENT_WIDTH로 상한만 둔다.
+  const cardWidth = Math.min(windowWidth, MAX_CONTENT_WIDTH) - 32;
+  const chartWidth = chartWidthFor(cardWidth);
 
   return (
     <View style={styles.container}>
@@ -96,14 +92,13 @@ export default function AnalysisDetail() {
             style={styles.titleRow}
             onPress={() => setDefinitionOpen((open) => !open)}
           >
-            <View style={{ transform: [{ rotate: trendingUp ? "0deg" : "180deg" }] }}>
+            {/* 삼각형이 곧 접힘/펼침 표시다 — 접혀 있으면 아래(▼), 펴져 있으면 위(▲).
+                오른쪽에 chevron을 하나 더 두면 같은 상태를 두 번 말하게 된다. */}
+            <View style={{ transform: [{ rotate: definitionOpen ? "0deg" : "180deg" }] }}>
               <UpTriangleIcon size={14} />
             </View>
             <Text style={styles.title}>{indicator.title}</Text>
             <StatusBadge status={indicator.status} />
-            <View style={definitionOpen ? styles.definitionChevronOpen : undefined}>
-              <ChevronDownIcon size={16} />
-            </View>
           </Pressable>
 
           {definitionOpen && (
@@ -127,21 +122,65 @@ export default function AnalysisDetail() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 6 },
+header: { ...headerBar, justifyContent: "space-between", paddingHorizontal: 16 },
   headerTitle: { position: "absolute", left: 0, right: 0, textAlign: "center", color: "#111", fontFamily: "Pretendard-Medium", fontSize: 16 },
 
   emptyState: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyTitle: { color: "#707070", fontFamily: "Pretendard-Medium", fontSize: 16 },
 
-  content: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 32, gap: 14 },
+  // 시안 좌표(393 기준): 지표명 줄 top 156 · 차트 카드 212 · 설명 제목 465.
+  content: { paddingHorizontal: 16, paddingTop: 64, paddingBottom: 32 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  title: { flex: 1, color: "#414141", fontFamily: "Pretendard-SemiBold", fontSize: 20, letterSpacing: -1 },
-  definition: { color: "#111", fontFamily: "Pretendard-Regular", fontSize: 12, lineHeight: 18 },
-  definitionChevronOpen: { transform: [{ rotate: "180deg" }] },
+  title: {
+    flex: 1,
+    color: colors.textStrong,
+    fontFamily: font.semiBold,
+    fontSize: 20,
+    letterSpacing: -1,
+  },
+  definition: {
+    marginTop: 8,
+    color: colors.text,
+    fontFamily: font.regular,
+    fontSize: 12,
+    lineHeight: 18,
+    letterSpacing: tracking(12),
+  },
 
-  chartCard: { backgroundColor: "#FFFCFD", borderRadius: 14, paddingVertical: 18, paddingHorizontal: 16 },
+  // 시안 361x211. 그래프 위 41 / 아래 10, 왼쪽 9는 구간 라벨 자리,
+  // 오른쪽 35는 마지막 점 위 말풍선이 카드를 넘지 않도록 비워둔 폭이다.
+  chartCard: {
+    marginTop: 20,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingTop: 41,
+    paddingBottom: 10,
+    paddingLeft: 9,
+    paddingRight: 35,
+    ...cardShadow,
+  },
 
-  summaryHeading: { color: "#414141", fontFamily: "Pretendard-SemiBold", fontSize: 18, letterSpacing: -1, marginTop: 4 },
-  summaryCard: { backgroundColor: "#FFFCFD", borderRadius: 14, padding: 18 },
-  summaryText: { color: "#111", fontFamily: "Pretendard-Regular", fontSize: 12, lineHeight: 18 },
+  summaryHeading: {
+    marginTop: 28,
+    color: colors.textStrong,
+    fontFamily: font.semiBold,
+    fontSize: 18,
+    letterSpacing: -1,
+  },
+  // 시안 361x106, 본문 폭 334 → 좌우 13.5
+  summaryCard: {
+    marginTop: 12,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingVertical: 8,
+    paddingHorizontal: 13.5,
+    ...cardShadow,
+  },
+  summaryText: {
+    color: colors.text,
+    fontFamily: font.regular,
+    fontSize: 12,
+    lineHeight: 18,
+    letterSpacing: tracking(12),
+  },
 });

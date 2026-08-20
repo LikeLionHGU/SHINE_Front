@@ -1,4 +1,5 @@
 import { CloseIcon, XXLogoIcon } from "@/components/icons";
+import { headerBar } from "@/lib/theme";
 import { centeredContentStyle, centeredSheetStyle } from "@/lib/layout";
 import { DEMO_SUMMARY } from "@/lib/report";
 import { LinearGradient } from "expo-linear-gradient";
@@ -43,7 +44,7 @@ export default function ScanResult() {
       <LinearGradient colors={["#FFFCFD", "#FFEBF3"]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
         <View style={styles.header}>
-          <XXLogoIcon width={65} />
+          <XXLogoIcon />
           <Pressable hitSlop={8} onPress={goHome}>
             <CloseIcon size={24} />
           </Pressable>
@@ -72,7 +73,7 @@ export default function ScanResult() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 6 },
+header: { ...headerBar, justifyContent: "space-between", paddingHorizontal: 16 },
   content: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 24, gap: 16 },
   heading: { color: "#4C4C4C", fontFamily: "Pretendard-SemiBold", fontSize: 24, lineHeight: 32 },
   preview: { width: "100%", borderRadius: 14, backgroundColor: "#FFF0F6" },
