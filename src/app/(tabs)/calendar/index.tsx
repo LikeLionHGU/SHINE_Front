@@ -271,12 +271,9 @@ export default function Calendar() {
   }, [records, allHospitalVisits]);
 
   const [openQuestions, setOpenQuestions] = useState<string[]>([]);
-  // 한 줄로 줄인 질문 중 사용자가 눌러서 펼쳐 놓은 것들.
-  const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set());
   const [questionsLoading, setQuestionsLoading] = useState(false);
 
   useEffect(() => {
-    setExpandedQuestions(new Set());
     if (!openVisitId) {
       setOpenQuestions([]);
       return;
@@ -528,33 +525,17 @@ export default function Calendar() {
                           아직 준비된 질문이 없어요. 날짜를 눌러 질문을 추가해보세요.
                         </Text>
                       ) : (
-                        openQuestions.map((question, qi) => {
-                          // 질문이 길면 한 줄로 줄여 "..."로 끝나는데, 그러면
-                          // 뒷부분을 볼 방법이 없었다. 누르면 전체가 펼쳐진다.
-                          const expanded = expandedQuestions.has(question);
-                          return (
-                            <Pressable
-                              key={qi}
-                              style={styles.questionRow}
-                              onPress={() =>
-                                setExpandedQuestions((prev) => {
-                                  const next = new Set(prev);
-                                  if (next.has(question)) next.delete(question);
-                                  else next.add(question);
-                                  return next;
-                                })
-                              }
-                            >
+                        // 질문은 줄여 쓰지 않는다. 예전에는 한 줄로 잘라두고
+                        // 눌러야 펴지게 했는데, 잘린 채로는 무엇을 물어볼
+                        // 질문인지 알 수 없어 누를 이유조차 보이지 않았다.
+                        openQuestions.map((question, qi) => (
+                          <View key={qi} style={styles.questionRow}>
+                            <View style={styles.questionIcon}>
                               <AiQuestionIcon />
-                              <Text
-                                style={styles.questionText}
-                                numberOfLines={expanded ? undefined : 1}
-                              >
-                                {question}
-                              </Text>
-                            </Pressable>
-                          );
-                        })
+                            </View>
+                            <Text style={styles.questionText}>{question}</Text>
+                          </View>
+                        ))
                       )}
                     </View>
                   )}
@@ -932,16 +913,19 @@ header: { ...headerBar, justifyContent: "space-between", paddingHorizontal: 16 }
     borderRadius: 16,
     gap: 5,
   },
+  // 여러 줄이 되므로 아이콘을 첫 줄에 맞춘다(가운데 정렬이면 아이콘이 아래로 내려간다).
   questionRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 9,
   },
+  questionIcon: { paddingTop: 3 },
   questionText: {
     flexShrink: 1,
     flex: 1,
     color: "#A0A0A0",
     fontSize: 14,
+    lineHeight: 21,
     fontFamily: "Pretendard-Medium",
   },
   questionEmptyText: {

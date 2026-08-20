@@ -10,6 +10,8 @@ import {
   createQuestion,
   getQuestionsBySheet,
   getRecordDetail,
+  loadAuthToken,
+  resolveAuthedImageUri,
   submitReport,
   uploadTestSheetImage,
 } from "@/lib/api";
@@ -35,7 +37,7 @@ import {
 import { cardShadow, headerBar, tracking } from "@/lib/theme";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
   Linking,
@@ -124,6 +126,8 @@ export default function AnalysisReport() {
   const [insightsError, setInsightsError] = useState<string | null>(null);
   // 서버 저장(POST /reports)은 사용자가 "저장하기"를 누를 때만 한다.
   const [savingToServer, setSavingToServer] = useState(false);
+  // 사진을 이미 올린 검사지들. 값을 고쳐 여러 번 저장해도 사진은 처음 한 번만 보낸다.
+  const uploadedPhotoSheets = useRef<Set<string>>(new Set());
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   // 서버에 저장한 뒤 값을 고쳤는지. 고쳤으면 다시 저장할 수 있게 버튼을 되살린다.
   const [unsavedChanges, setUnsavedChanges] = useState(false);
@@ -133,20 +137,70 @@ export default function AnalysisReport() {
   const [editValue, setEditValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [imageAspect, setImageAspect] = useState(310.088 / 509);
+  // 서버에 저장된 검사지 사진은 인증이 걸려 있어, 토큰 없이 요청하면 401이 나고
+  // 빈 칸만 보인다. 로컬에서 방금 찍은 사진(file://)에는 필요 없다.
+  const [authHeaders, setAuthHeaders] = useState<Record<string, string> | undefined>();
+
+  useEffect(() => {
+    loadAuthToken().then((token) => {
+      setAuthHeaders(token ? { Authorization: `Bearer ${token}` } : undefined);
+    });
+  }, []);
+
+  // 화면에 실제로 그릴 사진 주소.
+  //
+  // 방금 올린 사진은 로컬 주소를 그대로 쓰고, 기록 탭에서 연 검사지는 서버 주소라
+  // 인증을 통과한 형태로 바꿔야 한다. 웹에서는 그 결과가 blob: 주소여서, 다 쓰고
+  // 반드시 풀어줘야 메모리에 쌓이지 않는다.
+  const [photoUri, setPhotoUri] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    const source = report?.uri;
+    if (!source) {
+      setPhotoUri(undefined);
+      return;
+    }
+    if (!report?.fromServer) {
+      setPhotoUri(source);
+      return;
+    }
+
+    let active = true;
+    let objectUrl: string | null = null;
+    resolveAuthedImageUri(source).then((resolved) => {
+      if (!active) {
+        if (resolved?.startsWith("blob:")) URL.revokeObjectURL(resolved);
+        return;
+      }
+      objectUrl = resolved?.startsWith("blob:") ? resolved : null;
+      setPhotoUri(resolved ?? undefined);
+    });
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [report?.uri, report?.fromServer]);
 
   // 업로드한 사진의 실제 가로세로 비율대로 보여준다(고정 목업 비율로
   // 잘리지 않도록). scanDocumentImage(lib/scan.ts)는 리사이즈를 하지 않으므로
   // 여기서 읽는 크기가 곧 사용자가 넣은 사진 원본 크기다.
   useEffect(() => {
-    if (!report?.uri) return;
-    Image.getSize(
-      report.uri,
-      (width, height) => {
-        if (width > 0 && height > 0) setImageAspect(width / height);
-      },
-      () => {},
-    );
-  }, [report?.uri]);
+    if (!photoUri) return;
+    const uri = photoUri;
+    const onSize = (width: number, height: number) => {
+      if (width > 0 && height > 0) setImageAspect(width / height);
+    };
+    // 서버 사진은 인증이 걸려 있어 헤더 없이 크기를 물어보면 401이 난다.
+    // 다만 getSizeWithHeaders는 웹(react-native-web)에 없는 경우가 있어,
+    // 있을 때만 쓰고 없으면 헤더 없는 쪽으로 떨어뜨린다(비율만 못 맞을 뿐이다).
+    // blob: 주소는 이미 내려받은 사진이라 헤더가 필요 없다.
+    const headers = report?.fromServer && !uri.startsWith("blob:") ? authHeaders : undefined;
+    if (headers && typeof Image.getSizeWithHeaders === "function") {
+      Image.getSizeWithHeaders(uri, headers, onSize, () => {});
+    } else {
+      Image.getSize(uri, onSize, () => {});
+    }
+  }, [photoUri, report?.fromServer, authHeaders]);
 
   // 기록 탭에서 연 검사지는 recordId로, 방금 올린 검사지는 "last"로 구분해 저장한다.
   const editsKey = recordId ?? "last";
@@ -174,6 +228,9 @@ export default function AnalysisReport() {
                       : (detail.questions ?? []),
                   // 저장할 때 함께 보낸 추천 재료. 서버가 돌려주면 그대로 보여준다.
                   foods: detail.foods ?? [],
+                  // 등록할 때 올려둔 원본 사진. 기록 탭에서는 이걸 불러다 보여주기만
+                  // 하고 다시 올리지 않는다(업로드는 최초 등록 때 한 번뿐).
+                  uri: detail.images?.[0]?.imageUrl,
                   fromServer: true,
                 }
               : null,
@@ -373,11 +430,17 @@ export default function AnalysisReport() {
 
       // 검사지 사진도 같은 기록에 붙인다.
       // 판정 결과 저장(/reports)이 끝난 뒤라, 사진이 실패해도 기록은 이미 남아 있다.
-      // 사진이 없는 건(기록 탭에서 연 지난 검사지) 올릴 것도 없으므로 건너뛴다.
-      const photoUploaded =
-        report.uri && next.testSheetId != null
-          ? await uploadTestSheetImage(next.testSheetId, report.uri)
-          : true;
+      //
+      // 올리는 건 이 검사지를 처음 등록할 때 한 번뿐이다.
+      //  · 기록 탭에서 연 지난 검사지는 uri가 없다 — 올릴 사진 자체가 없다.
+      //  · 값을 고쳐 다시 저장할 때는 이미 올린 사진을 또 보내지 않는다.
+      //    서버는 갈아끼우기만 하므로 결과는 같은데 통신만 낭비된다.
+      const sheetKey = next.testSheetId != null ? String(next.testSheetId) : null;
+      let photoUploaded = true;
+      if (report.uri && !report.fromServer && sheetKey && !uploadedPhotoSheets.current.has(sheetKey)) {
+        photoUploaded = await uploadTestSheetImage(sheetKey, report.uri);
+        if (photoUploaded) uploadedPhotoSheets.current.add(sheetKey);
+      }
 
       if (report.uri) {
         await saveLastReport({
@@ -605,12 +668,18 @@ export default function AnalysisReport() {
             {/* 이미지 위 마커는 OCR이 추정한 위치가 부정확해서(항목 텍스트와
                 안 맞는 곳에 찍힘) 뺐다 — 항목 상세는 아래 종합 분석 표의
                 행을 눌러서만 연다. */}
-            {report.uri && (
+            {photoUri && (
               <>
                 <Text style={styles.sectionTitle}></Text>
                 <View style={[styles.imageWrap, { aspectRatio: imageAspect }]}>
                   <Image
-                    source={{ uri: report.uri }}
+                    source={{
+                      uri: photoUri,
+                      // blob:이면 이미 받아온 사진이라 헤더가 필요 없다.
+                      ...(report.fromServer && authHeaders && !photoUri.startsWith("blob:")
+                        ? { headers: authHeaders }
+                        : {}),
+                    }}
                     style={[styles.image, styles.scanFilter]}
                     resizeMode="contain"
                   />
@@ -859,7 +928,9 @@ export default function AnalysisReport() {
                 if (list.length > 0) {
                   return list.map((q, i) => (
                     <View key={i} style={styles.exampleRow}>
-                      <AiQuestionIcon />
+                      <View style={styles.exampleIcon}>
+                        <AiQuestionIcon />
+                      </View>
                       <Text style={styles.example}>{q}</Text>
                     </View>
                   ));
@@ -1724,11 +1795,16 @@ const styles = StyleSheet.create({
     gap: 10,
     ...shadow,
   },
-  exampleRow: { flexDirection: "row", alignItems: "center", gap: 9 },
+  // 질문은 두세 줄이 되므로 아이콘을 첫 줄에 맞춘다
+  // (가운데 정렬이면 아이콘이 줄 사이로 내려간다).
+  exampleRow: { flexDirection: "row", alignItems: "flex-start", gap: 9, marginBottom: 4 },
+  exampleIcon: { paddingTop: 3 },
   example: {
+    flex: 1,
     color: "#707070",
     fontFamily: "Pretendard-Medium",
     fontSize: 14,
+    lineHeight: 21,
     letterSpacing: tracking(14),
   },
   inputWrap: {

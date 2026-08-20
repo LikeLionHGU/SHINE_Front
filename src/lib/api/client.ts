@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
 import {
   DEMO_RECORDS,
   DEMO_TREND_INDICATORS,
@@ -19,7 +20,7 @@ import {
   MOCK_SUGGESTED_QUESTIONS,
   MOCK_VISITS,
 } from "./mock-data";
-import { API_BASE_URL, apiRequest, apiUpload, setAuthToken, withFallback } from "./http";
+import { API_BASE_URL, apiRequest, ApiError, apiUpload, loadAuthToken, setAuthToken, withFallback } from "./http";
 import { compressForUpload } from "@/lib/scan";
 import type {
   AuthResult,
@@ -507,6 +508,8 @@ type TestSheetDetailResponse = {
   items?: TestResultResponse[] | null;
   questions?: (string | { content?: string | null })[] | null;
   foods?: ReportFood[] | null;
+  /** 검사지 원본 사진. 경로는 "/api/v1/test-sheets/49/images/1"처럼 상대 경로로 온다. */
+  images?: { page?: number | null; imageUrl?: string | null }[] | null;
 };
 
 const STATUS_LABELS: IndicatorStatus[] = ["안심", "주의", "위험"];
@@ -540,6 +543,17 @@ function toRecordDetail(sheet: TestSheetDetailResponse): RecordDetail {
     items: rawItems.map(toParsedItem),
     questions,
     foods: (sheet.foods ?? []).filter((food) => !!food?.name),
+    // 사진 경로는 상대 경로로 오므로 호스트를 붙여둔다(검사지 참조와 같은 방식).
+    images: (sheet.images ?? [])
+      .map((image, i) => {
+        const path = image?.imageUrl?.trim();
+        if (!path) return null;
+        return {
+          page: image?.page ?? i + 1,
+          imageUrl: /^https?:\/\//.test(path) ? path : `${API_BASE_URL}${path}`,
+        };
+      })
+      .filter((image): image is { page: number; imageUrl: string } => image !== null),
   };
 }
 
@@ -685,6 +699,10 @@ export async function submitReport(submission: ReportSubmission): Promise<Report
  * 덧붙인다. 이렇게 하면 기록이 두 개로 갈라지지도 않는다
  * (기존 `POST /test-sheets`는 검사지를 새로 만들어 버린다).
  *
+ * 언제 부르나: **검사지를 처음 등록할 때 한 번**이다. 기록 탭에서 지난 검사지를
+ * 열면 사진은 서버에서 내려받아 보여주기만 하고 다시 올리지 않는다.
+ * 같은 사진을 다시 보내도 서버가 기존 사진을 갈아끼울 뿐이라 얻는 게 없다.
+ *
  * 사진이 못 올라가도 판정 결과는 이미 저장된 뒤다. 그래서 오류를 던지지 않고
  * false를 돌려준다 — 사진 하나 때문에 "저장 실패"라고 말하면 안 된다.
  */
@@ -696,21 +714,74 @@ export async function uploadTestSheetImage(
 
   try {
     const uploadUri = await compressForUpload(uri);
+    // 파일명 확장자로 서버가 형식을 검사하므로 .jpg를 반드시 붙인다
+    // (compressForUpload가 내놓는 임시 경로에는 확장자가 없을 수 있다).
+    const filename = `test-sheet-${testSheetId}.jpg`;
     const form = new FormData();
-    // 필드명 'files'는 백엔드의 검사지 업로드 스펙(POST /test-sheets)과 맞춘 것이다.
-    // RN의 FormData는 웹의 File이 아니라 { uri, name, type } 객체를 파일로 받는다.
-    form.append("files", {
-      uri: uploadUri,
-      name: `test-sheet-${testSheetId}.jpg`,
-      type: "image/jpeg",
-    } as unknown as Blob);
 
+    // 필드명은 'file'이 아니라 'files'다(복수형). 틀리면 400 MISSING_FILE_PART.
+    //
+    // 파일을 담는 방법이 플랫폼마다 다르다.
+    //  · 네이티브: RN의 FormData는 { uri, name, type } 객체를 파일로 알아본다.
+    //  · 웹: 브라우저 표준 FormData라 그 객체를 모른다. 그대로 넣으면 파일이 아니라
+    //    "[object Object]"라는 **문자열 필드**가 실려 나가고, 서버는 파일 파트를
+    //    못 찾아 MISSING_FILE_PART로 400을 낸다. 그래서 웹에서는 URI를 실제로 읽어
+    //    Blob으로 만들어 넣는다.
+    if (Platform.OS === "web") {
+      const blob = await (await fetch(uploadUri)).blob();
+      // 세 번째 인자가 파일명이 된다 — 확장자 검사를 통과하려면 반드시 넘겨야 한다.
+      form.append("files", blob, filename);
+    } else {
+      form.append("files", {
+        uri: uploadUri,
+        name: filename,
+        type: "image/jpeg",
+      } as unknown as Blob);
+    }
+
+    // Content-Type을 직접 넣지 않는다 — apiUpload 주석 참고(boundary가 빠진다).
     await apiUpload(`/test-sheets/${encodeURIComponent(String(testSheetId))}/images`, form);
     return true;
   } catch (error) {
-    // 404면 아직 백엔드에 이 엔드포인트가 없는 것이다(전달사항 문서 참고).
-    console.warn("[api] 검사지 사진 업로드 실패:", error);
+    // 서버가 실패 원인을 code로 알려준다(MISSING_FILE_PART · INVALID_CONTENT_TYPE ·
+    // FILE_TOO_LARGE · SHEET_NOT_OWNED …). 메시지만 찍으면 어디가 틀렸는지 못 찾는다.
+    const code = error instanceof ApiError ? error.code : null;
+    console.warn(`[api] 검사지 사진 업로드 실패${code ? ` (${code})` : ""}:`, error);
     return false;
+  }
+}
+
+/**
+ * 인증이 걸린 이미지를 화면에 띄울 수 있는 주소로 바꾼다.
+ *
+ * 검사지 원본(`/test-sheets/{id}/images/{page}`)은 토큰이 있어야 열린다.
+ * 네이티브는 <Image source={{ uri, headers }}>로 헤더를 실을 수 있지만,
+ * **웹(react-native-web)은 <img src>로 그려서 헤더를 붙일 방법이 없다** —
+ * 그대로 두면 401이 나고 빈 칸만 보인다. 그래서 웹에서는 토큰을 붙여 직접
+ * 받아온 뒤 blob: 주소로 바꿔 넘긴다.
+ *
+ * 돌려준 blob: 주소는 다 쓰고 URL.revokeObjectURL로 풀어줘야 한다(호출부 책임).
+ * 실패하면 null - 화면은 사진 없이 그리면 된다.
+ */
+export async function resolveAuthedImageUri(url: string): Promise<string | null> {
+  const target = url?.trim();
+  if (!target) return null;
+  // 네이티브는 헤더를 실을 수 있으니 주소를 그대로 쓴다.
+  if (Platform.OS !== "web") return target;
+
+  try {
+    const token = await loadAuthToken();
+    const response = await fetch(target, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    if (!response.ok) {
+      console.warn(`[api] 검사지 사진을 불러오지 못했어요 (${response.status})`);
+      return null;
+    }
+    return URL.createObjectURL(await response.blob());
+  } catch (error) {
+    console.warn("[api] 검사지 사진을 불러오지 못했어요:", error);
+    return null;
   }
 }
 

@@ -162,6 +162,11 @@ export type RecordDetail = {
   questions?: string[];
   /** 그때 저장해둔 추천 재료 (서버가 검사지와 함께 돌려주는 경우) */
   foods?: ReportFood[];
+  /**
+   * 등록할 때 함께 올린 검사지 원본 사진. 절대 URL로 바꿔서 담는다.
+   * 이 경로도 인증이 필요해서 Authorization 헤더를 함께 보내야 열린다.
+   */
+  images?: { page: number; imageUrl: string }[];
 };
 
 /* ---------------------------------------------------------------- 홈 */

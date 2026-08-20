@@ -24,6 +24,7 @@ import {
   deleteVisit,
   formatVisitTime,
   getCalendarMonthMarks,
+  getRecords,
   getVisitDetail,
   getVisitsByDate,
   saveVisitQuestions,
@@ -32,6 +33,7 @@ import {
   type Report,
   type VisitDetail,
 } from "@/lib/api";
+import type { RecordEntry } from "@/lib/report";
 
 /** "2026-08-15" → "2026. 08. 15" */
 function formatDate(value: string | undefined) {
@@ -39,6 +41,16 @@ function formatDate(value: string | undefined) {
   const [year, month, day] = value.split("-");
   if (!year || !month || !day) return value;
   return `${year}. ${month}. ${day}`;
+}
+
+/**
+ * 날짜 문자열을 비교용 6자리(YYMMDD)로 줄인다.
+ *
+ * 같은 날짜인데도 자리마다 표기가 다르다 — 검사지 카드는 "2026. 08. 20",
+ * 기록 목록은 "26.08.20". 숫자만 뽑아 뒤 6자리를 보면 둘 다 "260820"이 된다.
+ */
+function dateKey(value: string | undefined) {
+  return (value ?? "").replace(/\D/g, "").slice(-6);
 }
 
 /** "2026-08-15" → "26.08.15" (일정 데이터의 날짜 형식) */
@@ -85,6 +97,20 @@ export default function CalendarDay() {
   const visitKey = toVisitKey(date);
 
   const [dayMark, setDayMark] = useState<DayMark | undefined>(undefined);
+
+  // 검사지 카드를 눌렀을 때 열 id를 날짜로 되찾기 위한 목록.
+  // 서버 응답에 검사지 id가 빠져 있어도 이걸로 이동할 수 있다(reportIdOf 참고).
+  const [records, setRecords] = useState<RecordEntry[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    getRecords().then((result) => {
+      if (active) setRecords(result);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -150,14 +176,24 @@ export default function CalendarDay() {
 
   /**
    * 검사지 카드를 누르면 그 검사지의 분석 화면으로 넘어간다.
-   * id는 서버가 준 이미지 경로에서 뽑아낸 값이라(응답에 별도 필드가 없다)
-   * 없을 수도 있는데, 그때는 눌러도 아무 일도 일어나지 않게 둔다.
+   *
+   * 원래는 서버가 준 이미지 경로에서 뽑아낸 testSheetId만 썼는데, 응답에 그
+   * 경로가 없으면 id가 비어서 카드를 눌러도 아무 일도 일어나지 않았다.
+   * 그럴 때는 같은 날짜의 기록을 찾아 그 id로 연다 — 검사지는 날짜로 특정된다.
    */
+  const reportIdOf = (report: Report | null): string | null => {
+    if (!report) return null;
+    if (report.testSheetId != null) return String(report.testSheetId);
+    const matched = records.find((record) => dateKey(record.date) === dateKey(report.date));
+    return matched?.id ?? null;
+  };
+
   const openReport = (report: Report | null) => {
-    if (!report?.testSheetId) return;
+    const id = reportIdOf(report);
+    if (!id) return;
     router.push({
       pathname: "/(tabs)/analysis/report",
-      params: { recordId: String(report.testSheetId) },
+      params: { from: "record", recordId: id },
     });
   };
 
@@ -267,10 +303,15 @@ export default function CalendarDay() {
           {isPrenatalDay && (
           <>
           {todayReport ? (
-            <Pressable style={styles.reportCard} onPress={() => openReport(todayReport)}>
+            <Pressable
+              style={({ pressed }) => [styles.reportCard, pressed && styles.reportCardPressed]}
+              // 열 수 없는 검사지면 눌러도 아무 일이 없다 — 화살표를 흐리게 해서 미리 알린다.
+              disabled={!reportIdOf(todayReport)}
+              onPress={() => openReport(todayReport)}
+            >
               <Text style={styles.reportLabel}>당일검사지</Text>
               <Text style={styles.reportDate}>{todayReport.date}</Text>
-              <ChevronRightIcon size={20} />
+              <ChevronRightIcon size={20} color={reportIdOf(todayReport) ? "#A0A0A0" : "#E2E2E2"} />
             </Pressable>
           ) : (
             <View style={styles.reportCard}>
@@ -281,12 +322,17 @@ export default function CalendarDay() {
 
           {previousReport ? (
             <Pressable
-              style={[styles.reportCard, styles.reportCardSpacing]}
+              style={({ pressed }) => [
+                styles.reportCard,
+                styles.reportCardSpacing,
+                pressed && styles.reportCardPressed,
+              ]}
+              disabled={!reportIdOf(previousReport)}
               onPress={() => openReport(previousReport)}
             >
               <Text style={styles.reportLabel}>이전검사지</Text>
               <Text style={styles.reportDate}>{previousReport.date}</Text>
-              <ChevronRightIcon size={20} />
+              <ChevronRightIcon size={20} color={reportIdOf(previousReport) ? "#A0A0A0" : "#E2E2E2"} />
             </Pressable>
           ) : (
             <View style={[styles.reportCard, styles.reportCardSpacing]}>
@@ -311,10 +357,11 @@ export default function CalendarDay() {
 
             {suggestedQuestions.map((text, i) => (
               <View key={i} style={styles.questionRow}>
-                <AiQuestionIcon />
-                <Text style={styles.questionText} numberOfLines={1}>
-                  {text}
-                </Text>
+                <View style={styles.questionIcon}>
+                  <AiQuestionIcon />
+                </View>
+                {/* 한 줄로 자르면 정작 무엇을 물어볼 질문인지 알 수 없다 — 전문을 보여준다. */}
+                <Text style={styles.questionText}>{text}</Text>
               </View>
             ))}
 
@@ -626,16 +673,20 @@ header: { ...headerBar, justifyContent: "space-between", paddingHorizontal: 12 }
     fontSize: 16,
     fontFamily: "Pretendard-SemiBold",
   },
+  // 여러 줄이 되므로 아이콘을 첫 줄에 맞춘다(가운데 정렬이면 아이콘이 아래로 내려간다).
   questionRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 9,
     marginBottom: 12,
   },
+  reportCardPressed: { opacity: 0.78 },
+  questionIcon: { paddingTop: 3 },
   questionText: {
     flex: 1,
     color: "#707070",
     fontSize: 14,
+    lineHeight: 21,
     fontFamily: "Pretendard-Medium",
   },
   questionInput: {

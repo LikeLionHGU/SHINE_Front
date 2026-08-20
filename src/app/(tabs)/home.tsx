@@ -186,10 +186,11 @@ export default function Home() {
                   accessibilityRole="button"
                   accessibilityLabel={`추천 질문 담기: ${item.content}`}
                 >
-                  <AiQuestionIcon />
-                  <Text style={styles.example} numberOfLines={1}>
-                    {item.content}
-                  </Text>
+                  <View style={styles.exampleIcon}>
+                    <AiQuestionIcon />
+                  </View>
+                  {/* 한 줄로 자르면 정작 무엇을 물어볼 질문인지 알 수 없다 — 전문을 보여준다. */}
+                  <Text style={styles.example}>{item.content}</Text>
                 </Pressable>
               ))
             ) : (
@@ -198,10 +199,15 @@ export default function Home() {
               </Text>
             )}
             <View style={styles.inputWrap}>
+              {/* multiline을 쓰지 않는다.
+                  웹에서 multiline TextInput은 <textarea>로 그려지는데, textarea는
+                  높이를 지정하면 내용이 그 안에서 스크롤된다 — 한 줄짜리 칸인데도
+                  스크롤바가 생기고 글자가 눌려 보이는 원인이 이것이다.
+                  긴 질문은 한 줄 안에서 가로로 흐르게 두는 편이 시안과도 맞는다. */}
               <TextInput
                 value={question}
                 onChangeText={setQuestion}
-                placeholder="질문 입력하기"
+                placeholder="질문 기록하기"
                 placeholderTextColor="#A0A0A0"
                 style={styles.input}
                 returnKeyType="send"
@@ -412,13 +418,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     ...shadow,
   },
+  // 질문이 길면 두세 줄이 된다. 높이를 고정하면 뒷줄이 잘리고, 가운데 정렬이면
+  // AIQ 아이콘이 줄 사이로 내려간다 — 최소 높이 + 위쪽 정렬로 둔다.
   exampleRow: {
-    height: 21,
+    minHeight: 21,
+    marginBottom: 4,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 9,
   },
-  example: { ...t.body14, flex: 1 },
+  exampleIcon: { paddingTop: 3 },
+  example: { ...t.body14, flex: 1, lineHeight: 21 },
   cardHint: {
     paddingVertical: 6,
     fontFamily: font.regular,
@@ -428,6 +438,8 @@ const styles = StyleSheet.create({
     color: colors.textHint,
   },
   // 입력창 top 61 − (paddingTop 13 + 행 21×2) = 6
+  // 시안(837:4276): 325x41, r8, secondary_pink. 카드 폭에서 좌우 18씩 뺀 크기다.
+  // 바깥 칸이 높이 41을 잡고, 글자 줄은 그 안에서 세로 가운데에 놓인다.
   inputWrap: {
     height: 41,
     marginTop: 6,
@@ -436,11 +448,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surfacePink,
   },
+  // 글자 줄 자체는 20 — 시안의 글자칸 높이(17)에 맞춘 한 줄 크기다.
+  //
+  // 입력칸에 padding을 주면 안 된다. 바깥 칸이 이미 41을 잡고 가운데 정렬을
+  // 하고 있어서, 안쪽에 또 위아래 여백을 넣으면 글자 상자가 41을 넘어
+  // 스크롤이 생긴다(웹에서 스크롤바가 보이던 원인).
+  // includeFontPadding은 안드로이드가 글꼴 위아래에 몰래 붙이는 여백인데,
+  // 20으로 조인 줄에서는 이것 때문에 글자가 잘린다.
   input: {
     flex: 1,
-    height: "100%",
+    height: 20,
+    paddingVertical: 0,
     paddingHorizontal: 15,
+    includeFontPadding: false,
     ...t.body14,
+    lineHeight: 20,
     color: colors.text,
   },
   send: {
