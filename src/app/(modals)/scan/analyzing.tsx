@@ -1,8 +1,8 @@
-import { saveLastReport, takePendingScan, type ParsedTestItem, type ReportFood } from "@/lib/report";
+import { saveLastReport, clearReportEdits, takePendingScan, type ParsedTestItem, type ReportFood } from "@/lib/report";
 import { parseTestReport } from "@/lib/ocr";
 import { generateReportInsights } from "@/lib/insights";
 import { scanDocumentImage } from "@/lib/scan";
-import { submitReport } from "@/lib/api";
+import { currentPregnancyWeek } from "@/lib/pregnancy";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
@@ -48,9 +48,21 @@ export default function ScanAnalyzing() {
     (async () => {
       const minVisible = new Promise<void>((resolve) => setTimeout(resolve, MIN_VISIBLE_MS));
 
+      // 임신 주차는 두 군데에 쓰인다.
+      //  (1) 판정 엔진 — 삼분기별 기준(헤모글로빈 11 / 10.5 / 11 등)을 고르는 데
+      //  (2) AI 종합 분석 프롬프트 — "임신 28주차에 받은 이번 검사는…" 처럼 주차에 맞춰 설명하게
+      // 한 번만 구해서 둘 다 넘긴다.
+      const gestationalWeek = await currentPregnancyWeek();
+
       let finalUri = uri ?? null;
       let items: ParsedTestItem[] | undefined;
       let resolvedTestDate = testDate;
+      // 판정 엔진이 함께 돌려주는 값들 — 항목 하나만 봐서는 안 보이는 소견,
+      // 아직 지원하지 않는 항목, 화면 하단에 표기할 출처 목록.
+      let crossFindings: Awaited<ReturnType<typeof parseTestReport>>["crossFindings"] | undefined;
+      let unsupported: Awaited<ReturnType<typeof parseTestReport>>["unsupported"] | undefined;
+      let sources: Awaited<ReturnType<typeof parseTestReport>>["sources"] | undefined;
+      let unreadable: Awaited<ReturnType<typeof parseTestReport>>["unreadable"] | undefined;
 
       if (uri) {
         const pending = takePendingScan(uri);
@@ -70,8 +82,12 @@ export default function ScanAnalyzing() {
           }
 
           try {
-            const result = await parseTestReport(finalUri);
+            const result = await parseTestReport(finalUri, { gestationalWeek });
             items = result.items;
+            crossFindings = result.crossFindings;
+            unsupported = result.unsupported;
+            sources = result.sources;
+            unreadable = result.unreadable;
             resolvedTestDate = resolvedTestDate ?? toStoredDate(result.reportDate);
           } catch (error) {
             // OCR 파싱이 실패해도(키 미설정, 네트워크 오류 등) 스캔 자체는
@@ -88,7 +104,7 @@ export default function ScanAnalyzing() {
 
       if (items && items.length > 0) {
         try {
-          const insights = await generateReportInsights(items);
+          const insights = await generateReportInsights(items, { gestationalWeek });
           summary = insights.summary;
           questions = insights.questions;
           foods = insights.foods;
@@ -99,50 +115,19 @@ export default function ScanAnalyzing() {
         }
       }
 
-      // 서버에 올리고 교정본을 받아온다. 검사항목이 하나도 없으면 보낼 게 없다.
-      let testSheetId: number | undefined;
-      let week: string | undefined;
-
-      if (items && items.length > 0) {
-        try {
-          const corrected = await submitReport({
-            testDate: resolvedTestDate,
-            items,
-            summary,
-            questions,
-            foods,
-          });
-
-          // 서버가 임신 기준으로 다시 판정하고 대표명·검수된 설명으로 바꿔준 값으로 교체한다.
-          // 이때 항목명이 "헤모글로빈" → "혈색소"로 바뀌므로, 사용자가 손에 든 검사지와
-          // 대조할 수 있도록 OCR이 읽은 원문명을 같이 붙여둔다. 서버가 원문을 돌려주지
-          // 않아서 순서로 짝짓는데, 개수가 다르면 잘못 붙을 수 있으니 그때는 포기한다.
-          if (corrected?.items?.length) {
-            const ocrNames = items?.map((item) => item.name) ?? [];
-            const sameLength = ocrNames.length === corrected.items.length;
-            items = corrected.items.map((item, i) => {
-              const printed = sameLength ? ocrNames[i] : undefined;
-              return printed && printed !== item.name ? { ...item, originalName: printed } : item;
-            });
-          }
-          if (corrected?.summary) summary = corrected.summary;
-          if (corrected?.questions?.length) questions = corrected.questions;
-          if (corrected?.foods?.length) foods = corrected.foods;
-          if (corrected?.testDate) resolvedTestDate = corrected.testDate;
-          testSheetId = corrected?.testSheetId;
-          week = corrected?.week;
-        } catch (error) {
-          // 서버 전송이 실패해도(로그인 만료, 서버 미기동 등) 프론트 OCR 결과로
-          // 화면은 그대로 보여준다. 다만 판정은 검사지 인쇄 기준이라 임신 기준과
-          // 다를 수 있다.
-          console.warn("[scan] 검사지 서버 전송 실패:", error);
-        }
-      }
+      // 서버 전송은 여기서 하지 않는다.
+      //
+      // 예전에는 스캔이 끝나자마자 자동으로 POST /reports를 보냈다. 그런데 이 시점의
+      // 값은 아직 사용자가 확인하기 전이라, OCR이 잘못 읽은 수치가 그대로 서버에
+      // 기록으로 남았다. 지금은 결과 화면에서 값을 확인·수정한 뒤 "저장하기"를
+      // 눌렀을 때만 서버로 보낸다(analysis/report.tsx의 saveToServer).
 
       await minVisible;
       if (cancelled) return;
 
       if (finalUri) {
+        // 새 검사지를 올렸으니 이전 검사지에 대한 수정분은 더 이상 유효하지 않다.
+        await clearReportEdits("last").catch(() => {});
         await saveLastReport({
           uri: finalUri,
           items,
@@ -150,8 +135,10 @@ export default function ScanAnalyzing() {
           summary,
           questions,
           foods,
-          testSheetId,
-          week,
+          crossFindings,
+          unsupported,
+          sources,
+          unreadable,
         }).catch(() => {});
       }
       router.dismissTo("/(tabs)/analysis/report");

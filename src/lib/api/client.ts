@@ -515,7 +515,7 @@ const STATUS_LABELS: IndicatorStatus[] = ["안심", "주의", "위험"];
  *
  * 같은 검사지를 두 가지 모양으로 돌려주는 서버가 있어서(표준 REST의 `results[]`
  * 와 POST /reports 응답과 같은 `items[]`) 둘 다 받는다. 한쪽 모양만 보다가
- * 상태(status)를 못 읽어서 전부 "미분류"로 보이던 문제가 있었다.
+ * 상태(status)를 못 읽어서 전부 "확인 필요"로 보이던 문제가 있었다.
  */
 function toRecordDetail(sheet: TestSheetDetailResponse): RecordDetail {
   const rawItems = sheet.items?.length ? sheet.items : (sheet.results ?? []);
@@ -554,7 +554,7 @@ function toParsedItem(result: TestResultResponse): ParsedTestItem {
     originalName: printed && printed !== name ? printed : undefined,
     value: formatResultValue(result),
     // 상태 문자열이 없으면 서버가 판정하지 못한 항목(UNKNOWN)이다.
-    status: STATUS_LABELS.includes(label as IndicatorStatus) ? (label as IndicatorStatus) : "미분류",
+    status: STATUS_LABELS.includes(label as IndicatorStatus) ? (label as IndicatorStatus) : "확인 필요",
     definition: (result.definition ?? result.description ?? "").trim(),
     // verdict를 주는 응답이면 그대로 쓰고, 없으면 측정치와 참고치를 다시 적어준다
     // (진단처럼 읽힐 문장을 새로 만들지 않는다).

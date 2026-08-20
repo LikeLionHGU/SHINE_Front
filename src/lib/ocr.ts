@@ -1,4 +1,7 @@
-import type { IndicatorStatus, ParsedTestItem } from "@/lib/report";
+import type { ParsedTestItem } from "@/lib/report";
+import { analyzeRows, type AnalyzeResult } from "@/lib/labs/bridge";
+import type { ExtractedRow } from "@/lib/labs/types";
+import { parsePrintedRange } from "@/lib/labs/normalize";
 
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
 /**
@@ -13,51 +16,77 @@ const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
  */
 const OPENAI_MODEL = process.env.EXPO_PUBLIC_OCR_MODEL || "gpt-4o";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 이 파일은 더 이상 "판정"을 하지 않는다.
+//
+// 예전 프롬프트는 모델에게 "status(안심/주의/위험)를 정해 ... 임신부 정상
+// 참고범위에 대한 너의 의학 지식으로 판단하고"라고 시켰다. 그 구조에서는
+//   (1) 왜 그렇게 판정했는지 근거를 추적할 수 없고,
+//   (2) 가이드라인이 개정돼도(ATA는 2026년 6월에 개정됐다) 반영할 방법이 없고,
+//   (3) 검사실마다 다른 참고범위를 무시하게 되고,
+//   (4) B형간염 표면'항체' 음성을 '위험'으로 띄우는 것 같은 오판정을 막을 수 없다.
+//
+// 그래서 역할을 둘로 쪼갰다.
+//   이 파일        : 검사지에 적힌 것을 그대로 옮겨 적기만 한다(전사).
+//   lib/labs/*    : 학회 기준표를 lookup해서 결정론적으로 판정하고 출처를 붙인다.
+// ─────────────────────────────────────────────────────────────────────────────
+
 const SYSTEM_PROMPT =
-  "너는 임산부의 산전 검사지(혈액검사·소변검사 등) 사진을 읽고 표로 정리해주는 의료 문서 도우미야. " +
-  "사진 속 표에 보이는 행은 하나도 빠짐없이 전부 읽어야 해 — 네가 잘 아는 항목이든 낯선 항목이든, " +
-  "수치형(예: 12.2 g/dL)이든 정성형(예: 음성, 정상, RH+, A형)이든 상관없이 표에 있는 행은 전부 " +
-  "items 배열에 담아. 일부만 골라 담거나 어려운 항목을 건너뛰면 안 돼. " +
-  // 표를 열 단위로 읽어서 나중에 순서대로 짝지으면 항목과 수치가 어긋난다.
-  // 실제 검사지(GC Labs 등)에는 결과가 비어 있는 그룹 라벨 행과, 결과가 여러
-  // 줄인 행이 섞여 있어서 두 열의 줄 수가 애초에 맞지 않기 때문이다.
-  "**가장 중요한 규칙: 표는 반드시 가로 한 줄씩 읽어. 검사항목 열을 먼저 쭉 읽고 검사결과 열을 " +
-  "따로 읽어서 순서대로 짝지으면 절대 안 돼.** 한 항목의 name과 value는 사진에서 같은 높이(같은 " +
-  "가로줄)에 있는 글자여야 해. 각 행을 담기 전에 그 값이 정말 그 항목과 같은 줄에 있는지 눈으로 " +
-  "한 번 더 확인해. " +
-  "표에는 다음이 섞여 있으니 주의해: " +
-  "(1) 검사항목 칸에 이름만 있고 검사결과 칸이 비어 있는 '그룹 제목' 행이 있다(예: 'Urine Routine'). " +
-  "이런 행은 실제 검사 결과가 아니므로 items에 넣지 말고, 아래 행들의 값이 위로 당겨지지 않게 조심해. " +
-  "(2) 한 항목의 결과가 여러 줄에 걸쳐 적힌 행이 있다(예: '요침사(Flow cytometry)'의 'WBC: 0-3', " +
-  "'RBC: 4-9', 'E.P cell: 0-3', 'Others: None'). 이건 네 개가 아니라 한 항목이니 여러 줄을 하나의 " +
-  "value로 합쳐 담아(줄바꿈 대신 ', '로 이어 붙여). " +
-  "(3) 보험코드가 붙은 행과 안 붙은 행이 섞여 있는데, 코드 유무는 항목 구분과 관계없다. " +
-  "(4) 결과값이 항목명보다 살짝 아래나 위로 치우쳐 인쇄된 경우가 있으니, 가장 가까운 같은 줄을 기준으로 삼아. " +
-  // 참고치 열에서 값을 집어오는 실수가 잦다. 열의 위치와 생김새를 함께 알려준다.
-  "**열을 헷갈리지 마. 표는 보통 왼쪽부터 [보험코드] [검사항목] [검사결과] [단위] [참고치] 순서다.** " +
-  "value에는 반드시 '검사결과' 열의 값만 담아. '참고치'(정상범위) 열은 '6 ~ 20', '0.50 ~ 0.90', " +
-  "'11.0 ~ 15.0'처럼 물결표나 하이픈으로 두 숫자를 이은 범위이거나 'Negative'라고 적힌 기준값이야. " +
-  "이 범위 값을 결과로 옮겨 적으면 완전히 틀린 수치가 된다. 결과 열은 보통 범위가 아니라 단일 값이야. " +
-  "어떤 항목의 결과 칸이 비어 보이면 값을 참고치 열에서 끌어오지 말고 그 항목을 빼. " +
-  // 값 지어내기는 의료 정보에서 가장 위험한 실패다.
-  "**숫자는 절대 추측하거나 지어내지 마.** 흐릿해서 확실하지 않으면 그 항목을 items에서 빼는 편이 " +
-  "잘못된 숫자를 적는 것보다 낫다. 읽어낸 숫자는 사진에 인쇄된 자릿수 그대로 옮겨(예: 8.37을 8.4나 " +
-  "9.3으로 바꾸지 마). " +
-  "각 항목마다 name(검사명)과 value(결과값 — 참고치가 같이 적혀 있으면 원문 그대로 옮겨 적어)를 읽어내고, " +
-  "status(안심/주의/위험)를 정해. 검사지에 이미 '판정' 또는 '결과' 같은 컬럼에 정상/이상 등 판정이 " +
-  "인쇄되어 있으면, 그 인쇄된 판정을 최우선 근거로 삼아 정상→안심, 이상→위험, 경계/애매함→주의로 " +
-  "매핑해(네가 다시 계산하지 마). 인쇄된 판정이 없는 항목만 임신부 정상 참고범위에 대한 너의 의학 " +
-  "지식으로 판단하고, 확신이 서지 않으면 '주의'로 표기해. " +
-  "각 항목마다 두 문장도 간결하게 채워줘: definition은 '이 검사 항목이 일반적으로 무엇을 보는 지표인지'를 " +
-  "임산부가 이해하기 쉬운 말로 1문장 설명한 것(이번 수치와 무관한 일반 설명), verdict는 '이번에 읽은 " +
-  "수치가 왜 그 상태로 판정됐는지'를 이번 수치·참고범위(또는 인쇄된 판정)를 근거로 1문장으로 설명한 " +
-  "것이야. 두 문장 모두 진단·처방처럼 단정하지 말고 참고 정보 톤으로. " +
-  "마지막으로 reportDate도 찾아줘 — 문서에 '검사일', '채취일', '접수일', '발급일자' 등으로 인쇄된, " +
-  "이 검사를 받은 날짜를 YYYY-MM-DD 형식으로 알려줘. 여러 날짜가 있으면 검사/채취일을 우선하고, " +
-  "발급일자만 있으면 그거라도 써. 날짜를 전혀 찾을 수 없으면 reportDate는 null로 줘(추측해서 " +
-  "지어내지 마). " +
-  '출력은 반드시 JSON 객체 하나로만: {"items": [{"name": string, "value": string, "status": "안심" | "주의" | "위험", "definition": string, "verdict": string}], "reportDate": string | null}. ' +
-  "사진이 검사지가 아니거나 표를 전혀 읽을 수 없으면 items를 빈 배열로, reportDate를 null로 줘.";
+  "너는 한국 병원의 산전 검사 결과지 사진에서 데이터를 그대로 옮겨 적는 전사자야.\n\n" +
+  "## 절대 규칙\n" +
+  "1. 너는 판정하지 않는다. 정상/비정상, 안심/주의/위험, 높음/낮음을 스스로 판단하지 마.\n" +
+  "2. 의학적 해석·조언·설명을 쓰지 마.\n" +
+  "3. 검사지에 적혀 있는 것만 옮겨. 안 보이는 값은 추측하지 말고 null로 둬.\n" +
+  "4. 검사지에 참고범위(정상범위, 참고치)가 인쇄돼 있으면 반드시 함께 옮겨. 이게 가장 중요하다.\n" +
+  "5. 표에 보이는 행은 하나도 빠짐없이 전부 담아. 낯선 항목도 건너뛰지 마.\n" +
+  "6. 구분선이나 소제목(예: 'AIDS', '혈액검사')처럼 결과값이 없는 줄은 항목으로 만들지 마.\n\n" +
+  "## 표 읽는 법 (여기서 실수가 가장 많이 난다)\n" +
+  "**가장 중요한 규칙: 표는 반드시 가로 한 줄씩 읽어. 검사항목 열을 먼저 쭉 읽고 결과 열을 " +
+  "따로 읽어서 순서대로 짝지으면 절대 안 돼.** 한 항목의 rawName과 rawValue는 사진에서 같은 " +
+  "높이(같은 가로줄)에 있는 글자여야 해. 각 행을 담기 전에 그 값이 정말 그 항목과 같은 줄에 " +
+  "있는지 눈으로 한 번 더 확인해.\n" +
+  "표에는 다음이 섞여 있으니 주의해:\n" +
+  "(1) 검사항목 칸에 이름만 있고 결과 칸이 비어 있는 '그룹 제목' 행이 있다(예: 'Urine Routine', '말기검사'). " +
+  "실제 결과가 아니므로 rows에 넣지 말고, 아래 행들의 값이 위로 당겨지지 않게 조심해.\n" +
+  "(2) 한 항목의 결과가 여러 줄에 걸쳐 적힌 행이 있다(예: '요침사'의 'WBC: 0-3', 'RBC: 4-9'). " +
+  "이건 여러 개가 아니라 한 항목이니 ', '로 이어 붙여 하나의 rawValue로 담아.\n" +
+  "(3) 보험코드가 붙은 행과 안 붙은 행이 섞여 있는데, 코드 유무는 항목 구분과 관계없다.\n" +
+  "(4) 결과값이 항목명보다 살짝 위아래로 치우쳐 인쇄된 경우가 있으니, 가장 가까운 같은 줄을 기준으로 삼아.\n\n" +
+  "## 열 구분\n" +
+  "**표는 보통 왼쪽부터 [보험코드] [검사항목] [검사결과] [단위] [참고치] 순서다.**\n" +
+  "- rawValue에는 반드시 '검사결과' 열의 값만 담아.\n" +
+  "- '참고치'(정상범위) 열은 '6 ~ 20', '11.0 ~ 15.0'처럼 두 숫자를 이은 범위이거나 'Negative' 같은 " +
+  "기준값이야. 이건 rawValue가 아니라 **printedRangeRaw에 따로** 담아. 결과 열은 보통 범위가 아니라 단일 값이야.\n" +
+  "- 어떤 항목의 결과 칸이 비어 보이면 참고치 열에서 값을 끌어오지 말고 그 항목을 빼.\n" +
+  "- '정상'·'이상' 같은 판정 열의 글자를 rawValue로 쓰지 마. 그건 flag로 처리한다.\n" +
+  "- 판정 열에 '△/이상·상한', '▽/이상·하한', H, L 같은 표시가 있으면 flag를 각각 \"H\", \"L\"로 넣어.\n" +
+  "- 검사항목 이름이 '일반혈액검사(CBC)-[혈구세포-장비측정]_백혈구수'처럼 길면 **줄여 쓰지 말고 그대로** 옮겨.\n\n" +
+  "## 숫자를 지어내지 마\n" +
+  "**흐릿해서 확실하지 않으면 그 항목을 rows에서 빼고 unreadable에 남기는 편이 잘못된 숫자를 적는 것보다 낫다.** " +
+  "읽어낸 숫자는 사진에 인쇄된 자릿수 그대로 옮겨(예: 8.37을 8.4나 9.3으로 바꾸지 마).\n\n" +
+  "## 항목마다 뽑을 것\n" +
+  "- rawName: 검사지에 적힌 항목명 그대로 (번역·풀어쓰기 금지)\n" +
+  "- rawValue: 결과값 문자열 그대로 (예: \"11.2\", \"음성\", \"음성(4.80)\", \"NR\", \"2+\")\n" +
+  "- unit: 단위 그대로 (예: \"g/dL\", \"10^3/uL\", \"mIU/L\"). 없으면 null\n" +
+  "- printedRangeRaw: 인쇄된 참고범위 문자열 그대로 (예: \"12.0-16.0\", \"<5.0\"). 없으면 null\n" +
+  "- flag: 검사실이 붙인 이상 표시가 있으면 \"H\" 또는 \"L\", 없으면 \"N\"\n\n" +
+  "## 문서 전체\n" +
+  "- reportDate: 검사일/채취일/접수일/발급일자 중 하나를 YYYY-MM-DD로. 없으면 null (지어내지 마)\n" +
+  "- labName: 검사기관·병원 이름. 없으면 null\n\n" +
+  '출력은 JSON 객체 하나로만: {"labName": string|null, "reportDate": string|null, ' +
+  '"rows": [{"rawName": string, "rawValue": string, "unit": string|null, ' +
+  '"printedRangeRaw": string|null, "flag": "H"|"L"|"N"}], ' +
+  '"unreadable": [{"reason": string, "location": string}]}\n' +
+  "읽기 어렵거나 확신이 없으면 rows에 억지로 넣지 말고 unreadable에 남겨. " +
+  "잘못 읽는 것보다 못 읽었다고 말하는 게 낫다.";
+
+type OcrRow = {
+  rawName: string;
+  rawValue: string;
+  unit: string | null;
+  printedRangeRaw: string | null;
+  flag: "H" | "L" | "N";
+};
 
 async function uriToDataUrl(uri: string): Promise<string> {
   const response = await fetch(uri);
@@ -74,15 +103,55 @@ export type ParsedTestReport = {
   items: ParsedTestItem[];
   /** 문서에 인쇄된 검사일("YYYY-MM-DD"). 못 찾으면 null. */
   reportDate: string | null;
+  /** 여러 항목을 함께 봐야 나오는 소견 */
+  crossFindings: AnalyzeResult["crossFindings"];
+  /** 아직 지원하지 않는 항목 — 화면에 밝혀서 보여준다 */
+  unsupported: AnalyzeResult["unsupported"];
+  /** 화면 하단 출처 표기 */
+  sources: AnalyzeResult["sources"];
+  dataUpdatedAt: string;
+  /** 모델이 "못 읽겠다"고 스스로 남긴 부분 */
+  unreadable: { reason: string; location: string }[];
+  /** 두 번 읽었을 때 값이 갈린 항목 */
+  conflicts: { name: string; a: string; b: string }[];
 };
 
-// 검사지 사진에서 "검사항목 / 수치 / 상태 / 검사일"을 실제로 읽어내는 OCR + 판정.
-// 백엔드 서버가 없어서 클라이언트에서 바로 OpenAI Vision(gpt-4o-mini)에
-// 이미지를 보내고, 표 인식과 정상범위 판정을 모델에게 맡긴 뒤 구조화된
-// JSON으로 돌려받는다. (주의: API 키가 클라이언트 번들에 포함되므로
-// 해커톤 데모용 구조다 — 프로덕션에서는 서버를 거쳐야 한다.)
+export type ParseContext = {
+  /** 임신 주수 — 삼분기별 기준을 가르는 핵심 입력. 없으면 주수 무관 기준만 적용된다. */
+  gestationalWeek?: number;
+  /** 'high_risk' | 'gdm_diagnosed' 등 */
+  flags?: string[];
+  previousResults?: { itemId: string; value: number; testedAt: string }[];
+};
+
+/** 결과값이 숫자로 시작하는 경우에만 수치로 본다. "음성(4.80)" 같은 건 정성값 + 참고수치. */
+function toRow(r: OcrRow): ExtractedRow {
+  const raw = (r.rawValue ?? "").trim();
+  const leadingNumber = raw.match(/^-?\d+(?:\.\d+)?/);
+  const parenNumber = raw.match(/\((-?\d+(?:\.\d+)?)\)/);
+  const value = leadingNumber
+    ? parseFloat(leadingNumber[0])
+    : parenNumber
+      ? parseFloat(parenNumber[1])
+      : undefined;
+
+  return {
+    rawName: r.rawName,
+    rawValue: raw,
+    value: Number.isFinite(value as number) ? (value as number) : undefined,
+    unit: r.unit ?? undefined,
+    printedRange: r.printedRangeRaw ? parsePrintedRange(r.printedRangeRaw) : undefined,
+    flag: r.flag ?? "N",
+  };
+}
+
+/**
+ * 검사지 사진 → 구조화된 값 추출(LLM) → 학회 기준 lookup 판정(결정론적).
+ * 판정·문구·출처는 전부 lib/labs가 만든 것이고, LLM은 글자를 옮기기만 한다.
+ */
 export async function parseTestReport(
   imageUri: string,
+  ctx: ParseContext = {},
 ): Promise<ParsedTestReport> {
   if (!OPENAI_API_KEY) {
     throw new Error(
@@ -91,7 +160,129 @@ export async function parseTestReport(
   }
 
   const dataUrl = await uriToDataUrl(imageUri);
+  const first = await extractOnce(dataUrl);
 
+  // 1차 추출 결과를 판정해 보고, 의심스러운 항목이 하나라도 있으면 2차 추출로 대조한다.
+  // 매번 두 번 부르면 비용·시간이 두 배라, "수상할 때만" 한 번 더 본다.
+  const firstRows = toRows(first);
+  const firstPass = analyzeRows(firstRows, engineCtx(ctx));
+  const suspect = firstPass.items.some((i) => i.engineStatus === "indeterminate");
+
+  let rows = firstRows;
+  let conflicts: { name: string; a: string; b: string }[] = [];
+
+  if (suspect) {
+    try {
+      const second = await extractOnce(dataUrl);
+      const merged = crossCheck(first, second);
+      conflicts = merged.conflicts;
+      rows = toRows(merged.agreed);
+      // 두 번 읽어서 값이 갈린 항목은 "확실치 않음"으로 표시해 사용자에게 확인받는다.
+      //
+      // 단, 갈린 행이 너무 많으면 2차 추출 자체가 어긋난 것(행이 통째로 밀렸거나
+      // 다른 표를 읽은 것)이지 개별 숫자가 의심스러운 게 아니다. 그때 전부 보류로
+      // 만들면 멀쩡한 항목까지 판정을 잃고, 추천 질문도 "잘 안 읽혔어요"만 남는다.
+      const ratio = rows.length > 0 ? conflicts.length / rows.length : 0;
+      if (ratio > 0.3) {
+        console.warn(
+          `[ocr] 2차 추출이 1차와 ${Math.round(ratio * 100)}% 어긋나 교차검증을 건너뜁니다.`,
+        );
+        conflicts = [];
+      } else {
+        for (const c of conflicts) {
+          const row = rows.find((r) => r.rawName === c.name);
+          if (row) row.uncertain = `두 번 읽었을 때 값이 달랐어요 (${c.a} / ${c.b}).`;
+        }
+      }
+    } catch {
+      // 2차 추출이 실패해도 1차 결과로 계속 진행한다.
+    }
+  }
+
+  const analyzed = analyzeRows(rows, engineCtx(ctx));
+
+  const rawDate = (first as { reportDate?: unknown })?.reportDate;
+  const reportDate =
+    typeof rawDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rawDate.trim()) ? rawDate.trim() : null;
+
+  return {
+    items: analyzed.items,
+    reportDate,
+    crossFindings: analyzed.crossFindings,
+    unsupported: analyzed.unsupported,
+    sources: analyzed.sources,
+    dataUpdatedAt: analyzed.dataUpdatedAt,
+    unreadable: Array.isArray((first as any)?.unreadable) ? (first as any).unreadable : [],
+    conflicts,
+  };
+}
+
+function engineCtx(ctx: ParseContext) {
+  return {
+    gestationalWeek: ctx.gestationalWeek,
+    flags: ctx.flags,
+    previousResults: ctx.previousResults,
+  };
+}
+
+/** OCR 원본 응답 → 판정 엔진 입력 */
+function toRows(raw: unknown): ExtractedRow[] {
+  const rawRows = Array.isArray((raw as { rows?: unknown })?.rows)
+    ? ((raw as { rows: unknown[] }).rows as OcrRow[])
+    : [];
+  return rawRows
+    .filter((r) => !!r && typeof r === "object" && typeof r.rawName === "string" && r.rawName.trim())
+    // 산전 검사지는 아무리 길어도 60행을 넘지 않는다. 그 이상이면 모델이 폭주한 것이라
+    // 잘라낸다(중복은 뒤에서 dedupeRows가 한 번 더 걸러준다).
+    .slice(0, 60)
+    .map((r) => toRow({ ...r, rawName: String(r.rawName).trim(), rawValue: String(r.rawValue ?? "").trim() }));
+}
+
+/**
+ * 같은 사진을 두 번 읽어 값이 갈리는 항목을 찾아낸다.
+ * 온도를 0으로 두어도 비전 모델은 흐린 숫자에서 답이 갈릴 수 있는데,
+ * 그 "갈리는 지점"이 곧 잘못 읽었을 가능성이 높은 지점이다.
+ */
+function crossCheck(a: any, b: any): { agreed: any; conflicts: { name: string; a: string; b: string }[] } {
+  const rowsA: OcrRow[] = Array.isArray(a?.rows) ? a.rows : [];
+  const rowsB: OcrRow[] = Array.isArray(b?.rows) ? b.rows : [];
+  const mapB = new Map(rowsB.map((r) => [String(r.rawName ?? "").trim().toLowerCase(), r]));
+  const conflicts: { name: string; a: string; b: string }[] = [];
+
+  for (const r of rowsA) {
+    const key = String(r.rawName ?? "").trim().toLowerCase();
+    const other = mapB.get(key);
+    if (!other) continue; // 한쪽에만 있는 행은 여기서 판단하지 않는다(항목 자체를 버리지 않기 위해)
+    const va = String(r.rawValue ?? "").trim();
+    const vb = String(other.rawValue ?? "").trim();
+    if (!sameReading(va, vb)) {
+      conflicts.push({ name: String(r.rawName).trim(), a: va, b: vb });
+    }
+  }
+  return { agreed: a, conflicts };
+}
+
+/**
+ * 두 번 읽은 값이 "사실상 같은가".
+ *
+ * 공백·대소문자·천단위 쉼표, 그리고 "8.40"과 "8.4" 같은 표기 차이는 같은 값으로 본다.
+ * 이런 것까지 불일치로 세면 멀쩡한 항목이 무더기로 판정 보류가 된다.
+ */
+function sameReading(a: string, b: string): boolean {
+  const norm = (v: string) => v.replace(/[\s,]/g, "").toLowerCase();
+  const na = norm(a);
+  const nb = norm(b);
+  if (na === nb) return true;
+  const fa = parseFloat(na);
+  const fb = parseFloat(nb);
+  // 둘 다 순수 숫자로 읽히면 수치로 비교한다("8.40" vs "8.4").
+  if (Number.isFinite(fa) && Number.isFinite(fb) && /^-?[\d.]+$/.test(na) && /^-?[\d.]+$/.test(nb)) {
+    return fa === fb;
+  }
+  return false;
+}
+
+async function extractOnce(dataUrl: string): Promise<unknown> {
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -101,86 +292,57 @@ export async function parseTestReport(
     body: JSON.stringify({
       model: OPENAI_MODEL,
       response_format: { type: "json_object" },
+      // 판정 문장을 생성하지 않으므로 예전보다 응답이 짧다. 대신 온도를 0으로 두어
+      // 같은 사진이면 같은 값이 나오게 한다(전사 작업이라 창의성이 필요 없다).
+      temperature: 0,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         {
           role: "user",
           content: [
-            {
-              type: "text",
-              text: "이 산전 검사지 사진을 읽고 지시한 JSON 형식으로 정리해줘.",
-            },
+            { type: "text", text: "이 산전 검사지 사진을 읽고 지시한 JSON 형식으로 옮겨 적어줘. 판정은 하지 마." },
             { type: "image_url", image_url: { url: dataUrl } },
           ],
         },
       ],
-      // 산전 검사지는 보통 15~20행 이상이라 항목마다 definition/verdict까지
-      // 채우면 응답이 길어진다. 예전 2000 토큰 한도에서는 응답이 중간에 잘려
-      // 뒷부분 항목이 통째로 빠지는 문제가 있어 넉넉하게 올림.
-      max_tokens: 4096,
+      // frequency_penalty는 쓰지 않는다.
+      // 한국 검사지는 항목명이 "일반혈액검사(CBC)-[혈구세포-장비측정]_백혈구수"처럼
+      // 긴 공통 접두사를 공유하는데, 반복 패널티를 걸면 그 접두사 토큰이 억제되면서
+      // 모델이 뒷 행을 아예 생성하지 않고 멈춘다(17행 중 3행만 나오던 원인).
+      // 반복 문제는 프롬프트 규칙 + dedupeRows(코드)로 막는다.
+      max_tokens: 8192,
     }),
   });
 
   if (!response.ok) {
     const errText = await response.text().catch(() => "");
-    throw new Error(
-      `OpenAI 요청 실패 (${response.status}): ${errText.slice(0, 300)}`,
-    );
+    throw new Error(`OpenAI 요청 실패 (${response.status}): ${errText.slice(0, 300)}`);
   }
 
   const json = await response.json();
-  const content: string | undefined = json?.choices?.[0]?.message?.content;
+  const choice = json?.choices?.[0];
+  const content: string | undefined = choice?.message?.content;
   if (!content) throw new Error("OpenAI 응답에서 결과를 찾지 못했어요.");
+
+  // 행이 많은 검사지는 응답이 길어 토큰 한도에 걸릴 수 있다. 잘린 채로 파싱하면
+  // 뒷부분 항목이 통째로 사라지므로, 원인을 분명히 알려준다.
+  if (choice?.finish_reason === "length") {
+    throw new Error(
+      "검사지가 길어 OpenAI 응답이 중간에 끊겼어요. max_tokens를 늘리거나 사진을 나눠 올려주세요.",
+    );
+  }
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(content);
+    const text = content.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    parsed = JSON.parse(start !== -1 && end > start ? text.slice(start, end + 1) : text);
   } catch {
-    throw new Error("OpenAI 응답을 JSON으로 해석하지 못했어요.");
+    throw new Error(
+      `OpenAI 응답을 JSON으로 해석하지 못했어요. 받은 내용 앞부분: ${content.slice(0, 200)}`,
+    );
   }
 
-  const rawItems = Array.isArray((parsed as { items?: unknown })?.items)
-    ? (parsed as { items: unknown[] }).items
-    : [];
-  const validStatuses: IndicatorStatus[] = ["안심", "주의", "위험"];
-
-  const items = rawItems
-    .filter(
-      (
-        item,
-      ): item is {
-        name: string;
-        value?: unknown;
-        status?: unknown;
-        definition?: unknown;
-        verdict?: unknown;
-      } =>
-        !!item &&
-        typeof item === "object" &&
-        typeof (item as any).name === "string" &&
-        (item as any).name.trim(),
-    )
-    .map(
-      (item): ParsedTestItem => ({
-        name: String(item.name).trim(),
-        value: item.value != null ? String(item.value).trim() : "",
-        status: validStatuses.includes(item.status as IndicatorStatus)
-          ? (item.status as IndicatorStatus)
-          : "주의",
-        definition:
-          item.definition != null ? String(item.definition).trim() : "",
-        verdict: item.verdict != null ? String(item.verdict).trim() : "",
-      }),
-    );
-
-  // reportDate는 "YYYY-MM-DD" 형식일 때만 신뢰한다 — 형식이 다르거나
-  // 모델이 엉뚱한 값을 주면 null로 취급해서(파싱 실패와 동일하게) 화면에서
-  // 사용자가 직접 날짜를 고르게 한다.
-  const rawDate = (parsed as { reportDate?: unknown })?.reportDate;
-  const reportDate =
-    typeof rawDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rawDate.trim())
-      ? rawDate.trim()
-      : null;
-
-  return { items, reportDate };
+  return parsed;
 }

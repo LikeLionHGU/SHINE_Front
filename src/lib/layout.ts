@@ -23,3 +23,14 @@ export const centeredSheetStyle: ViewStyle = {
   maxWidth: MAX_CONTENT_WIDTH,
   alignSelf: "center",
 };
+
+/**
+ * 진료 일정 날짜("26.08.26")를 안내 문구용 짧은 라벨("08.26")로 바꾼다.
+ * 이 앱의 날짜 포맷은 ISO가 아니라 YY.MM.DD라, ISO로 착각하고 자르면
+ * "undefined.undefined"가 나온다(실제로 한 번 났던 버그).
+ */
+export function visitDateLabel(date: string): string {
+  const parts = date.split(".");
+  if (parts.length === 3) return `${parts[1]}.${parts[2]}`;
+  return date;
+}

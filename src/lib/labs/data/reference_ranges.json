@@ -1,0 +1,2041 @@
+{
+  "schema_version": "2.1.0",
+  "updated_at": "2026-08-19",
+  "sources_file": "sources.json",
+  "locale": "ko-KR",
+  "population": "korean_pregnant_women",
+  "policy": {
+    "range_priority": [
+      "printed_lab_range",
+      "trimester_reference_interval",
+      "guideline_cutoff"
+    ],
+    "min_trust_tier_for_judgment": [
+      "A",
+      "B"
+    ],
+    "block_tier_d": true,
+    "unknown_item_behavior": "return_unsupported",
+    "missing_unit_behavior": "return_needs_confirmation"
+  },
+  "trimester_weeks": {
+    "T1": [
+      0,
+      13
+    ],
+    "T2": [
+      14,
+      27
+    ],
+    "T3": [
+      28,
+      42
+    ]
+  },
+  "statuses": [
+    "safe",
+    "watch",
+    "recheck",
+    "indeterminate",
+    "alert",
+    "info_only",
+    "unsupported"
+  ],
+  "items": [
+    {
+      "id": "hemoglobin",
+      "name": "헤모글로빈(혈색소)",
+      "aliases": [
+        "hb",
+        "hgb",
+        "혈색소",
+        "hemoglobin",
+        "헤모글로빈",
+        "혈색소(hb)",
+        "혈색소(헤모글로빈)",
+        "hb(혈색소)"
+      ],
+      "unit": "g/dL",
+      "unitAliases": {
+        "g/dl": 1,
+        "g/L": 0.1,
+        "g/l": 0.1
+      },
+      "valueType": "numeric",
+      "plausibleRange": [
+        3,
+        25
+      ],
+      "referenceIntervals": {
+        "T1": [
+          11.3,
+          14.3
+        ],
+        "T2": [
+          10.1,
+          13.3
+        ],
+        "T3": [
+          10.1,
+          14.1
+        ],
+        "sourceId": "medicina_2025_kr_cbc",
+        "quote": "한국인 임산부 삼분기별 CBC 참고구간 — Hemoglobin T1 11.3-14.3, T2 10.1-13.3, T3 10.1-14.1 g/dL"
+      },
+      "rules": [
+        {
+          "id": "hb_severe",
+          "op": "lt",
+          "value": 7.0,
+          "status": "alert",
+          "label": "중증 빈혈",
+          "message": "헤모글로빈이 중증 빈혈 기준보다 낮습니다. 담당 의료진과 빠르게 상의하세요.",
+          "sources": [
+            {
+              "id": "who_2024",
+              "quote": "Table 3: pregnant women, all trimesters — severe anaemia < 70 g/L"
+            }
+          ]
+        },
+        {
+          "id": "hb_moderate_t1t3",
+          "guard": {
+            "trimester": [
+              "T1",
+              "T3"
+            ]
+          },
+          "op": "lt",
+          "value": 10.0,
+          "status": "alert",
+          "label": "중등도 빈혈",
+          "message": "1·3분기 중등도 빈혈 구간입니다. 철분 보충이나 추가 검사가 필요할 수 있어 진료 상담을 권합니다.",
+          "sources": [
+            {
+              "id": "who_2024",
+              "quote": "Table 3: pregnant women, first/third trimester — moderate anaemia 70-99 g/L"
+            }
+          ]
+        },
+        {
+          "id": "hb_moderate_t2",
+          "guard": {
+            "trimester": [
+              "T2"
+            ]
+          },
+          "op": "lt",
+          "value": 9.5,
+          "status": "alert",
+          "label": "중등도 빈혈",
+          "message": "2분기 중등도 빈혈 구간입니다. 진료 상담을 권합니다.",
+          "sources": [
+            {
+              "id": "who_2024",
+              "quote": "Table 3: pregnant women, second trimester — moderate anaemia 70-94 g/L"
+            }
+          ]
+        },
+        {
+          "id": "hb_mild_t1t3",
+          "guard": {
+            "trimester": [
+              "T1",
+              "T3"
+            ]
+          },
+          "op": "lt",
+          "value": 11.0,
+          "status": "watch",
+          "label": "경증 빈혈",
+          "message": "임신 1·3분기 기준(11.0 g/dL)보다 조금 낮습니다. 임신 중에는 혈액량이 늘어 흔한 편이지만, 다음 진료 때 철분제 얘기를 나눠보세요.",
+          "sources": [
+            {
+              "id": "acog_pb233_2021",
+              "quote": "hemoglobin (g/dL) and hematocrit (percentage) levels below 11 g/dL and 33%, respectively, in the first trimester; 10.5 g/dL and 32%, respectively, in the second trimester; and 11 g/dL and 33%, respectively, in the third trimester"
+            },
+            {
+              "id": "who_2024",
+              "quote": "Table 3: pregnant women, first/third trimester — no anaemia >=110 g/L, mild 100-109 g/L"
+            }
+          ]
+        },
+        {
+          "id": "hb_mild_t2",
+          "guard": {
+            "trimester": [
+              "T2"
+            ]
+          },
+          "op": "lt",
+          "value": 10.5,
+          "status": "watch",
+          "label": "경증 빈혈",
+          "message": "임신 2분기 기준(10.5 g/dL)보다 조금 낮습니다. 2분기에는 혈액이 가장 묽어지는 시기라 흔합니다.",
+          "sources": [
+            {
+              "id": "acog_pb233_2021",
+              "quote": "10.5 g/dL and 32%, respectively, in the second trimester"
+            },
+            {
+              "id": "who_2024",
+              "quote": "Table 3: pregnant women, second trimester — no anaemia >=105 g/L, mild 95-104 g/L"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "임신 주수 기준 정상 범위입니다.",
+      "screening": {
+        "text": "1분기 1회 + 24~28주 재검",
+        "sourceId": "acog_pb233_2021",
+        "quote": "All pregnant women should be screened for anemia with a complete blood count in the first trimester and again at 24 0/7-28 6/7 weeks of gestation."
+      },
+      "consistencyNote": {
+        "text": "미국(ACOG PB233)·CDC와 WHO 2024의 임산부 빈혈 컷오프 수치가 완전히 일치합니다(11.0 / 10.5 / 11.0 g/dL). 서로 독립된 기관의 기준이 같다는 점이 이 판정의 신뢰도 근거입니다.",
+        "sourceIds": [
+          "acog_pb233_2021",
+          "who_2024"
+        ]
+      },
+      "primarySourceId": "acog_pb233_2021",
+      "corroboratingSourceIds": [
+        "who_2024",
+        "medicina_2025_kr_cbc"
+      ]
+    },
+    {
+      "id": "hematocrit",
+      "name": "헤마토크릿",
+      "aliases": [
+        "hct",
+        "헤마토크릿",
+        "hematocrit",
+        "적혈구용적률",
+        "헤마토크리트",
+        "헤마토크릿(hct)",
+        "적혈구용적",
+        "ht"
+      ],
+      "unit": "%",
+      "valueType": "numeric",
+      "plausibleRange": [
+        10,
+        60
+      ],
+      "referenceIntervals": {
+        "T1": [
+          32.8,
+          43.9
+        ],
+        "T2": [
+          29.2,
+          40.8
+        ],
+        "T3": [
+          30.7,
+          43.3
+        ],
+        "sourceId": "medicina_2025_kr_cbc",
+        "quote": "Hematocrit T1 32.8-43.9, T2 29.2-40.8, T3 30.7-43.3 %"
+      },
+      "rules": [
+        {
+          "id": "hct_low_t1t3",
+          "guard": {
+            "trimester": [
+              "T1",
+              "T3"
+            ]
+          },
+          "op": "lt",
+          "value": 33,
+          "status": "watch",
+          "label": "빈혈 가능",
+          "message": "헤마토크릿이 1·3분기 기준(33%)보다 낮습니다. 헤모글로빈 결과와 함께 보세요.",
+          "sources": [
+            {
+              "id": "acog_pb233_2021",
+              "quote": "33%, respectively, in the first trimester ... and 33%, respectively, in the third trimester"
+            }
+          ]
+        },
+        {
+          "id": "hct_low_t2",
+          "guard": {
+            "trimester": [
+              "T2"
+            ]
+          },
+          "op": "lt",
+          "value": 32,
+          "status": "watch",
+          "label": "빈혈 가능",
+          "message": "헤마토크릿이 2분기 기준(32%)보다 낮습니다.",
+          "sources": [
+            {
+              "id": "acog_pb233_2021",
+              "quote": "32%, respectively, in the second trimester"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "임신 주수 기준 정상 범위입니다.",
+      "secondaryTo": "hemoglobin"
+    },
+    {
+      "id": "ferritin",
+      "name": "페리틴(철 저장량)",
+      "aliases": [
+        "ferritin",
+        "페리틴",
+        "혈청페리틴",
+        "serum ferritin"
+      ],
+      "unit": "ng/mL",
+      "unitAliases": {
+        "ug/L": 1,
+        "µg/L": 1,
+        "ng/ml": 1
+      },
+      "valueType": "numeric",
+      "plausibleRange": [
+        0,
+        2000
+      ],
+      "dualStandard": true,
+      "rules": [
+        {
+          "id": "ferritin_depleted",
+          "op": "lt",
+          "value": 15,
+          "status": "alert",
+          "label": "철 저장량 고갈",
+          "message": "몸에 저장된 철이 거의 남아있지 않은 수준입니다. 철분 보충에 대해 진료 상담이 필요합니다.",
+          "sources": [
+            {
+              "id": "acog_pb233_2021",
+              "quote": "Levels of less than 30 micrograms/L confirm iron deficiency anemia."
+            }
+          ]
+        },
+        {
+          "id": "ferritin_low",
+          "op": "lt",
+          "value": 30,
+          "status": "watch",
+          "label": "철 부족(임신 기준)",
+          "message": "검사실 참고범위로는 정상으로 표시될 수 있지만, 임신 중 철 저장량 기준(30 ng/mL)보다는 낮습니다. 빈혈이 오기 전 단계일 수 있어 철분제 상담을 권합니다.",
+          "sources": [
+            {
+              "id": "acog_pb233_2021",
+              "quote": "Levels of less than 30 micrograms/L confirm iron deficiency anemia."
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "철 저장량이 임신 중 권장 수준 이상입니다.",
+      "mandatoryCaveat": {
+        "text": "페리틴은 검사실 참고범위와 임신 중 임상 기준이 다른 대표 항목입니다. 국내 병원 참고범위는 여성 기준 7.4~73(서울아산), 9~89(서울대) ng/mL로 30보다 훨씬 낮아, 검사지에는 '정상'으로 찍혀도 임신 중 기준으로는 보충 대상일 수 있습니다.",
+        "sourceIds": [
+          "amc_nm_ferritin",
+          "snuh_nm_ferritin"
+        ]
+      },
+      "uncertaintyNote": {
+        "text": "철결핍 판정 컷오프는 국제적으로 15 vs 30 논쟁이 있으며, 미국질병예방특별위원회는 2024년 이 주제에 '근거 불충분(Grade I)' 판정을 내렸습니다.",
+        "sourceId": "uspstf_iron_2024",
+        "quote": "there is no consensus on the exact ferritin level that is indicative of iron deficiency."
+      }
+    },
+    {
+      "id": "wbc",
+      "name": "백혈구(WBC)",
+      "aliases": [
+        "wbc",
+        "백혈구",
+        "white blood cell",
+        "백혈구수",
+        "leukocyte",
+        "백혈구(wbc)",
+        "wbc(백혈구)"
+      ],
+      "unit": "10^3/uL",
+      "unitAliases": {
+        "10^9/L": 1,
+        "10*3/ul": 1,
+        "k/ul": 1,
+        "/ul": 0.001,
+        "10^3/µl": 1
+      },
+      "valueType": "numeric",
+      "plausibleRange": [
+        0.5,
+        100
+      ],
+      "referenceIntervals": {
+        "T1": [
+          5.11,
+          12.14
+        ],
+        "T2": [
+          6.11,
+          13.45
+        ],
+        "T3": [
+          5.62,
+          12.42
+        ],
+        "sourceId": "medicina_2025_kr_cbc",
+        "quote": "WBC T1 5.11-12.14, T2 6.11-13.45, T3 5.62-12.42 x10^9/L"
+      },
+      "rules": [
+        {
+          "id": "wbc_high_marked",
+          "op": "gt",
+          "ref": {
+            "kind": "riUpper",
+            "multiplier": 1.3
+          },
+          "status": "watch",
+          "label": "뚜렷한 증가",
+          "message": "임신 중 정상적인 증가 폭보다 높습니다. 감염 등 다른 이유가 있는지 진료 시 확인해 보세요.",
+          "sources": [
+            {
+              "id": "medicina_2025_kr_cbc",
+              "quote": "한국인 임산부 삼분기별 WBC 참고구간 상한 대비 30% 초과"
+            }
+          ]
+        },
+        {
+          "id": "wbc_high_physiologic",
+          "op": "aboveRI",
+          "status": "info_only",
+          "label": "임신 중 흔한 증가",
+          "message": "임신 중에는 백혈구가 자연스럽게 늘어납니다. 비임신 기준으로 보면 높아 보여도 임신 중에는 흔한 소견입니다.",
+          "sources": [
+            {
+              "id": "medicina_2025_kr_cbc",
+              "quote": "WBC increases physiologically across trimesters in Korean pregnant women"
+            }
+          ]
+        },
+        {
+          "id": "wbc_low",
+          "op": "belowRI",
+          "status": "watch",
+          "label": "감소",
+          "message": "임신 주수 기준 참고구간보다 낮습니다. 다음 진료 때 확인해 보세요.",
+          "sources": [
+            {
+              "id": "medicina_2025_kr_cbc",
+              "quote": "한국인 임산부 삼분기별 WBC 참고구간 하한 미만"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "임신 주수 기준 정상 범위입니다."
+    },
+    {
+      "id": "platelet",
+      "name": "혈소판",
+      "aliases": [
+        "plt",
+        "platelet",
+        "혈소판",
+        "혈소판수",
+        "platelet count",
+        "혈소판수(platelet)",
+        "혈소판(plt)"
+      ],
+      "unit": "10^3/uL",
+      "unitAliases": {
+        "10^9/L": 1,
+        "k/ul": 1,
+        "/ul": 0.001
+      },
+      "valueType": "numeric",
+      "plausibleRange": [
+        1,
+        1500
+      ],
+      "referenceIntervals": {
+        "T1": [
+          184,
+          374
+        ],
+        "T2": [
+          164,
+          356
+        ],
+        "T3": [
+          145,
+          349
+        ],
+        "sourceId": "medicina_2025_kr_cbc",
+        "quote": "Platelet T1 184-374, T2 164-356, T3 145-349 x10^9/L"
+      },
+      "rules": [
+        {
+          "id": "plt_severe",
+          "op": "lt",
+          "value": 100,
+          "status": "alert",
+          "label": "혈소판 감소",
+          "message": "혈소판이 10만/uL 미만입니다. 임신중독증(전자간증)의 중증 소견 중 하나이므로 담당 의료진과 바로 상의하세요.",
+          "sources": [
+            {
+              "id": "acog_pb222_2020",
+              "quote": "Thrombocytopenia (platelet count less than 100,000 x 10^9/L)"
+            }
+          ]
+        },
+        {
+          "id": "plt_low",
+          "op": "belowRI",
+          "status": "watch",
+          "label": "임신성 혈소판감소증 가능",
+          "message": "임신 후기에는 혈소판이 자연스럽게 줄어드는 경우가 많습니다. 10만 이상이면 대개 경과 관찰 대상입니다.",
+          "sources": [
+            {
+              "id": "medicina_2025_kr_cbc",
+              "quote": "Platelet count declines across trimesters; T3 lower limit 145 x10^9/L in Korean pregnant women"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "임신 주수 기준 정상 범위입니다.",
+      "correctionNote": "구버전의 '150 미만 주의'는 한국인 3분기 하한이 145라 정상 임신부를 과잉 경고했음."
+    },
+    {
+      "id": "tsh",
+      "name": "갑상선자극호르몬(TSH)",
+      "aliases": [
+        "tsh",
+        "갑상선자극호르몬",
+        "thyroid stimulating hormone"
+      ],
+      "unit": "mIU/L",
+      "unitAliases": {
+        "uiu/ml": 1,
+        "µiu/ml": 1,
+        "miu/l": 1
+      },
+      "valueType": "numeric",
+      "plausibleRange": [
+        0,
+        200
+      ],
+      "preferPrintedLabRange": true,
+      "referenceIntervals": {
+        "T1": [
+          0.01,
+          4.1
+        ],
+        "T2": [
+          0.01,
+          4.26
+        ],
+        "T3": [
+          0.15,
+          4.57
+        ],
+        "sourceId": "kta_2023",
+        "quote": "대한갑상선학회 2023 권고안 Table 1, Moon et al. 한국인 데이터: 1분기 0.01-4.10, 2분기 0.01-4.26, 3분기 0.15-4.57 mIU/L"
+      },
+      "alternateReferenceIntervals": {
+        "T1": [
+          0.03,
+          4.24
+        ],
+        "T2": [
+          0.13,
+          4.84
+        ],
+        "T3": [
+          0.3,
+          5.57
+        ],
+        "sourceId": "kta_2023",
+        "quote": "동 Table 1, Kim et al. 한국인 데이터"
+      },
+      "rules": [
+        {
+          "id": "tsh_overt",
+          "op": "gt",
+          "value": 10,
+          "status": "alert",
+          "label": "현성 갑상선기능저하 의심",
+          "message": "TSH가 10 mIU/L를 넘습니다. 치료가 필요한 구간일 수 있으니 담당 의료진과 상의하세요.",
+          "sources": [
+            {
+              "id": "kta_2023",
+              "quote": "TPO 항체 음성이면서 TSH 4.0~10.0인 경우 LT4 치료를 고려하며, 10.0을 초과하면 치료 대상"
+            }
+          ]
+        },
+        {
+          "id": "tsh_high",
+          "op": "aboveRI",
+          "status": "recheck",
+          "label": "기준보다 높음 — 재검 필요",
+          "message": "임신 중 기준보다 높지만, 이 한 번의 수치로 확정하지 않습니다. 국제 가이드라인은 4~6주 뒤 재검으로 지속되는지 먼저 확인하도록 권고합니다.",
+          "sources": [
+            {
+              "id": "ata_2026",
+              "quote": "For subclinical hypothyroidism ... we recommend aiming for diagnostic confirmation upon first identification ... by rechecking TSH and fT4 after four to six weeks."
+            },
+            {
+              "id": "kta_2023",
+              "quote": "지역적 특성을 고려한 임신 분기별 TSH의 정상범위가 설정되어 있지 않다면, 임신 1분기 혈중 TSH의 정상 상한선은 4.0 mIU/L로 제안한다."
+            }
+          ]
+        },
+        {
+          "id": "tsh_low",
+          "op": "lt",
+          "value": 0.1,
+          "status": "recheck",
+          "label": "낮음 — 재검 필요",
+          "message": "임신 초기에는 hCG 영향으로 TSH가 일시적으로 낮아질 수 있습니다. 재검으로 확인이 필요합니다.",
+          "sources": [
+            {
+              "id": "ata_2026",
+              "quote": "would correspond, for the typical patient, to a first-trimester reference interval of 0.1-4.0 mU/L"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "임신 주수 기준 정상 범위입니다.",
+      "guidelineFallbackUpper": {
+        "T1": 4.0,
+        "T2": 4.5,
+        "T3": 5.0,
+        "sourceId": "ata_2026",
+        "quote": "a first-trimester reference interval of 0.1-4.0 mU/L ... The use of a laboratory and trimester-specific reference interval is the preferred method"
+      },
+      "mandatoryCaveat": {
+        "text": "TSH는 검사 장비에 따라 정상 상한이 크게 다릅니다. 국내만 봐도 서울아산병원 7.0, 서울대병원 4.1~5.0, 학회 임신 1분기 기준 4.0 mIU/L입니다. 검사지에 참고범위가 적혀 있다면 그 값이 우선입니다.",
+        "sourceIds": [
+          "amc_nm_tsh",
+          "snuh_nm_tsh",
+          "ata_2026"
+        ]
+      },
+      "uncertaintyNote": {
+        "text": "63,198명을 분석한 국제 메타분석에서 임신 1분기 TSH 상한이 코호트별로 2.24~6.02 mIU/L까지 벌어졌습니다.",
+        "sourceId": "jcem_2022_tsh_meta",
+        "quote": "first-trimester TSH upper limits ranged from 2.24 to 6.02 mU/L across cohorts"
+      },
+      "deprecated": [
+        {
+          "what": "TPO 항체 양성 여부로 치료 결정을 가르는 로직",
+          "why": "ATA 2026에서 삭제됨",
+          "sourceId": "ata_2026",
+          "quote": "TPOAb status is no longer used to guide LT4 treatment decision-making in women with subclinical hypothyroidism."
+        },
+        {
+          "what": "TSH 상한 2.5 mIU/L",
+          "why": "ATA 2011 값으로 2017년 개정에서 폐기됨",
+          "sourceId": "ata_2026"
+        }
+      ]
+    },
+    {
+      "id": "free_t4",
+      "name": "유리 티록신(Free T4)",
+      "aliases": [
+        "free t4",
+        "ft4",
+        "f-t4",
+        "유리티록신",
+        "유리 t4"
+      ],
+      "unit": "ng/dL",
+      "valueType": "numeric",
+      "plausibleRange": [
+        0,
+        10
+      ],
+      "preferPrintedLabRange": true,
+      "referenceIntervals": {
+        "T1": [
+          0.83,
+          1.65
+        ],
+        "T2": [
+          0.71,
+          1.22
+        ],
+        "T3": [
+          0.65,
+          1.13
+        ],
+        "sourceId": "annlabmed_2015_kr_thyroid",
+        "quote": "한국인 임신부 free T4: 1분기 0.83-1.65, 2분기 0.71-1.22, 3분기 0.65-1.13 ng/dL (Roche Elecsys, 465명)"
+      },
+      "rules": [
+        {
+          "id": "ft4_outside",
+          "op": "outsideRI",
+          "status": "recheck",
+          "label": "재검 권장",
+          "message": "임신 주수 기준 범위를 벗어났습니다. free T4는 검사 장비마다 값이 달라 이 수치만으로 판단하지 않습니다.",
+          "sources": [
+            {
+              "id": "ata_2026",
+              "quote": "The use of a laboratory and trimester-specific fT4 reference interval ... is thus the preferred method for fT4 interpretation during pregnancy."
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "임신 주수 기준 정상 범위입니다."
+    },
+    {
+      "id": "fasting_glucose",
+      "name": "공복혈당",
+      "aliases": [
+        "공복혈당",
+        "fbs",
+        "fasting glucose",
+        "glucose fasting",
+        "공복 혈당",
+        "glu(공복)",
+        "혈당",
+        "glucose",
+        "포도당"
+      ],
+      "unit": "mg/dL",
+      "unitAliases": {
+        "mmol/L": 18.016
+      },
+      "valueType": "numeric",
+      "plausibleRange": [
+        20,
+        800
+      ],
+      "context": "일반 산전 채혈의 공복혈당(경구당부하검사가 아님)",
+      "rules": [
+        {
+          "id": "fpg_overt",
+          "op": "gte",
+          "value": 126,
+          "status": "alert",
+          "label": "당뇨병 진단 기준 이상",
+          "message": "공복혈당이 당뇨병 진단 기준(126 mg/dL) 이상입니다. 담당 의료진과 바로 상의하세요.",
+          "sources": [
+            {
+              "id": "kda_2025",
+              "quote": "8시간 이상 공복 후 혈장포도당 126 mg/dL 이상이면 당뇨병으로 진단한다"
+            }
+          ]
+        },
+        {
+          "id": "fpg_gdm_range",
+          "op": "gte",
+          "value": 92,
+          "status": "recheck",
+          "label": "정밀검사 필요",
+          "message": "75g 경구당부하검사의 공복 기준(92 mg/dL)에 해당합니다. 임신성 당뇨는 당부하검사로 확인하므로, 이 수치만으로 확정되지 않습니다.",
+          "sources": [
+            {
+              "id": "kda_2025",
+              "quote": "75g 경구포도당내성검사 공복 92 mg/dL 이상이면 임신성 당뇨병으로 진단"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "공복혈당이 정상 범위입니다.",
+      "correctionNote": "이전 버전의 '105 mg/dL 주의' 기준은 진단 기준이 아니라 White 분류(A1/A2)와 혈당 조절 목표치였음. 폐기함.",
+      "defaultSources": [
+        {
+          "id": "kda_2025",
+          "quote": "8시간 이상 공복 후 혈장포도당 126 mg/dL 이상이면 당뇨병으로 진단"
+        }
+      ]
+    },
+    {
+      "id": "gct_50g_1h",
+      "name": "50g 당부하 1시간 혈당(선별)",
+      "aliases": [
+        "50g gct",
+        "gct",
+        "당부하검사",
+        "임신성당뇨 선별",
+        "50g 경구당부하",
+        "당부하 1시간"
+      ],
+      "unit": "mg/dL",
+      "valueType": "numeric",
+      "plausibleRange": [
+        30,
+        500
+      ],
+      "rules": [
+        {
+          "id": "gct_highrisk",
+          "guard": {
+            "flags": [
+              "high_risk"
+            ]
+          },
+          "op": "gte",
+          "value": 130,
+          "status": "recheck",
+          "label": "2차 검사 필요(고위험)",
+          "message": "고위험 임신부 기준(130 mg/dL) 이상이라 100g 정밀검사가 필요합니다. 선별검사일 뿐 진단이 아닙니다.",
+          "sources": [
+            {
+              "id": "kda_2025",
+              "quote": "1차 50g 경구포도당부하검사 1시간 후 140 mg/dL 이상(고위험 임신부는 130 mg/dL 이상)이면 2차 검사 시행"
+            }
+          ]
+        },
+        {
+          "id": "gct_positive",
+          "op": "gte",
+          "value": 140,
+          "status": "recheck",
+          "label": "2차 검사 필요",
+          "message": "선별 기준(140 mg/dL) 이상이라 100g 정밀검사가 필요합니다. 선별검사에서 기준을 넘어도 실제 임신성 당뇨로 진단되는 경우는 일부입니다.",
+          "sources": [
+            {
+              "id": "kda_2025",
+              "quote": "1차 50g 경구포도당부하검사 1시간 후 140 mg/dL 이상이면 2차 검사 시행"
+            },
+            {
+              "id": "snuh_gdm",
+              "quote": "50g 당부하검사에서 1시간 후 혈당이 140 mg/dL 이상이면 100g 경구당부하검사를 시행한다"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "임신성 당뇨 선별검사 기준 범위 안입니다.",
+      "screening": {
+        "text": "임신 24~28주",
+        "sourceId": "kda_2025",
+        "quote": "임신 24~28주에 임신성 당뇨병 선별검사를 시행한다"
+      },
+      "defaultSources": [
+        {
+          "id": "kda_2025",
+          "quote": "1차 50g 경구포도당부하검사 1시간 후 140 mg/dL 이상이면 2차 검사 시행"
+        }
+      ]
+    },
+    {
+      "id": "ogtt_100g",
+      "name": "100g 경구당부하검사(확진)",
+      "aliases": [
+        "100g ogtt",
+        "100g 경구당부하",
+        "carpenter-coustan",
+        "경구당부하검사"
+      ],
+      "unit": "mg/dL",
+      "valueType": "panel",
+      "panel": {
+        "cutoffs": {
+          "fasting": 95,
+          "h1": 180,
+          "h2": 155,
+          "h3": 140
+        },
+        "requiredExceeded": 2,
+        "sourceId": "kda_2025",
+        "quote": "100g 경구포도당부하검사(Carpenter-Coustan): 공복 95, 1시간 180, 2시간 155, 3시간 140 mg/dL 중 2개 이상 충족 시 임신성 당뇨병으로 진단"
+      },
+      "rules": [
+        {
+          "id": "ogtt100_positive",
+          "op": "panelExceededGte",
+          "value": 2,
+          "status": "alert",
+          "label": "임신성 당뇨 진단 기준 충족",
+          "message": "4개 시점 중 2개 이상이 기준을 넘었습니다. 임신성 당뇨 진단 기준에 해당하므로 담당 의료진의 관리 계획이 필요합니다.",
+          "sources": [
+            {
+              "id": "kda_2025",
+              "quote": "2개 이상 충족 시 임신성 당뇨병으로 진단"
+            }
+          ]
+        },
+        {
+          "id": "ogtt100_partial",
+          "op": "panelExceededGte",
+          "value": 1,
+          "status": "watch",
+          "label": "일부 시점만 초과",
+          "message": "일부 시점만 기준을 넘었습니다. 진단에는 2개 이상이 필요해 아직 진단 기준은 아니지만, 담당 의료진과 상의해 보세요.",
+          "sources": [
+            {
+              "id": "kda_2025",
+              "quote": "2개 이상 충족 시 임신성 당뇨병으로 진단"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "모든 시점이 기준 범위 안입니다.",
+      "defaultSources": [
+        {
+          "id": "kda_2025",
+          "quote": "100g 경구포도당부하검사(Carpenter-Coustan): 공복 95, 1시간 180, 2시간 155, 3시간 140 mg/dL 중 2개 이상 충족 시 진단"
+        }
+      ]
+    },
+    {
+      "id": "ogtt_75g",
+      "name": "75g 경구당부하검사(1단계)",
+      "aliases": [
+        "75g ogtt",
+        "75g 경구당부하",
+        "iadpsg"
+      ],
+      "unit": "mg/dL",
+      "valueType": "panel",
+      "panel": {
+        "cutoffs": {
+          "fasting": 92,
+          "h1": 180,
+          "h2": 153
+        },
+        "requiredExceeded": 1,
+        "sourceId": "kda_2025",
+        "quote": "75g 경구포도당내성검사: 공복 92, 1시간 180, 2시간 153 mg/dL 중 하나 이상이면 임신성 당뇨병으로 진단"
+      },
+      "rules": [
+        {
+          "id": "ogtt75_positive",
+          "op": "panelExceededGte",
+          "value": 1,
+          "status": "alert",
+          "label": "임신성 당뇨 진단 기준 충족",
+          "message": "한 시점 이상이 기준을 넘어 임신성 당뇨 진단 기준에 해당합니다. 담당 의료진의 관리 계획이 필요합니다.",
+          "sources": [
+            {
+              "id": "kda_2025",
+              "quote": "하나 이상 충족 시 임신성 당뇨병으로 진단"
+            },
+            {
+              "id": "ada_soc_2026",
+              "quote": "GDM diagnosis when ANY of following BG values are exceeded: Fasting >= 92 mg/dl, 1 h >= 180 mg/dl, 2 h >= 153 mg/dl"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "모든 시점이 기준 범위 안입니다.",
+      "defaultSources": [
+        {
+          "id": "kda_2025",
+          "quote": "75g 경구포도당내성검사: 공복 92, 1시간 180, 2시간 153 mg/dL 중 하나 이상이면 진단"
+        }
+      ]
+    },
+    {
+      "id": "smbg_target",
+      "name": "자가혈당 목표치",
+      "aliases": [
+        "식후 2시간 혈당",
+        "식후혈당",
+        "자가혈당",
+        "혈당 조절 목표",
+        "식후 1시간 혈당"
+      ],
+      "unit": "mg/dL",
+      "valueType": "target",
+      "targets": {
+        "fasting": 95,
+        "h1": 140,
+        "h2": 120,
+        "sourceId": "ada_soc_2026",
+        "quote": "Fasting glucose < 95 mg/dL (5.3 mmol/L), 1-h postprandial glucose < 140 mg/dL (7.8 mmol/L), 2-h postprandial glucose < 120 mg/dL (6.7 mmol/L)"
+      },
+      "rules": [
+        {
+          "id": "smbg_not_diagnosed",
+          "guard": {
+            "notFlags": [
+              "gdm_diagnosed"
+            ]
+          },
+          "op": "always",
+          "status": "info_only",
+          "label": "관리 목표치",
+          "message": "이 수치는 임신성 당뇨로 이미 진단받은 분의 '관리 목표'이지 선별·진단 기준이 아닙니다. 진단은 당부하검사로 합니다.",
+          "sources": [
+            {
+              "id": "ada_soc_2026",
+              "quote": "Glycemic targets in pregnancy for individuals with GDM"
+            }
+          ]
+        },
+        {
+          "id": "smbg_over",
+          "guard": {
+            "flags": [
+              "gdm_diagnosed"
+            ]
+          },
+          "op": "targetExceeded",
+          "status": "watch",
+          "label": "목표치 초과",
+          "message": "관리 목표를 넘었습니다. 식사·활동 기록과 함께 담당 의료진에게 보여주세요.",
+          "sources": [
+            {
+              "id": "ada_soc_2026",
+              "quote": "Fasting < 95, 1-h < 140, 2-h < 120 mg/dL"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "관리 목표 범위 안입니다.",
+      "defaultSources": [
+        {
+          "id": "ada_soc_2026",
+          "quote": "Fasting < 95, 1-h < 140, 2-h < 120 mg/dL"
+        }
+      ]
+    },
+    {
+      "id": "hba1c",
+      "name": "당화혈색소(HbA1c)",
+      "aliases": [
+        "hba1c",
+        "당화혈색소",
+        "a1c",
+        "hb a1c"
+      ],
+      "unit": "%",
+      "valueType": "numeric",
+      "plausibleRange": [
+        3,
+        20
+      ],
+      "rules": [
+        {
+          "id": "hba1c_overt",
+          "guard": {
+            "trimester": [
+              "T1"
+            ]
+          },
+          "op": "gte",
+          "value": 6.5,
+          "status": "alert",
+          "label": "당뇨병 진단 기준",
+          "message": "임신 초기 6.5% 이상은 임신 전부터 있던 당뇨로 분류됩니다. 담당 의료진과 상의하세요.",
+          "sources": [
+            {
+              "id": "kda_2025",
+              "quote": "당화혈색소 6.5% 이상이면 당뇨병으로 진단"
+            }
+          ]
+        },
+        {
+          "id": "hba1c_target",
+          "op": "gte",
+          "value": 6.0,
+          "status": "watch",
+          "label": "관리 목표 초과",
+          "message": "임신 중 권장 목표(6% 미만)보다 높습니다. 다만 임신 중에는 적혈구가 빨리 교체되어 실제보다 낮게 나오는 경향이 있어, 이 수치 하나로 판단하지 않습니다.",
+          "sources": [
+            {
+              "id": "ada_soc_2026",
+              "quote": "The A1C target in pregnancy is < 6% (< 42 mmol/mol) if this can be achieved without significant hypoglycemia"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "권장 목표 범위 안입니다.",
+      "defaultSources": [
+        {
+          "id": "ada_soc_2026",
+          "quote": "The A1C target in pregnancy is < 6% if this can be achieved without significant hypoglycemia"
+        }
+      ]
+    },
+    {
+      "id": "alt",
+      "name": "간수치 ALT",
+      "aliases": [
+        "alt",
+        "sgpt",
+        "gpt",
+        "알라닌아미노전이효소",
+        "alt(gpt)",
+        "alt(sgpt)"
+      ],
+      "unit": "U/L",
+      "valueType": "numeric",
+      "plausibleRange": [
+        0,
+        5000
+      ],
+      "referenceIntervals": {
+        "T1": [
+          3,
+          30
+        ],
+        "T2": [
+          2,
+          33
+        ],
+        "T3": [
+          2,
+          25
+        ],
+        "sourceId": "york_nhs_lft",
+        "quote": "ALT in pregnancy: T1 3-30, T2 2-33, T3 2-25 U/L",
+        "trustTier": "C",
+        "useForJudgment": false,
+        "displayOnly": true,
+        "reason": "Abbassi-Ghanavati 2009 원논문 미검증(tier D). 참고 표시용으로만 사용하고 판정은 검사지 참고범위 기준으로 수행."
+      },
+      "rules": [
+        {
+          "id": "alt_severe",
+          "op": "gte",
+          "ref": {
+            "kind": "labUpper",
+            "multiplier": 2
+          },
+          "status": "alert",
+          "label": "간수치 상승",
+          "message": "간수치가 검사실 정상 상한의 2배 이상입니다. 임신중독증의 중증 소견 중 하나이므로 담당 의료진과 바로 상의하세요.",
+          "sources": [
+            {
+              "id": "acog_pb222_2020",
+              "quote": "Elevated blood concentrations of liver transaminases to twice normal concentration"
+            }
+          ]
+        },
+        {
+          "id": "alt_mild",
+          "op": "gt",
+          "ref": {
+            "kind": "labUpper"
+          },
+          "status": "watch",
+          "label": "약간 상승",
+          "message": "검사실 정상 상한보다 높습니다. 임신 중에는 정상 상한이 오히려 낮아지므로 다음 진료 때 확인해 보세요.",
+          "sources": [
+            {
+              "id": "york_nhs_lft",
+              "quote": "ALT reference intervals are lower in pregnancy than in the non-pregnant state"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "정상 범위입니다.",
+      "requiresPrintedLabRange": true,
+      "fallbackWhenNoLabRange": {
+        "upper": 33,
+        "note": "검사지에 참고범위가 없을 때만 사용하는 보수적 상한",
+        "sourceId": "york_nhs_lft"
+      }
+    },
+    {
+      "id": "ast",
+      "name": "간수치 AST",
+      "aliases": [
+        "ast",
+        "sgot",
+        "got",
+        "아스파르테이트아미노전이효소",
+        "ast(got)",
+        "ast(sgot)"
+      ],
+      "unit": "U/L",
+      "valueType": "numeric",
+      "plausibleRange": [
+        0,
+        5000
+      ],
+      "referenceIntervals": {
+        "T1": [
+          3,
+          23
+        ],
+        "T2": [
+          3,
+          33
+        ],
+        "T3": [
+          4,
+          32
+        ],
+        "sourceId": "york_nhs_lft",
+        "quote": "AST in pregnancy: T1 3-23, T2 3-33, T3 4-32 U/L",
+        "trustTier": "C",
+        "useForJudgment": false,
+        "displayOnly": true
+      },
+      "rules": [
+        {
+          "id": "ast_severe",
+          "op": "gte",
+          "ref": {
+            "kind": "labUpper",
+            "multiplier": 2
+          },
+          "status": "alert",
+          "label": "간수치 상승",
+          "message": "간수치가 검사실 정상 상한의 2배 이상입니다. 임신중독증의 중증 소견 중 하나이므로 담당 의료진과 바로 상의하세요.",
+          "sources": [
+            {
+              "id": "acog_pb222_2020",
+              "quote": "Elevated blood concentrations of liver transaminases to twice normal concentration"
+            }
+          ]
+        },
+        {
+          "id": "ast_mild",
+          "op": "gt",
+          "ref": {
+            "kind": "labUpper"
+          },
+          "status": "watch",
+          "label": "약간 상승",
+          "message": "검사실 정상 상한보다 높습니다. 다음 진료 때 확인해 보세요.",
+          "sources": [
+            {
+              "id": "york_nhs_lft",
+              "quote": "AST reference intervals are lower in pregnancy"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "정상 범위입니다.",
+      "requiresPrintedLabRange": true,
+      "fallbackWhenNoLabRange": {
+        "upper": 33,
+        "sourceId": "york_nhs_lft"
+      }
+    },
+    {
+      "id": "creatinine",
+      "name": "크레아티닌",
+      "aliases": [
+        "creatinine",
+        "cr",
+        "크레아티닌",
+        "혈청크레아티닌",
+        "크레아티닌(cr)",
+        "혈청 크레아티닌"
+      ],
+      "unit": "mg/dL",
+      "unitAliases": {
+        "umol/L": 0.0113,
+        "µmol/L": 0.0113
+      },
+      "valueType": "numeric",
+      "plausibleRange": [
+        0.1,
+        20
+      ],
+      "rules": [
+        {
+          "id": "cr_severe",
+          "op": "gt",
+          "value": 1.1,
+          "status": "alert",
+          "label": "신기능 이상",
+          "message": "크레아티닌이 1.1 mg/dL를 넘습니다. 임신중독증의 중증 소견 중 하나이므로 담당 의료진과 바로 상의하세요.",
+          "sources": [
+            {
+              "id": "acog_pb222_2020",
+              "quote": "Renal insufficiency (serum creatinine concentration more than 1.1 mg/dL or a doubling of the serum creatinine concentration in the absence of other renal disease)"
+            }
+          ]
+        },
+        {
+          "id": "cr_high",
+          "op": "gt",
+          "value": 0.9,
+          "status": "watch",
+          "label": "임신 기준 상단",
+          "message": "임신 중에는 신장이 더 많이 일해 크레아티닌이 비임신 때보다 낮은 것이 정상입니다. 비임신 기준으로는 정상이어도 임신 중에는 확인이 필요한 구간입니다.",
+          "sources": [
+            {
+              "id": "acog_pb222_2020",
+              "quote": "serum creatinine concentration more than 1.1 mg/dL"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "임신 주수 기준 정상 범위입니다.",
+      "defaultSources": [
+        {
+          "id": "acog_pb222_2020",
+          "quote": "serum creatinine concentration more than 1.1 mg/dL"
+        }
+      ]
+    },
+    {
+      "id": "urine_protein",
+      "name": "요단백",
+      "aliases": [
+        "요단백",
+        "urine protein",
+        "protein(urine)",
+        "단백뇨",
+        "뇨단백",
+        "u-protein"
+      ],
+      "unit": "dipstick",
+      "valueType": "ordinal",
+      "gradeScale": [
+        "음성",
+        "trace",
+        "1+",
+        "2+",
+        "3+",
+        "4+"
+      ],
+      "gradeToMgPerDl": {
+        "음성": 0,
+        "trace": 15,
+        "1+": 30,
+        "2+": 100,
+        "3+": 300,
+        "4+": 1000,
+        "sourceId": "amc_proteinuria",
+        "quote": "1+는 30 mg/dL, 2+는 100 mg/dL, 3+는 300 mg/dL, 4+는 1000 mg/dL에 해당"
+      },
+      "quantitativeCutoffs": {
+        "urine24hProteinMg": 300,
+        "proteinCreatinineRatio": 0.3,
+        "sourceId": "acog_pb222_2020",
+        "quote": "Proteinuria: 300 mg or more per 24 hour urine collection ... or Protein/creatinine ratio 0.3 mg/dL or more"
+      },
+      "rules": [
+        {
+          "id": "up_2plus",
+          "guard": {
+            "minGestationalWeek": 20
+          },
+          "op": "gradeGte",
+          "value": "2+",
+          "status": "alert",
+          "label": "단백뇨",
+          "message": "임신 20주 이후 요단백 2+ 이상입니다. 혈압과 함께 임신중독증 확인이 필요하니 담당 의료진과 상의하세요.",
+          "sources": [
+            {
+              "id": "acog_pb222_2020",
+              "quote": "Dipstick reading of 2+ (used only if other quantitative methods not available)"
+            }
+          ]
+        },
+        {
+          "id": "up_trace",
+          "op": "gradeGte",
+          "value": "trace",
+          "status": "watch",
+          "label": "경미한 단백뇨",
+          "message": "소량의 단백이 검출됐습니다. 수분 섭취나 검체 상태에 따라 달라질 수 있어 재검으로 확인하는 경우가 많습니다.",
+          "sources": [
+            {
+              "id": "acog_pb222_2020",
+              "quote": "Proteinuria: 300 mg or more per 24 hour urine collection ... or Protein/creatinine ratio 0.3 mg/dL or more"
+            },
+            {
+              "id": "amc_proteinuria",
+              "quote": "하루 300 mg 이상의 단백질이 배출되면 단백뇨로 정의합니다"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "요단백이 검출되지 않았습니다.",
+      "mandatoryCaveat": {
+        "text": "단백뇨가 음성이어도 임신중독증일 수 있습니다. 20주 이후 혈압 상승과 함께 혈소판 감소·간수치 상승·크레아티닌 상승·두통·시야 이상 중 하나만 있어도 진단됩니다.",
+        "sourceId": "acog_pb222_2020",
+        "quote": "in the absence of proteinuria, new-onset hypertension with the new onset of any of the following: Thrombocytopenia, Renal insufficiency, Impaired liver function, Pulmonary edema, New-onset headache, Visual symptoms"
+      },
+      "correctionNote": "이전 버전의 '0.3 mg/dL 기준'은 단위 오류(0.3은 g/24hr).",
+      "defaultSources": [
+        {
+          "id": "acog_pb222_2020",
+          "quote": "Proteinuria: 300 mg or more per 24 hour urine collection ... or Protein/creatinine ratio 0.3 mg/dL or more"
+        }
+      ]
+    },
+    {
+      "id": "urine_glucose",
+      "name": "요당",
+      "aliases": [
+        "요당",
+        "urine glucose",
+        "glucose(urine)",
+        "뇨당",
+        "u-glucose",
+        "소변 요당",
+        "urine sugar"
+      ],
+      "unit": "dipstick",
+      "valueType": "ordinal",
+      "gradeScale": [
+        "음성",
+        "trace",
+        "1+",
+        "2+",
+        "3+",
+        "4+"
+      ],
+      "rules": [
+        {
+          "id": "ug_high",
+          "op": "gradeGte",
+          "value": "2+",
+          "status": "watch",
+          "label": "혈당 확인 권장",
+          "message": "요당이 뚜렷하게 나왔습니다. 다만 임신성 당뇨는 요당이 아니라 혈당·당부하검사로 진단하므로, 혈당 결과를 함께 확인하세요.",
+          "sources": [
+            {
+              "id": "kda_2025",
+              "quote": "임신성 당뇨병의 진단은 경구포도당부하검사의 혈장포도당 수치로 한다"
+            }
+          ]
+        },
+        {
+          "id": "ug_low",
+          "op": "gradeGte",
+          "value": "1+",
+          "status": "info_only",
+          "label": "임신 중 흔함",
+          "message": "임신 중에는 신장이 당을 덜 재흡수해 정상에서도 요당이 나올 수 있습니다.",
+          "sources": [
+            {
+              "id": "kda_2025",
+              "quote": "요당은 임신성 당뇨병의 진단 기준이 아니다"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "요당이 검출되지 않았습니다.",
+      "defaultSources": [
+        {
+          "id": "kda_2025",
+          "quote": "임신성 당뇨병의 진단은 경구포도당부하검사의 혈장포도당 수치로 한다"
+        }
+      ]
+    },
+    {
+      "id": "rubella_igg",
+      "name": "풍진 항체(IgG)",
+      "aliases": [
+        "풍진",
+        "rubella igg",
+        "풍진항체",
+        "rubella ab",
+        "rubella"
+      ],
+      "unit": "IU/mL",
+      "valueType": "numeric",
+      "plausibleRange": [
+        0,
+        500
+      ],
+      "rules": [
+        {
+          "id": "rub_immune",
+          "op": "gte",
+          "value": 10,
+          "status": "safe",
+          "label": "면역 있음",
+          "message": "풍진 항체가 있는 것으로 판정되는 수준입니다.",
+          "sources": [
+            {
+              "id": "cdc_rubella_2024",
+              "quote": "EIA can reliably detect rubella IgG concentrations greater than 10 IU/ml, which is the cutoff for defining rubella immunity used in the United States."
+            }
+          ]
+        },
+        {
+          "id": "rub_gray",
+          "op": "gte",
+          "value": 5,
+          "status": "indeterminate",
+          "label": "판정 보류(회색지대)",
+          "message": "면역이 있는지 없는지 판정을 보류하는 구간입니다. 검사기관에 따라 결과 해석이 달라질 수 있어 담당 의료진의 판단이 필요합니다.",
+          "sources": [
+            {
+              "id": "seegene_rubella",
+              "quote": "Rubella IgG 판정: 음성 5.0 IU/mL 이하 / 회색지대(gray zone) 5.0-9.9 / 양성 10.0 이상"
+            },
+            {
+              "id": "jcm_2016_rubella",
+              "quote": "equivocal results should not be interpreted as non-immune; interpreting equivocal as positive improved agreement from 36-76% to 73-93.3% without loss of specificity"
+            },
+            {
+              "id": "cdc_rubella_2024",
+              "quote": "EIA can reliably detect rubella IgG concentrations greater than 10 IU/ml, which is the cutoff for defining rubella immunity used in the United States."
+            }
+          ]
+        },
+        {
+          "id": "rub_nonimmune",
+          "op": "lt",
+          "value": 5,
+          "status": "watch",
+          "label": "면역 없음 가능",
+          "message": "풍진 면역이 없을 수 있습니다. 임신 중에는 생백신을 맞을 수 없어 보통 출산 후 접종을 권합니다. 담당 의료진과 상의하세요.",
+          "sources": [
+            {
+              "id": "cdc_rubella_2024",
+              "quote": "greater than 10 IU/ml ... is the cutoff for defining rubella immunity used in the United States."
+            },
+            {
+              "id": "seegene_rubella",
+              "quote": "음성 5.0 IU/mL 이하"
+            }
+          ]
+        },
+        {
+          "id": "rub_qual_pos",
+          "op": "eq",
+          "value": "positive",
+          "status": "safe",
+          "label": "면역 있음",
+          "message": "검사지에 수치 없이 '양성'으로만 적혀 있어요. 풍진 항체가 있는 것으로 판정된 결과입니다.",
+          "sources": [
+            {
+              "id": "cdc_rubella_2024",
+              "quote": "EIA can reliably detect rubella IgG concentrations greater than 10 IU/ml, which is the cutoff for defining rubella immunity used in the United States."
+            }
+          ]
+        },
+        {
+          "id": "rub_qual_neg",
+          "op": "eq",
+          "value": "negative",
+          "status": "watch",
+          "label": "면역 없음 가능",
+          "message": "검사지에 수치 없이 '음성'으로 적혀 있어요. 풍진 면역이 없을 수 있습니다. 임신 중에는 생백신을 맞을 수 없어 보통 출산 후 접종을 권합니다. 담당 의료진과 상의하세요.",
+          "sources": [
+            {
+              "id": "cdc_rubella_2024",
+              "quote": "greater than 10 IU/ml ... is the cutoff for defining rubella immunity used in the United States."
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "indeterminate",
+      "defaultMessage": "판정을 보류합니다.",
+      "mandatoryCaveat": {
+        "text": "풍진 항체 수치는 검사 장비에 따라 같은 검체도 결과가 크게 달라집니다. WHO 표준품에 교정된 상용 검사 8종을 비교한 연구에서, 동일 검체의 양성 판정률이 6%에서 64.8%까지, 역가는 최대 10배까지 차이 났습니다.",
+        "sourceId": "jcm_2016_rubella",
+        "quote": "positivity rates ranged from 6% to 64.8% depending on the assay; titers varied up to 10-fold for the same sample"
+      },
+      "defaultSources": [
+        {
+          "id": "cdc_rubella_2024",
+          "quote": "greater than 10 IU/ml ... is the cutoff for defining rubella immunity used in the United States."
+        }
+      ],
+      "qualitativeAliases": {
+        "면역있음": "positive",
+        "면역 있음": "positive",
+        "immune": "positive",
+        "면역없음": "negative",
+        "면역 없음": "negative",
+        "non-immune": "negative"
+      }
+    },
+    {
+      "id": "hbsag",
+      "name": "B형간염 표면항원(HBsAg)",
+      "aliases": [
+        "hbsag",
+        "b형간염",
+        "b형간염 항원",
+        "hbs ag",
+        "hbs-ag",
+        "b형간염 표면항원",
+        "표면항원",
+        "b형간염검사(hbs ag)",
+        "b형 간염 항원(hbs ag)"
+      ],
+      "unit": "qualitative",
+      "valueType": "categorical",
+      "rules": [
+        {
+          "id": "hbsag_pos",
+          "op": "eq",
+          "value": "positive",
+          "status": "alert",
+          "label": "양성",
+          "message": "출생 직후 백신과 면역글로불린을 함께 투여하면 아기에게 전달되는 것을 대부분 막을 수 있고, 그래서 이 검사를 임신 초기에 합니다. 담당 의료진에게 결과를 꼭 알려 출산 계획에 반영하세요.",
+          "sources": [
+            {
+              "id": "uspstf_hbv_2019",
+              "quote": "The USPSTF recommends screening for hepatitis B virus (HBV) infection in pregnant women at their first prenatal visit"
+            },
+            {
+              "id": "cdc_hbv_2023",
+              "quote": "All pregnant women should be tested for hepatitis B surface antigen (HBsAg) during an early prenatal visit in each pregnancy"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "음성입니다.",
+      "toneRule": "양성 결과는 공포가 아니라 '조치 가능성'을 첫 문장에 둔다.",
+      "defaultSources": [
+        {
+          "id": "uspstf_hbv_2019",
+          "quote": "The USPSTF recommends screening for hepatitis B virus (HBV) infection in pregnant women at their first prenatal visit"
+        }
+      ]
+    },
+    {
+      "id": "anti_hbc",
+      "name": "B형간염 코어항체(anti-HBc)",
+      "aliases": [
+        "hbcab",
+        "anti-hbc",
+        "antihbc",
+        "hbc ab",
+        "b형간염 코어항체",
+        "코어항체",
+        "total anti-hbc"
+      ],
+      "unit": "qualitative",
+      "valueType": "categorical",
+      "rules": [
+        {
+          "id": "antihbc_pos",
+          "op": "eq",
+          "value": "positive",
+          "status": "recheck",
+          "label": "추가 확인 필요",
+          "message": "과거 감염 이력이 있을 수 있어 표면항원·표면항체 결과와 함께 해석해야 합니다. 이 항목 하나로는 판단하지 않습니다.",
+          "sources": [
+            {
+              "id": "cdc_hbv_2023",
+              "quote": "Interpretation of the triple panel requires all three results (HBsAg, anti-HBs, total anti-HBc) together"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "음성입니다.",
+      "severityCap": "recheck",
+      "defaultSources": [
+        {
+          "id": "cdc_hbv_2023",
+          "quote": "CDC recommends the triple panel (HBsAg, anti-HBs, total anti-HBc) at least once for adults"
+        }
+      ]
+    },
+    {
+      "id": "anti_hbs",
+      "name": "B형간염 표면항체(anti-HBs)",
+      "aliases": [
+        "hbsab",
+        "hbs ab",
+        "anti-hbs",
+        "antihbs",
+        "b형간염 표면항체",
+        "b형간염항체",
+        "b형간염 항체",
+        "표면항체",
+        "b형간염검사(hbs ab)",
+        "b형 간염 항체(hbs ab)"
+      ],
+      "unit": "qualitative",
+      "valueType": "categorical",
+      "rules": [
+        {
+          "id": "antihbs_neg",
+          "op": "eq",
+          "value": "negative",
+          "status": "watch",
+          "label": "면역 없음",
+          "message": "B형간염을 막아주는 항체가 없는 상태예요. 병에 걸린 게 아니라 '아직 예방접종이 필요한 상태'라는 뜻입니다. B형간염 백신은 사백신이라 임신 중에도 맞을 수 있으니, 접종이 필요한지 담당 의료진과 상의해 보세요.",
+          "sources": [
+            {
+              "id": "cdc_hbv_2023",
+              "quote": "Persons who are susceptible to HBV infection should be told that they have never been infected with HBV and are not protected from future infection. ... All persons who are susceptible to infection should be offered HepB vaccine per ACIP recommendations."
+            },
+            {
+              "id": "immunize_hepb_pregnancy",
+              "quote": "Many years of experience with Engerix-B and Recombivax HB brands of HepB vaccines and more recent studies of Heplisav-B vaccine indicate no apparent risk for adverse events to a developing fetus."
+            }
+          ]
+        },
+        {
+          "id": "antihbs_pos",
+          "op": "eq",
+          "value": "positive",
+          "status": "safe",
+          "label": "면역 있음",
+          "message": "B형간염을 막아주는 항체가 있습니다.",
+          "sources": [
+            {
+              "id": "cdc_hbv_2023",
+              "quote": "anti-HBs alone indicates immunity from vaccination"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "결과를 확인했습니다.",
+      "severityCap": "watch",
+      "mandatoryCaveat": {
+        "text": "임신부 산전검사에서 아기에게 전달될 위험을 보는 항목은 표면'항원'(HBsAg)이고, 표면'항체'(anti-HBs)는 내 면역 여부를 보는 항목입니다. 항체 음성은 위험 신호가 아니라 예방접종 상담 대상이라는 뜻입니다.",
+        "sourceId": "cdc_hbv_2023",
+        "quote": "All persons who are susceptible to infection should be offered HepB vaccine per ACIP recommendations."
+      },
+      "toneRule": "'위험'으로 표시하지 않는다. 조치 가능한 상태임을 첫 문장에 둔다.",
+      "correctionNote": "v1에서 anti-HBs 음성을 '위험'으로 판정했으나, 이는 감염이 아니라 감수성(susceptible) 상태로 예방접종 대상임. 과잉 경고였음.",
+      "defaultSources": [
+        {
+          "id": "cdc_hbv_2023",
+          "quote": "anti-HBs alone indicates immunity from vaccination"
+        }
+      ]
+    },
+    {
+      "id": "syphilis",
+      "name": "매독 검사(VDRL/RPR)",
+      "aliases": [
+        "vdrl",
+        "rpr",
+        "매독",
+        "매독반응검사",
+        "sts",
+        "매독혈청검사",
+        "매독검사",
+        "sts(vdrl)",
+        "rpr정성",
+        "매독 항체",
+        "매독반응검사(vdrl,rpr,art)",
+        "매독항체검사",
+        "매독검사항응집검사(tpha)",
+        "tpha"
+      ],
+      "unit": "qualitative",
+      "valueType": "categorical",
+      "rules": [
+        {
+          "id": "syph_pos",
+          "op": "eq",
+          "value": "positive",
+          "status": "recheck",
+          "label": "확인검사 필요",
+          "message": "이 검사는 선별검사라 양성이어도 확진이 아닙니다. 표준 절차상 다른 종류의 검사를 한 번 더 해서 확인합니다. 담당 의료진과 상의하세요.",
+          "sources": [
+            {
+              "id": "uspstf_syphilis_2025",
+              "quote": "Screening should include both a treponemal and nontreponemal test."
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "음성입니다.",
+      "qualitativeAliases": {
+        "nr": "negative",
+        "non-reactive": "negative",
+        "nonreactive": "negative",
+        "비반응": "negative",
+        "r": "positive",
+        "reactive": "positive",
+        "반응": "positive"
+      },
+      "defaultSources": [
+        {
+          "id": "uspstf_syphilis_2025",
+          "quote": "The USPSTF recommends early, universal screening for syphilis infection during pregnancy"
+        }
+      ]
+    },
+    {
+      "id": "hiv",
+      "name": "HIV 항체",
+      "aliases": [
+        "hiv",
+        "에이즈",
+        "hiv ab",
+        "hiv 항체",
+        "anti-hiv",
+        "hiv검사",
+        "에이즈검사",
+        "hiv 항원/항체",
+        "hiv항체검사(hiv ag/ab)",
+        "hiv ag/ab"
+      ],
+      "unit": "qualitative",
+      "valueType": "categorical",
+      "privacy": {
+        "hideFromSummaryCards": true,
+        "hideFromPush": true,
+        "requireExplicitOpen": true
+      },
+      "rules": [
+        {
+          "id": "hiv_pos",
+          "op": "eq",
+          "value": "positive",
+          "status": "recheck",
+          "label": "확인검사 필요",
+          "message": "선별검사 양성은 확진이 아니며 반드시 확인검사를 거칩니다. 담당 의료진과 상의하세요.",
+          "sources": [
+            {
+              "id": "uspstf_hiv_2019",
+              "quote": "The USPSTF recommends that clinicians screen for HIV infection in all pregnant persons"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "음성입니다.",
+      "qualitativeAliases": {
+        "nr": "negative",
+        "non-reactive": "negative",
+        "비반응": "negative",
+        "r": "positive",
+        "reactive": "positive"
+      },
+      "defaultSources": [
+        {
+          "id": "uspstf_hiv_2019",
+          "quote": "The USPSTF recommends that clinicians screen for HIV infection in all pregnant persons"
+        }
+      ]
+    },
+    {
+      "id": "blood_type_rh",
+      "name": "혈액형 / Rh",
+      "aliases": [
+        "혈액형",
+        "rh",
+        "abo",
+        "blood type",
+        "rh(d)",
+        "abo/rh"
+      ],
+      "unit": "categorical",
+      "valueType": "categorical",
+      "rules": [
+        {
+          "id": "rh_neg",
+          "op": "eq",
+          "value": "rh_negative",
+          "status": "watch",
+          "label": "Rh 음성",
+          "message": "Rh 음성이면 항체선별검사와 임신 28주경 항-D 면역글로불린 투여 대상인지 확인이 필요합니다. 담당 의료진에게 꼭 말씀하세요.",
+          "sources": [
+            {
+              "id": "acog_cc8_2025",
+              "quote": "Prenatal labs Include: Complete Blood Count (CBC), blood type, Rh(D) Type, antibody screen ..."
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "safe",
+      "defaultMessage": "특별한 조치가 필요하지 않습니다.",
+      "defaultSources": [
+        {
+          "id": "acog_cc8_2025",
+          "quote": "Prenatal labs Include: Complete Blood Count (CBC), blood type, Rh(D) Type, antibody screen ..."
+        }
+      ]
+    },
+    {
+      "id": "total_cholesterol",
+      "name": "총콜레스테롤",
+      "aliases": [
+        "총콜레스테롤",
+        "total cholesterol",
+        "tc",
+        "콜레스테롤"
+      ],
+      "unit": "mg/dL",
+      "valueType": "numeric",
+      "plausibleRange": [
+        50,
+        800
+      ],
+      "rules": [
+        {
+          "id": "chol_info",
+          "op": "always",
+          "status": "info_only",
+          "label": "임신 중 생리적 상승",
+          "message": "임신 중에는 총콜레스테롤이 원래 크게 올라갑니다. 3분기 정상 상한이 350 mg/dL 안팎이라, 비임신 기준(200)으로 보면 대부분의 임산부가 '높음'으로 나옵니다. 표준 산전검사 필수 항목도 아니어서 이 앱에서는 판정하지 않습니다.",
+          "sources": [
+            {
+              "id": "rbe_2025_lipid",
+              "quote": "Pooled reference intervals for total cholesterol (mmol/L): T1 3.00-5.83, T2 3.79-7.87, T3 4.39-8.98 (13 studies, 54,517 participants)"
+            }
+          ]
+        }
+      ],
+      "defaultStatus": "info_only",
+      "defaultMessage": "임신 중에는 자연스럽게 올라가는 수치입니다."
+    }
+  ],
+  "crossRules": [
+    {
+      "id": "preeclampsia_severe_features",
+      "name": "임신중독증(전자간증) 중증 소견",
+      "requires": {
+        "minGestationalWeek": 20,
+        "anyOf": [
+          "blood_pressure",
+          "platelet",
+          "alt",
+          "ast",
+          "creatinine",
+          "urine_protein"
+        ]
+      },
+      "triggerConditions": [
+        {
+          "text": "수축기 160 mmHg 이상 또는 이완기 110 mmHg 이상",
+          "field": "blood_pressure"
+        },
+        {
+          "text": "혈소판 100,000/uL 미만",
+          "field": "platelet"
+        },
+        {
+          "text": "ALT 또는 AST가 검사실 정상 상한의 2배 이상",
+          "field": "alt|ast"
+        },
+        {
+          "text": "크레아티닌 1.1 mg/dL 초과 또는 기저치의 2배",
+          "field": "creatinine"
+        },
+        {
+          "text": "폐부종, 약이 듣지 않는 새로운 두통, 시야 이상",
+          "field": "symptom"
+        }
+      ],
+      "status": "alert",
+      "message": "임신중독증의 중증 소견에 해당하는 항목이 있습니다. 단백뇨가 없어도 진단될 수 있는 조합이므로, 담당 의료진에게 바로 연락하세요.",
+      "sources": [
+        {
+          "id": "acog_pb222_2020",
+          "quote": "Severe features of preeclampsia: Systolic blood pressure of 160 mm Hg or more, or diastolic blood pressure of 110 mm Hg or more ...; Thrombocytopenia (platelet count less than 100,000); Elevated blood concentrations of liver transaminases to twice normal; Renal insufficiency (serum creatinine more than 1.1 mg/dL); Pulmonary edema; New-onset headache unresponsive to medication; Visual disturbances"
+        }
+      ]
+    },
+    {
+      "id": "iron_deficiency_without_anemia",
+      "name": "빈혈 전 단계 철 결핍",
+      "requires": {
+        "allOf": [
+          "hemoglobin",
+          "ferritin"
+        ]
+      },
+      "condition": "hemoglobin >= 임신 주수 기준 하한 AND ferritin < 30",
+      "status": "watch",
+      "message": "헤모글로빈은 아직 정상이지만 저장된 철이 부족한 상태입니다. 빈혈이 오기 전에 미리 챙길 수 있는 시점이라, 다음 진료 때 철분제 복용을 상의해 보세요.",
+      "sources": [
+        {
+          "id": "acog_pb233_2021",
+          "quote": "Levels of less than 30 micrograms/L confirm iron deficiency anemia."
+        }
+      ]
+    },
+    {
+      "id": "anemia_type_branch",
+      "name": "빈혈 원인 분기 설명",
+      "requires": {
+        "allOf": [
+          "hemoglobin",
+          "mcv"
+        ]
+      },
+      "condition": "hemoglobin 낮음 + MCV 80 미만이면 철결핍 가능성을 우선 설명, MCV 정상/높으면 원인을 단정하지 않음",
+      "status": "watch",
+      "message": "빈혈의 원인은 여러 가지라 이 결과만으로 단정하지 않습니다. 담당 의료진이 추가 검사로 확인합니다.",
+      "sources": [
+        {
+          "id": "acog_pb233_2021",
+          "quote": "Iron deficiency is the most common cause of anemia in pregnancy, but evaluation should consider other causes."
+        }
+      ]
+    },
+    {
+      "id": "hbv_susceptible",
+      "name": "B형간염 예방접종 상담 대상",
+      "requires": {
+        "allOf": [
+          "hbsag",
+          "anti_hbs"
+        ]
+      },
+      "condition": "HBsAg 음성 AND anti-HBs 음성",
+      "status": "watch",
+      "message": "B형간염에 걸린 상태는 아니지만 막아주는 항체도 없는 상태예요. 예방접종으로 해결되는 부분이라, 담당 의료진에게 접종이 필요한지 물어보세요. B형간염 백신은 임신 중에도 맞을 수 있는 사백신입니다.",
+      "sources": [
+        {
+          "id": "cdc_hbv_2023",
+          "quote": "All persons who are susceptible to infection should be offered HepB vaccine per ACIP recommendations."
+        },
+        {
+          "id": "immunize_hepb_pregnancy",
+          "quote": "no apparent risk for adverse events to a developing fetus"
+        }
+      ]
+    }
+  ],
+  "pendingVerification": [
+    {
+      "item": "Abbassi-Ghanavati 2009 원논문 대조",
+      "affects": [
+        "alt",
+        "ast"
+      ],
+      "action": "학교 도서관 계정으로 PDF 확보 후 trust_tier D -> A 승격, useForJudgment true로 전환"
+    },
+    {
+      "item": "질병관리청 국가건강정보포털 '정상임신관리'",
+      "affects": [
+        "전체 항목 목록"
+      ],
+      "action": "robots.txt로 자동 수집 불가. 팀이 브라우저로 직접 열어 대조"
+    },
+    {
+      "item": "ACOG PB233/PB222 2026년 현행 여부",
+      "affects": [
+        "hemoglobin",
+        "ferritin",
+        "platelet",
+        "alt",
+        "ast",
+        "creatinine",
+        "urine_protein"
+      ],
+      "action": "acog.org 접근 가능한 환경에서 1회 재확인"
+    },
+    {
+      "item": "ASH 철결핍 진단 가이드라인 최종본(2026 발행 예정)",
+      "affects": [
+        "ferritin"
+      ],
+      "action": "발행 시 컷오프 갱신"
+    }
+  ]
+}

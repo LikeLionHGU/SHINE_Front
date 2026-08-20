@@ -40,3 +40,20 @@ export function pregnancyWeekOf(weekStart: Date, info: PregnancyInfo) {
   );
   return info.week + Math.round(days / 7);
 }
+
+/**
+ * 지금 시점의 임신 주차. 판정 엔진(lib/labs)이 삼분기별 기준을 고르는 데 쓴다.
+ * 임신 정보를 아직 저장하지 않았으면 undefined — 이때 엔진은 주수와 무관한
+ * 기준만 적용하고, 주수별 기준(헤모글로빈 11 / 10.5 / 11 등)은 건너뛴다.
+ */
+export async function currentPregnancyWeek(): Promise<number | undefined> {
+  try {
+    const { getPregnancyInfo } = await import("@/lib/api");
+    const info = await getPregnancyInfo();
+    if (!info) return undefined;
+    const week = pregnancyWeekOf(startOfWeek(new Date()), info);
+    return Number.isFinite(week) && week > 0 ? week : undefined;
+  } catch {
+    return undefined;
+  }
+}

@@ -4,7 +4,13 @@ import {
   XXLogoIcon,
 } from "@/components/icons";
 import { FoodImage } from "@/components/food-image";
-import { createQuestion, getHome, getVisits, type CalendarVisit, type Home } from "@/lib/api";
+import {
+  createQuestion,
+  getHome,
+  getVisits,
+  type CalendarVisit,
+  type Home,
+} from "@/lib/api";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
@@ -46,6 +52,8 @@ function toVisitDate(isoDate: string): string {
 export default function Home() {
   const router = useRouter();
   const [question, setQuestion] = useState("");
+  // 질문 전송 상태. 저장은 lib/api의 createQuestion(POST /questions)이 맡는다.
+  const [sentNotice, setSentNotice] = useState<string | null>(null);
   const [home, setHome] = useState<Home | null>(null);
   const [visits, setVisits] = useState<CalendarVisit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,10 +92,14 @@ export default function Home() {
       await createQuestion(text, latestSheet?.testSheetId ?? null);
       setQuestion("");
       setHome(await getHome());
+      setSentNotice("다음 진료 질문에 추가했어요.");
     } catch (error) {
+      // 실패를 조용히 넘기면 사용자는 저장된 줄 안다. 화면에도 반드시 알린다.
       console.warn("[home] 질문 저장 실패:", error);
+      setSentNotice("질문을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
       setSendingQuestion(false);
+      setTimeout(() => setSentNotice(null), 2600);
     }
   }
   const nutritions = home?.nutritions ?? [];
@@ -131,11 +143,18 @@ export default function Home() {
             {loading ? (
               <Text style={styles.cardHint}>질문을 불러오는 중이에요...</Text>
             ) : questions.length > 0 ? (
+              // 추천 질문을 눌러 입력창에 담고, 다듬어서 바로 추가할 수 있게 한다.
               questions.slice(0, 2).map((item) => (
-                <View key={item.questionId} style={styles.exampleRow}>
+                <Pressable
+                  key={item.questionId}
+                  style={({ pressed }) => [styles.exampleRow, pressed && styles.pressed]}
+                  onPress={() => setQuestion(item.content)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`추천 질문 담기: ${item.content}`}
+                >
                   <AiQuestionIcon />
                   <Text style={styles.example} numberOfLines={1}>{item.content}</Text>
-                </View>
+                </Pressable>
               ))
             ) : (
               <Text style={styles.cardHint}>
@@ -154,11 +173,19 @@ export default function Home() {
                 editable={!sendingQuestion}
               />
               {question.trim().length > 0 && (
-                <Pressable onPress={submitQuestion} hitSlop={10} disabled={sendingQuestion}>
-                  <Text style={styles.send}>↑</Text>
+                <Pressable
+                  onPress={submitQuestion}
+                  disabled={sendingQuestion}
+                  hitSlop={12}
+                  accessibilityRole="button"
+                  accessibilityLabel="질문 추가"
+                  style={({ pressed }) => [pressed && styles.pressed]}
+                >
+                  <Text style={[styles.send, sendingQuestion && styles.sendDisabled]}>↑</Text>
                 </Pressable>
               )}
             </View>
+            {!!sentNotice && <Text style={styles.sentNotice}>{sentNotice}</Text>}
           </View>
 
           <Pressable style={({ pressed }) => [styles.analysisCard, pressed && styles.pressed]} onPress={() =>
@@ -243,7 +270,9 @@ const styles = StyleSheet.create({
   uploadTitle: { color: "#111", fontFamily: "Pretendard-SemiBold", fontSize: 18, lineHeight: 26 },
   uploadButton: { position: "absolute", right: 20, bottom: 16, height: 28, paddingHorizontal: 16, borderRadius: 6, justifyContent: "center", backgroundColor: "#FFF" },
   uploadButtonText: { color: "#111", fontFamily: "Pretendard-SemiBold", fontSize: 12 },
-  questionCard: { height: 113, paddingHorizontal: 18, paddingTop: 11, borderRadius: 14, backgroundColor: "#FFFCFD", ...shadow },
+  sendDisabled: { opacity: 0.4 },
+  sentNotice: { marginTop: 2, paddingHorizontal: 18, color: "#3A6B5C", fontFamily: "Pretendard-Medium", fontSize: 12 },
+  questionCard: { minHeight: 113, paddingHorizontal: 18, paddingTop: 11, borderRadius: 14, backgroundColor: "#FFFCFD", ...shadow },
   exampleRow: { height: 21, flexDirection: "row", alignItems: "center", gap: 9 },
   example: { color: "#707070", fontFamily: "Pretendard-Medium", fontSize: 14, flex: 1 },
   cardHint: { paddingVertical: 6, color: "#A0A0A0", fontFamily: "Pretendard-Regular", fontSize: 13, lineHeight: 20 },
