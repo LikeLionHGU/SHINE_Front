@@ -1,6 +1,8 @@
 
 # SHINE
 
+<img width="2880" height="1620" alt="커버" src="https://github.com/user-attachments/assets/347df9df-9b1e-4bba-8a62-bfe7ef888f8a" />
+
 임신부가 산전검사 결과지를 스스로 이해할 수 있게 돕는 앱입니다.
 
 검사지 사진 한 장을 찍으면 항목별로 판정하고, 왜 그런 판정인지 학회 원문까지 함께 보여줍니다.
