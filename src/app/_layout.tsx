@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Platform } from "react-native";
 import { DefaultTheme, Stack, ThemeProvider } from "expo-router";
+import Head from "expo-router/head";
 import {
   useFonts,
   ZalandoSansExpanded_700Bold,
@@ -41,6 +42,19 @@ export default function RootLayout() {
     // 화면마다 자체 배경(그라디언트/카드)을 그리므로 네비게이터 기본 배경은 투명으로 둔다.
     // 그래야 바텀시트 같은 투명 모달 뒤로 이전 화면이 비쳐 보인다.
     <ThemeProvider value={TRANSPARENT_THEME}>
+      {/* 브라우저 탭에 뜨는 제목.
+          expo-router가 <title>을 react-helmet으로 관리해서, 빌드 결과가
+          <title data-rh="true"></title>처럼 **빈 채로** 나온다. 그래서 app.json의
+          name만 바꿔서는 탭 제목이 안 바뀌고 브라우저가 주소를 대신 보여준다.
+          여기서 앱 전체의 기본 제목을 정한다. 특정 화면만 다르게 하고 싶으면
+          그 화면에서 같은 <Head>를 쓰면 덮어쓴다. */}
+      <Head>
+        <title>SHINE</title>
+        <meta
+          name="description"
+          content="산전 검사 결과를 임신 주차 기준으로 쉽게 읽어주는 서비스"
+        />
+      </Head>
       <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
