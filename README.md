@@ -7,6 +7,7 @@
 
 검사지 사진 한 장을 찍으면 항목별로 판정하고, 왜 그런 판정인지 학회 원문까지 함께 보여줍니다.
 
+배포링크: https://doublex.expo.app/
 백엔드: https://github.com/LikeLionHGU/SHINE_Backend
 
 <br/>
